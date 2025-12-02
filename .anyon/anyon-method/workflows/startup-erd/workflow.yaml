@@ -1,0 +1,44 @@
+# Startup ERD Workflow Configuration
+name: startup-erd
+description: "Create comprehensive Entity Relationship Diagram (ERD) document with detailed database schema design. Uses WebSearch to find ERD strategies from similar services. References all previous documents (PRD, UX, UI, TRD, Architecture). This is the final workflow in the startup-launchpad chain."
+author: "Anyon"
+
+# Critical variables from config
+config_source: "{project-root}/.anyon/anyon-method/config.yaml"
+user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
+document_output_language: "{config_source}:document_output_language"
+date: system-generated
+
+# Output folder - conversation subfolder in anyon-docs
+output_folder: "{project-root}/anyon-docs/conversation"
+
+# Module path and component files
+installed_path: "{project-root}/.anyon/anyon-method/workflows/startup-erd"
+template: "{installed_path}/template.md"
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# Inputs: All previous documents (YAML-based reference)
+input_prd: "{output_folder}/prd.md"
+input_ux: "{output_folder}/ux-design.md"
+input_ui: "{output_folder}/ui-design-guide.md"
+input_trd: "{output_folder}/trd.md"
+input_architecture: "{output_folder}/architecture.md"
+
+# Output file
+default_output_file: "{output_folder}/erd.md"
+
+# No next workflow - this is the final step
+next_workflow: null
+
+# Tool Requirements
+required_tools:
+  - "WebSearch":
+      description: "Search for ERD strategies and database schema patterns from similar services"
+      critical: true
+  - "WebFetch":
+      description: "Fetch ERD examples and database design best practices"
+      critical: true
+
+standalone: true

@@ -1,0 +1,26 @@
+# Git Merge Helper - 비개발자를 위한 Git 머지 도우미
+name: "git-merge-helper"
+description: "Git merge 작업을 비개발자도 쉽게 수행할 수 있도록 도와주는 워크플로우. 충돌 발생 시 이해하기 쉬운 객관식으로 해결 방법을 제시하고, 머지 후 코드가 잘 작동하도록 자동 검증 및 수정을 수행합니다."
+author: "Anyon"
+
+# Critical variables from config
+config_source: "{project-root}/.anyon/anyon-method/config.yaml"
+output_folder: "{config_source}:output_folder"
+user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
+date: system-generated
+
+# Module path and component files
+installed_path: "{project-root}/.anyon/anyon-method/workflows/git-merge-helper"
+template: false  # Action workflow - 문서 생성 없음
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# Invocation control
+standalone: true  # 사용자가 직접 실행 가능
+
+# Required tools
+required_tools:
+  - "Git CLI":
+      description: "Git 명령어 실행을 위해 필요합니다. 터미널에서 git 명령어가 작동해야 합니다."
+      link: "https://git-scm.com/"

@@ -1,0 +1,90 @@
+# PM Reviewer - Wave 단위 리뷰 & 즉석 수정 워크플로우
+name: "pm-reviewer"
+description: "PM Executor가 완료한 Wave의 모든 티켓을 리뷰하고, 문제 발견 시 즉시 자동 수정합니다. pm-executor와 함께 작동하는 품질 보증 워크플로우입니다."
+author: "Anyon"
+
+# Critical variables from config
+config_source: "{project-root}/.anyon/anyon-method/config.yaml"
+output_folder: "{config_source}:output_folder"
+user_name: "{config_source}:user_name"
+communication_language: "Korean"
+date: system-generated
+
+# Module path and component files
+installed_path: "{project-root}/.anyon/anyon-method/workflows/pm-reviewer"
+template: false  # Action workflow
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# 기본 출력 폴더 (pm-executor와 일치해야 함)
+output_folder: "{project-root}/anyon-docs/conversation"
+
+# PM Executor 출력물 경로
+progress_file: "{output_folder}/execution-progress.md"
+api_spec_file: "{output_folder}/api-spec.md"
+
+# 설계 문서 경로 (리뷰 기준)
+architecture_docs: "{output_folder}/*architecture*"
+trd_docs: "{output_folder}/*trd*.md"
+
+# 프로젝트 소스 코드 루트
+project_src: "{project-root}"
+
+# Invocation control
+standalone: true
+
+# Wave 단위 리뷰 설정
+review_config:
+  # 리뷰 단위 변경: Epic → Wave
+  review_unit: "wave"  # 한 Wave의 모든 티켓을 함께 리뷰
+  
+  # 병렬 리뷰 활성화 (4개 리뷰어 동시 실행)
+  parallel_review: true
+  
+  # Wave 리뷰 후 처리
+  post_review:
+    auto_fix: true  # 발견된 이슈 자동 수정
+    wait_for_fix: true  # 수정 완료까지 대기
+    update_progress: true  # execution-progress.md 자동 업데이트
+    prompt_next_wave: true  # 다음 Wave 준비 신호
+  
+  # 리뷰 영역 (4개)
+  review_areas:
+    - name: "code_quality"
+      description: "코드 품질 리뷰"
+      checks:
+        - "중복 코드 (DRY)"
+        - "네이밍 컨벤션"
+        - "함수/클래스 크기"
+        - "코드 복잡도"
+
+    - name: "architecture"
+      description: "아키텍처 준수 리뷰"
+      checks:
+        - "설계 문서 준수"
+        - "레이어 분리"
+        - "의존성 방향"
+        - "설계 패턴"
+
+    - name: "security"
+      description: "보안 리뷰 (OWASP)"
+      checks:
+        - "SQL Injection"
+        - "XSS"
+        - "입력 검증"
+        - "인증/인가"
+        - "민감정보 노출"
+
+    - name: "test_coverage"
+      description: "테스트 커버리지 리뷰"
+      checks:
+        - "테스트 존재 여부"
+        - "엣지 케이스"
+        - "에러 케이스"
+
+# 즉석 수정 설정 (pm-executor 메커니즘 재사용)
+fix_config:
+  max_attempts: 3
+  use_websearch: true
+  use_tdd: true
+  parallel_fix: true  # 독립적 이슈는 병렬 수정

@@ -1,0 +1,137 @@
+# PM Orchestrator - 프로젝트 티켓 생성 워크플로우
+name: "pm-orchestrator"
+description: "설계 문서(PRD, UX, UI, ERD, Architecture, TRD)를 분석하여 Epic별 통합 문서와 실행 계획을 생성합니다. 각 Epic 문서 안에서 마크다운 제목으로 티켓을 구분하며, 에이전트 할당, 의존성 그래프, Wave 구성까지 자동으로 수행합니다."
+author: "Anyon"
+
+# Critical variables from config
+config_source: "{project-root}/.anyon/anyon-method/config.yaml"
+user_name: "{config_source}:user_name"
+communication_language: "Korean"
+date: system-generated
+
+# Module path and component files
+installed_path: "{project-root}/.anyon/anyon-method/workflows/pm-orchestrator"
+template: false  # 문서 생성이지만 동적 생성이므로 template 불필요
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# 티켓 템플릿
+ticket_template: "{installed_path}/templates/ticket-template.md"
+execution_plan_template: "{installed_path}/templates/execution-plan-template.md"
+
+# 에이전트 템플릿 (프로젝트별 커스터마이징용)
+agent_templates_path: "{project-root}/.anyon/anyon-method/agent-templates"
+
+# Smart input file patterns - 6개 설계 문서 (모두 필수)
+input_file_patterns:
+  prd:
+    whole: "{project-root}/anyon-docs/conversation/*prd*.md"
+    sharded: "{project-root}/anyon-docs/conversation/*prd*/index.md"
+    load_strategy: FULL_LOAD
+    required: true
+    description: "제품 요구사항, 비즈니스 로직"
+
+  ux_design:
+    whole: "{project-root}/anyon-docs/conversation/*ux-design*.md"
+    sharded: "{project-root}/anyon-docs/conversation/*ux-design*/index.md"
+    load_strategy: FULL_LOAD
+    required: true
+    description: "사용자 플로우, 페이지 구조"
+
+  ui_design:
+    whole: "{project-root}/anyon-docs/conversation/*design-guide*.md"
+    sharded: "{project-root}/anyon-docs/conversation/*design-guide*/index.md"
+    load_strategy: FULL_LOAD
+    required: true
+    description: "디자인 스펙, 컴포넌트"
+
+  erd:
+    whole: "{project-root}/anyon-docs/conversation/*erd*.md"
+    sharded: "{project-root}/anyon-docs/conversation/*erd*/index.md"
+    load_strategy: FULL_LOAD
+    required: true
+    description: "데이터베이스 구조"
+
+  architecture:
+    whole: "{project-root}/anyon-docs/conversation/*architecture*.md"
+    sharded: "{project-root}/anyon-docs/conversation/*architecture*/index.md"
+    load_strategy: FULL_LOAD
+    required: true
+    description: "시스템 아키텍처, 백엔드 아키텍처, 프론트엔드 아키텍처"
+
+  trd:
+    whole: "{project-root}/anyon-docs/conversation/*trd*.md"
+    sharded: "{project-root}/anyon-docs/conversation/*trd*/index.md"
+    load_strategy: FULL_LOAD
+    required: true
+    description: "기술 스택, 기술 요구사항, 성능 지표"
+
+# Output configuration (수정: 2025-11-29 - 일관성 강화)
+# ✓ 명시적 정의 (config.yaml 참조 제거)
+# ✓ output_folder: 단일 정의
+# ✓ claude_context_file 추가
+# ✓ execution-progress-template 추가
+
+output_folder: "{project-root}/anyon-docs/conversation"
+
+output_configuration:
+  execution_plan: "{output_folder}/execution-plan.md"
+  dependency_graph: "{output_folder}/dependency-graph.md"
+  api_spec: "{output_folder}/api-spec.md"
+  epics_folder: "{output_folder}/epics"
+  agents_folder: "{project-root}/.claude/agents"
+  claude_context_file: "{project-root}/CLAUDE.md"
+
+# 내부 참조용 (레거시 호환성)
+epics_folder: "{output_folder}/epics"
+default_output_file: "{output_folder}/execution-plan.md"
+dependency_graph_file: "{output_folder}/dependency-graph.md"
+
+# Invocation control
+standalone: true
+
+# 에이전트 정의 (티켓 할당용)
+available_agents:
+  - name: "Scaffolding Engineer"
+    types: ["scaffolding", "setup"]
+    description: "프로젝트 초기 구조 생성, 의존성 설치"
+
+  - name: "Database Architect"
+    types: ["database", "schema"]
+    description: "DB 스키마 설계, Prisma/마이그레이션"
+
+  - name: "Backend Developer"
+    types: ["api", "backend", "auth"]
+    description: "API 엔드포인트, 비즈니스 로직, 인증"
+
+  - name: "Frontend Developer"
+    types: ["ui", "frontend", "page"]
+    description: "UI 컴포넌트, 페이지, 상태 관리"
+
+  - name: "Integration Engineer"
+    types: ["integration", "external"]
+    description: "외부 서비스 연동 (OAuth, 이메일, 결제 등)"
+
+  - name: "DevOps Engineer"
+    types: ["cicd", "infra", "deploy"]
+    description: "CI/CD, 인프라, 배포 설정"
+
+  - name: "QA Engineer"
+    types: ["test", "qa"]
+    description: "테스트 작성, E2E, 품질 검증"
+
+  - name: "Security Auditor"
+    types: ["security", "audit"]
+    description: "보안 검토, 취약점 분석"
+
+# 티켓 타입 정의
+ticket_types:
+  - scaffolding: "프로젝트 초기 설정"
+  - database: "데이터베이스 작업"
+  - api: "API 개발"
+  - ui: "UI 컴포넌트/페이지"
+  - integration: "외부 서비스 연동"
+  - cicd: "CI/CD 설정"
+  - test: "테스트 작성"
+  - security: "보안 감사"
+  - performance: "성능 최적화"

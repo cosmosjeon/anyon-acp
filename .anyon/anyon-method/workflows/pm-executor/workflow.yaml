@@ -1,0 +1,113 @@
+# PM Executor - 티켓 실행 워크플로우
+name: "pm-executor"
+description: "PM Orchestrator가 생성한 티켓들을 Wave 순서대로 실행하고, 각 에이전트에게 작업을 위임하여 프로젝트를 구현합니다."
+author: "Anyon"
+
+# Critical variables from config
+config_source: "{project-root}/.anyon/anyon-method/config.yaml"
+user_name: "{config_source}:user_name"
+communication_language: "Korean"
+date: system-generated
+
+# Module path and component files
+installed_path: "{project-root}/.anyon/anyon-method/workflows/pm-executor"
+template: false  # Action workflow - 코드 생성 및 실행
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# PM Orchestrator 출력물 경로 (수정: 2025-11-29)
+# ✓ tickets_folder → epics_folder로 변경 (Epic별 통합 파일 위치)
+# ✓ output_folder 명시적 정의 (모든 파일의 기준 경로)
+# ✓ api_spec_file 추가 (API 명세서)
+# ✓ claude_context_file 추가 (프로젝트 컨텍스트)
+# ✓ execution_progress_template 추가 (진행 추적 템플릿)
+# ✓ 중복 정의 제거 (명시적 정의로 통일)
+
+output_folder: "{project-root}/anyon-docs/conversation"
+epics_folder: "{output_folder}/epics"
+execution_plan_file: "{output_folder}/execution-plan.md"
+dependency_graph_file: "{output_folder}/dependency-graph.md"
+api_spec_file: "{output_folder}/api-spec.md"
+agents_folder: "{project-root}/.claude/agents"
+claude_context_file: "{project-root}/CLAUDE.md"
+progress_file: "{output_folder}/execution-progress.md"
+execution_progress_template: "{installed_path}/execution-progress-template.md"
+
+# 프로젝트 소스 코드 루트
+project_src: "{project-root}"
+
+# Invocation control
+standalone: true
+
+# 실행 모드 (현재: Wave 단위로 설정)
+# 참고: execution_mode는 여기서 지정되며, execution_modes는 향후 UI/문서화용으로 예약됨
+execution_mode: "wave_by_wave"
+# execution_modes:
+#   - name: "wave_by_wave"
+#     description: "Wave 단위 실행 - 한 명령당 한 Wave, 완료 후 pm-reviewer 수동 호출"
+#     default: true
+#   - name: "full_auto"
+#     description: "전체 자동 - 모든 Wave를 연속으로 실행 (권장 안 함)"
+#   - name: "supervised"
+#     description: "감독 모드 - Wave 완료 후 수동 승인"
+
+# Wave 실행 설정 (수정: 2025-11-30 - 수동 관리 모드)
+# ✓ auto_review: false (사용자가 pm-reviewer 수동 실행)
+# ✓ wait_for_review: false (pm-reviewer 완료 대기 없음)
+# ✓ prompt_next_wave: false (다음 Wave 자동 유도 없음)
+
+wave_execution:
+  unit: "wave"  # 한 명령마다 한 Wave만 실행
+  auto_review: false  # ✅ Wave 완료 후 멈춤 (사용자가 pm-reviewer 수동 실행)
+  wait_for_review: false  # ✅ pm-reviewer 대기 없음
+  prompt_next_wave: false  # ✅ 다음 Wave 자동 유도 없음
+
+# 참고: 이하 블록들은 documentation/reference용으로 예약됨
+# 현재 instructions.md에서는 사용되지 않음
+
+# # 티켓 상태 정의 (참고용)
+# ticket_statuses:
+#   - pending: "대기 중"
+#   - blocked: "의존성 대기"
+#   - in_progress: "실행 중"
+#   - review: "검토 필요"
+#   - completed: "완료"
+#   - failed: "실패"
+#
+# # 에이전트 실행 설정 (참고용)
+# agent_execution:
+#   max_retries: 3
+#   require_tests_pass: true
+#   require_review: false  # autonomous mode에서는 자동 검증
+
+# # 자율 실행 설정 (참고용 - 현재 instructions.md에서 직접 구현됨)
+# autonomous_settings:
+#   # Self-correction
+#   self_correction:
+#     enabled: true
+#     max_attempts: 3
+#     websearch_on_error: true
+#
+#   # Fail-forward
+#   fail_forward:
+#     enabled: true
+#     blocked_retry_next_session: true
+#
+#   # TDD 강제
+#   tdd_enforcement:
+#     enabled: true
+#     require_red_phase: true
+#     require_green_phase: true
+#
+#   # Termination conditions
+#   termination:
+#     on_all_tickets_processed: true
+#     on_critical_error_count: 5  # 연속 5개 에러 시 중단
+#
+# # Note: 컨텍스트 관리는 Claude Code가 자동으로 처리 (92%에서 자동 압축)
+#
+# # 병렬 실행 설정 (참고용)
+# parallel_execution:
+#   enabled: true
+#   max_concurrent: 5
+#   same_file_guard: true  # 같은 파일 수정하는 티켓은 순차 실행
