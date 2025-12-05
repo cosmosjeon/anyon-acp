@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { HashRouter } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Bot, FolderCode } from "lucide-react";
+import { Bot, FolderCode, Loader2 } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
+import { LoginPage } from "@/components/LoginPage";
 import { api, type Project, type Session, type ClaudeMdFile } from "@/lib/api";
 import { initializeWebMode } from "@/lib/apiAdapter";
 import { OutputCacheProvider } from "@/lib/outputCache";
@@ -248,7 +250,7 @@ function AppContent() {
               >
                 <h1 className="text-4xl font-bold tracking-tight">
                   <span className="rotating-symbol"></span>
-                  Welcome to opcode
+                  Welcome to ANYON
                 </h1>
               </motion.div>
 
@@ -493,9 +495,11 @@ function AppContent() {
 }
 
 /**
- * Main App component - Wraps the app with providers
+ * Main App component - Wraps the app with providers and auth gate
  */
 function App() {
+  const { isAuthenticated, checkAuth } = useAuthStore();
+  const [isChecking, setIsChecking] = useState(true);
   const [showIntro, setShowIntro] = useState(() => {
     // Read cached preference synchronously to avoid any initial flash
     try {
@@ -507,6 +511,22 @@ function App() {
     } catch (_ignore) {}
     return true; // default if no cache
   });
+
+  // Check authentication on mount
+  useEffect(() => {
+    const verifyAuth = async () => {
+      try {
+        const result = await checkAuth();
+        console.log('Auth check result:', result);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    verifyAuth();
+  }, [checkAuth]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -531,6 +551,30 @@ function App() {
     };
   }, []);
 
+  // Show loading while checking auth
+  if (isChecking) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <HashRouter>
+        <ThemeProvider>
+          <LoginPage />
+        </ThemeProvider>
+      </HashRouter>
+    );
+  }
+
+  // Show main app if authenticated
   return (
     <HashRouter>
       <ThemeProvider>

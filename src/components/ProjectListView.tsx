@@ -64,46 +64,26 @@ export const ProjectListView: React.FC = () => {
         await api.registerProject(selected);
         console.log('[ProjectListView] Registered project');
 
-        // Refresh project list and get the updated list directly
+        // Refresh project list and get the updated list
         const updatedProjects = await refreshProjects();
-        console.log('[ProjectListView] Refreshed projects, count:', updatedProjects.length);
-        console.log('[ProjectListView] Looking for project ID:', project.id);
-        console.log('[ProjectListView] Available project IDs:', updatedProjects.map(p => p.id));
-        console.log('[ProjectListView] Available project paths:', updatedProjects.map(p => p.path));
+        console.log('[ProjectListView] Projects refreshed, count:', updatedProjects.length);
 
-        // Verify the project exists in the updated list
+        // Find the project in the updated list to verify it exists
         const foundProject = updatedProjects.find(p => p.id === project.id);
+        console.log('[ProjectListView] Found project in updated list:', foundProject);
+
         if (foundProject) {
-          console.log('[ProjectListView] Project found in refreshed list, navigating...');
+          // Wait a moment for React state to propagate
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Navigate to the project
+          console.log('[ProjectListView] Navigating to project:', project.id);
+          goToProject(project.id);
         } else {
-          console.error('[ProjectListView] Project not found in refreshed list!');
-          console.error('[ProjectListView] Trying to find by path instead...');
-          console.error('[ProjectListView] Looking for path:', project.path.toLowerCase());
-          console.error('[ProjectListView] Available paths:', updatedProjects.map(p => p.path.toLowerCase()));
-          // Case-insensitive path comparison for Windows
-          const foundByPath = updatedProjects.find(p => {
-            const match = p.path.toLowerCase() === project.path.toLowerCase();
-            console.log(`[ProjectListView] Comparing "${p.path.toLowerCase()}" === "${project.path.toLowerCase()}" -> ${match}`);
-            return match;
-          });
-          console.error('[ProjectListView] foundByPath result:', foundByPath);
-          if (foundByPath) {
-            console.log('[ProjectListView] Found project by path! Using ID:', foundByPath.id);
-            // Navigate with the correct ID
-            goToProject(foundByPath.id);
-            return; // Skip the normal navigation below
-          } else {
-            console.error('[ProjectListView] Could not find project by path either!');
-          }
+          console.error('[ProjectListView] Project not found in updated list after registration');
         }
 
-        // Navigate to the project BEFORE starting installation
-        // This ensures the UI updates with the new project immediately
-        console.log('[ProjectListView] Navigating to project:', project.id);
-        goToProject(project.id);
-
-        // Check if it's a git repository, if not, initialize it
-        // Run npx anyon-agents@latest automatically (optional, won't block project creation)
+        // Run git init and anyon installation in the background
         setIsInstallingAnyon(true);
         setInstallStatus({ type: 'info', text: 'Checking git repository...' });
         
