@@ -41,17 +41,41 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
     }
   }, [projectId, projects, getProjectById]);
 
-  // Check anyon installation when project is loaded
+  // Check git repo and anyon installation when project is loaded
   useEffect(() => {
-    const checkAnyonInstallation = async () => {
+    const checkProjectSetup = async () => {
       if (project?.path) {
+        // First, check if it's a git repository and initialize if not
+        try {
+          const isGitRepo = await api.checkIsGitRepo(project.path);
+          
+          if (!isGitRepo) {
+            setInstallMessage({ type: 'info', text: 'Initializing git repository...' });
+            const gitResult = await api.initGitRepo(project.path);
+            
+            if (gitResult.success) {
+              setInstallMessage({ type: 'success', text: 'Git repository initialized!' });
+              setTimeout(() => setInstallMessage(null), 2000);
+            } else {
+              console.warn('Git init failed:', gitResult.stderr);
+              setInstallMessage({ type: 'info', text: 'Git initialization failed, but continuing...' });
+              setTimeout(() => setInstallMessage(null), 2000);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          }
+        } catch (gitErr) {
+          console.error('Failed to check/init git repo:', gitErr);
+          // Continue even if git check/init fails
+        }
+        
+        // Then check anyon installation
         const status = await api.checkAnyonInstalled(project.path);
         if (!status.is_installed) {
           setShowInstallDialog(true);
         }
       }
     };
-    checkAnyonInstallation();
+    checkProjectSetup();
   }, [project?.path]);
 
   const handleInstallAnyon = async () => {

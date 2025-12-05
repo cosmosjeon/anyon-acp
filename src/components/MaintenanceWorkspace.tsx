@@ -6,6 +6,7 @@ import { SplitPane } from '@/components/ui/split-pane';
 import { FileExplorer } from '@/components/FileExplorer';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import type { Project } from '@/lib/api';
+import { api } from '@/lib/api';
 
 // Lazy load ClaudeCodeSession for better performance
 const ClaudeCodeSession = lazy(() =>
@@ -36,6 +37,31 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
       setProject(found);
     }
   }, [projectId, projects, getProjectById]);
+
+  // Check and initialize git repo if needed
+  useEffect(() => {
+    const checkGitRepo = async () => {
+      if (project?.path) {
+        try {
+          const isGitRepo = await api.checkIsGitRepo(project.path);
+          
+          if (!isGitRepo) {
+            console.log('Initializing git repository for project:', project.path);
+            const gitResult = await api.initGitRepo(project.path);
+            
+            if (gitResult.success) {
+              console.log('Git repository initialized successfully');
+            } else {
+              console.warn('Git init failed:', gitResult.stderr);
+            }
+          }
+        } catch (gitErr) {
+          console.error('Failed to check/init git repo:', gitErr);
+        }
+      }
+    };
+    checkGitRepo();
+  }, [project?.path]);
 
   const handleBack = () => {
     if (projectId) {

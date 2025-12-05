@@ -2,7 +2,7 @@ import { apiCall } from './apiAdapter';
 import type { HooksConfiguration } from '@/types/hooks';
 
 /** Process type for tracking in ProcessRegistry */
-export type ProcessType = 
+export type ProcessType =
   | { AgentRun: { agent_id: number; agent_name: string } }
   | { ClaudeSession: { session_id: string } };
 
@@ -15,6 +15,17 @@ export interface ProcessInfo {
   project_path: string;
   task: string;
   model: string;
+}
+
+/** Development workflow session */
+export interface DevSession {
+  id: number;
+  project_path: string;
+  last_prompt: string;
+  cycle_count: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -2088,6 +2099,54 @@ export const api = {
     }
   },
 
+  /**
+   * Check if a directory is a git repository
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to true if it's a git repo
+   */
+  async checkIsGitRepo(projectPath: string): Promise<boolean> {
+    try {
+      return await apiCall<boolean>('check_is_git_repo', { projectPath });
+    } catch (error) {
+      console.error('Failed to check git repo:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Initialize a git repository in the specified directory
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to the command result
+   */
+  async initGitRepo(projectPath: string): Promise<NpxRunResult> {
+    try {
+      return await apiCall<NpxRunResult>('init_git_repo', { projectPath });
+    } catch (error) {
+      console.error('Failed to init git repo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Start development workflow
+   */
+  async startDevWorkflow(projectPath: string, model: string): Promise<void> {
+    return apiCall("start_dev_workflow", { projectPath, model });
+  },
+
+  /**
+   * Stop development workflow
+   */
+  async stopDevWorkflow(projectPath: string): Promise<void> {
+    return apiCall("stop_dev_workflow", { projectPath });
+  },
+
+  /**
+   * Get development workflow status
+   */
+  async getDevWorkflowStatus(projectPath: string): Promise<DevSession> {
+    return apiCall("get_dev_workflow_status", { projectPath });
+  },
 };
 
 /**

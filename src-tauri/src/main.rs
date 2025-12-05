@@ -27,7 +27,7 @@ use commands::claude::{
     list_checkpoints, list_directory_contents, list_projects, list_running_claude_sessions,
     load_session_history, open_new_session, read_claude_md_file, read_file_content,
     check_file_exists, list_anyon_docs, restore_checkpoint, resume_claude_code,
-    run_npx_anyon_agents, save_claude_md_file, save_claude_settings, save_system_prompt,
+    run_npx_anyon_agents, check_is_git_repo, init_git_repo, save_claude_md_file, save_claude_settings, save_system_prompt,
     search_files, track_checkpoint_message, track_session_messages, update_checkpoint_settings,
     update_hooks_config, validate_hook_command, ClaudeProcessState,
 };
@@ -119,6 +119,11 @@ fn main() {
 
             // Re-open the connection for the app to manage
             let conn = init_database(&app.handle()).expect("Failed to initialize agents database");
+
+            // Initialize dev_workflow table
+            commands::dev_workflow::init_dev_workflow_db(&conn)
+                .expect("Failed to initialize dev_workflow database");
+
             app.manage(AgentDb(Mutex::new(conn)));
 
             // Initialize checkpoint state
@@ -218,6 +223,9 @@ fn main() {
             // Anyon Agents
             check_anyon_installed,
             run_npx_anyon_agents,
+            // Git Integration
+            check_is_git_repo,
+            init_git_repo,
             // Checkpoint Management
             create_checkpoint,
             restore_checkpoint,
@@ -296,6 +304,10 @@ fn main() {
             // Proxy Settings
             get_proxy_settings,
             save_proxy_settings,
+            // Dev Workflow
+            commands::dev_workflow::start_dev_workflow,
+            commands::dev_workflow::stop_dev_workflow,
+            commands::dev_workflow::get_dev_workflow_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

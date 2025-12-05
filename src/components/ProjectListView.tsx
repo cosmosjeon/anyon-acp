@@ -53,8 +53,38 @@ export const ProjectListView: React.FC = () => {
         // Register the project so it appears in the list
         await api.registerProject(selected);
         
-        // Run npx anyon-agents@latest automatically
+        // Check if it's a git repository, if not, initialize it
         setIsInstallingAnyon(true);
+        setInstallStatus({ type: 'info', text: 'Checking git repository...' });
+        
+        try {
+          console.log('[Git Check] Checking git repo for:', selected);
+          const isGitRepo = await api.checkIsGitRepo(selected);
+          console.log('[Git Check] Is git repo:', isGitRepo);
+          
+          if (!isGitRepo) {
+            console.log('[Git Init] Initializing git repository...');
+            setInstallStatus({ type: 'info', text: 'Initializing git repository...' });
+            const gitResult = await api.initGitRepo(selected);
+            console.log('[Git Init] Result:', gitResult);
+            
+            if (gitResult.success) {
+              setInstallStatus({ type: 'success', text: 'Git repository initialized!' });
+              console.log('[Git Init] Success!');
+            } else {
+              console.warn('[Git Init] Failed:', gitResult.stderr);
+              setInstallStatus({ type: 'info', text: 'Git initialization failed, but continuing...' });
+            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          } else {
+            console.log('[Git Check] Already a git repository, skipping init');
+          }
+        } catch (gitErr) {
+          console.error('[Git Error] Failed to check/init git repo:', gitErr);
+          // Continue even if git check/init fails
+        }
+        
+        // Run npx anyon-agents@latest automatically
         setInstallStatus({ type: 'info', text: 'Installing ANYON agents...' });
         
         try {

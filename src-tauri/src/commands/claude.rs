@@ -1294,6 +1294,9 @@ async fn spawn_claude_process(
     let session_id_holder_clone3 = session_id_holder.clone();
     let run_id_holder_clone2 = run_id_holder.clone();
     let registry_clone2 = registry.0.clone();
+    let project_path_for_routing = project_path.clone();
+    let prompt_for_routing = prompt.clone();
+    let model_for_routing = model.clone();
     tokio::spawn(async move {
         let _ = stdout_task.await;
         let _ = stderr_task.await;
@@ -1304,6 +1307,31 @@ async fn spawn_claude_process(
             match child.wait().await {
                 Ok(status) => {
                     log::info!("Claude process exited with status: {}", status);
+
+                    // === Dev workflow auto-routing ===
+                    // Use a blocking thread spawn to avoid Send trait issues
+                    let app_for_routing = app_handle_wait.clone();
+                    let project_for_routing = project_path_for_routing.clone();
+                    let prompt_str = prompt_for_routing.clone();
+                    let model_str = model_for_routing.clone();
+                    let success = status.success();
+                    std::thread::spawn(move || {
+                        tauri::async_runtime::block_on(async move {
+                            if let Err(e) = super::dev_workflow::on_claude_complete(
+                                &app_for_routing,
+                                &project_for_routing,
+                                &prompt_str,
+                                success,
+                                &model_str,
+                            )
+                            .await
+                            {
+                                log::error!("Dev workflow auto-routing failed: {}", e);
+                            }
+                        });
+                    });
+                    // === End auto-routing ===
+
                     // Add a small delay to ensure all messages are processed
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                     if let Some(ref session_id) = *session_id_holder_clone3.lock().unwrap() {
@@ -2365,6 +2393,74 @@ pub async fn run_npx_anyon_agents(
     
     // Emit completion event
     let _ = app_handle.emit("anyon-install-complete", &result);
+    
+    Ok(result)
+}
+
+/// Check if a directory is a git repository
+#[tauri::command]
+pub async fn check_is_git_repo(project_path: String) -> Result<bool, String> {
+    log::info!("[Rust] Checking if {} is a git repo", project_path);
+    let path = PathBuf::from(&project_path);
+    
+    if !path.exists() {
+        log::error!("[Rust] Project path does not exist: {}", project_path);
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+    
+    let git_dir = path.join(".git");
+    let is_git = git_dir.exists() && git_dir.is_dir();
+    log::info!("[Rust] Is git repo: {}", is_git);
+    Ok(is_git)
+}
+
+/// Initialize a git repository in the specified directory
+#[tauri::command]
+pub async fn init_git_repo(
+    project_path: String,
+    app_handle: AppHandle,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Initializing git repo at: {}", project_path);
+    let path = PathBuf::from(&project_path);
+    
+    if !path.exists() {
+        log::error!("[Rust] Project path does not exist: {}", project_path);
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+    
+    // Emit start event
+    let _ = app_handle.emit("git-init-start", &project_path);
+    
+    // Run git init
+    log::info!("[Rust] Running 'git init' command...");
+    let output = Command::new("git")
+        .arg("init")
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .map_err(|e| {
+            log::error!("[Rust] Failed to run git init: {}", e);
+            format!("Failed to run git init: {}", e)
+        })?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let success = output.status.success();
+    let exit_code = output.status.code();
+    
+    log::info!("[Rust] Git init result - success: {}, stdout: {}, stderr: {}", success, stdout, stderr);
+    
+    let result = NpxRunResult {
+        success,
+        stdout,
+        stderr,
+        exit_code,
+    };
+    
+    // Emit completion event
+    let _ = app_handle.emit("git-init-complete", &result);
     
     Ok(result)
 }

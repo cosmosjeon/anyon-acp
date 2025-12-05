@@ -6,7 +6,10 @@ import { SplitPane } from '@/components/ui/split-pane';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
+import { DevDocsPanel } from '@/components/development';
+import { usePlanningDocs } from '@/hooks/usePlanningDocs';
 import type { Project } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 
 // Lazy load ClaudeCodeSession for better performance
@@ -38,12 +41,41 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   // Ref for ClaudeCodeSession to send prompts programmatically
   const claudeSessionRef = useRef<ClaudeCodeSessionRef>(null);
 
+  // Check planning docs completion
+  const { progress } = usePlanningDocs(project?.path);
+  const isPlanningComplete = progress.isAllComplete;
+
   useEffect(() => {
     if (projectId && projects.length > 0) {
       const found = getProjectById(projectId);
       setProject(found);
     }
   }, [projectId, projects, getProjectById]);
+
+  // Check and initialize git repo if needed
+  useEffect(() => {
+    const checkGitRepo = async () => {
+      if (project?.path) {
+        try {
+          const isGitRepo = await api.checkIsGitRepo(project.path);
+          
+          if (!isGitRepo) {
+            console.log('Initializing git repository for project:', project.path);
+            const gitResult = await api.initGitRepo(project.path);
+            
+            if (gitResult.success) {
+              console.log('Git repository initialized successfully');
+            } else {
+              console.warn('Git init failed:', gitResult.stderr);
+            }
+          }
+        } catch (gitErr) {
+          console.error('Failed to check/init git repo:', gitErr);
+        }
+      }
+    };
+    checkGitRepo();
+  }, [project?.path]);
 
   const handleBack = () => {
     if (projectId) {
@@ -175,15 +207,11 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                     />
                   )}
                   {activeTab === 'development' && (
-                    <div className="h-full flex items-center justify-center text-muted-foreground bg-background">
-                      <div className="text-center">
-                        <div className="w-16 h-16 rounded-xl bg-muted/50 flex items-center justify-center mb-4 mx-auto">
-                          <Code className="w-8 h-8" />
-                        </div>
-                        <p className="text-sm font-medium mb-1">개발문서 패널</p>
-                        <p className="text-xs opacity-70">코드 에디터가 여기에 추가됩니다</p>
-                      </div>
-                    </div>
+                    <DevDocsPanel
+                      projectPath={project?.path}
+                      isPlanningComplete={isPlanningComplete}
+                      onSendPrompt={handleSendPlanningPrompt}
+                    />
                   )}
                   {activeTab === 'preview' && (
                     <div className="h-full flex items-center justify-center text-muted-foreground bg-background">
