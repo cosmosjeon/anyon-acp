@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import anyonLogo from "../../src-tauri/icons/icon.png";
 import type { CSSProperties } from "react";
+import { useThemeContext } from "../contexts/ThemeContext";
 
 /**
  * StartupIntro - a lightweight startup overlay shown on app launch.
