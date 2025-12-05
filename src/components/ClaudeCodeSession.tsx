@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Copy,
@@ -75,19 +75,30 @@ interface ClaudeCodeSessionProps {
 }
 
 /**
- * ClaudeCodeSession component for interactive Claude Code sessions
- * 
- * @example
- * <ClaudeCodeSession onBack={() => setView('projects')} />
+ * Ref handle for ClaudeCodeSession
+ * Allows external components to send prompts programmatically
  */
-export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
+export interface ClaudeCodeSessionRef {
+  sendPrompt: (prompt: string, model?: "sonnet" | "opus") => void;
+  isLoading: boolean;
+}
+
+/**
+ * ClaudeCodeSession component for interactive Claude Code sessions
+ *
+ * @example
+ * const sessionRef = useRef<ClaudeCodeSessionRef>(null);
+ * <ClaudeCodeSession ref={sessionRef} onBack={() => setView('projects')} />
+ * sessionRef.current?.sendPrompt('/anyon:anyon-method:workflows:startup-prd');
+ */
+export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSessionProps>(({
   session,
   initialProjectPath = "",
   className,
   onStreamingChange,
   onProjectPathChange,
   embedded = false,
-}) => {
+}, ref) => {
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -469,9 +480,17 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   // Project path selection handled by parent tab controls
 
+  // Expose sendPrompt via ref for external components (e.g., PlanningDocsPanel)
+  useImperativeHandle(ref, () => ({
+    sendPrompt: (prompt: string, model: "sonnet" | "opus" = "sonnet") => {
+      handleSendPrompt(prompt, model);
+    },
+    isLoading,
+  }), [isLoading]);
+
   const handleSendPrompt = async (prompt: string, model: "sonnet" | "opus") => {
     console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, projectPath, claudeSessionId, effectiveSession });
-    
+
     if (!projectPath) {
       setError("Please select a project directory first");
       return;
@@ -1748,4 +1767,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       </div>
     </TooltipProvider>
   );
-};
+});
+
+// Display name for debugging
+ClaudeCodeSession.displayName = 'ClaudeCodeSession';

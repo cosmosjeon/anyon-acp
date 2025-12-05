@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FolderOpen, Search, Loader2, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FolderOpen, Search, Loader2, Plus, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -23,6 +23,8 @@ export const ProjectListView: React.FC = () => {
   const { projects, loading, error, refreshProjects } = useProjects();
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpeningFolder, setIsOpeningFolder] = useState(false);
+  const [isInstallingAnyon, setIsInstallingAnyon] = useState(false);
+  const [installStatus, setInstallStatus] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   // Filter projects by search query
   const filteredProjects = projects.filter((project) => {
@@ -50,6 +52,28 @@ export const ProjectListView: React.FC = () => {
         const project = await api.createProject(selected);
         // Register the project so it appears in the list
         await api.registerProject(selected);
+        
+        // Run npx anyon-agents@latest automatically
+        setIsInstallingAnyon(true);
+        setInstallStatus({ type: 'info', text: 'Installing ANYON agents...' });
+        
+        try {
+          const result = await api.runNpxAnyonAgents(selected);
+          if (result.success) {
+            setInstallStatus({ type: 'success', text: 'ANYON agents installed successfully!' });
+            setTimeout(() => setInstallStatus(null), 3000);
+          } else {
+            setInstallStatus({ type: 'error', text: result.stderr || 'Installation completed with warnings' });
+            setTimeout(() => setInstallStatus(null), 5000);
+          }
+        } catch (installErr) {
+          console.error('Failed to install anyon-agents:', installErr);
+          setInstallStatus({ type: 'error', text: 'Installation failed. You can install later from project settings.' });
+          setTimeout(() => setInstallStatus(null), 5000);
+        } finally {
+          setIsInstallingAnyon(false);
+        }
+        
         await refreshProjects();
         goToProject(project.id);
       }
@@ -82,6 +106,31 @@ export const ProjectListView: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto">
+      {/* Installation Status Toast */}
+      <AnimatePresence>
+        {installStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50"
+          >
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+              installStatus.type === 'error' 
+                ? 'bg-destructive/10 border-destructive/20 text-destructive' 
+                : installStatus.type === 'success'
+                ? 'bg-green-500/10 border-green-500/20 text-green-600'
+                : 'bg-primary/10 border-primary/20 text-primary'
+            }`}>
+              {installStatus.type === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
+              {installStatus.type === 'success' && <CheckCircle className="h-4 w-4" />}
+              {installStatus.type === 'error' && <AlertCircle className="h-4 w-4" />}
+              <span className="text-sm font-medium">{installStatus.text}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -97,15 +146,22 @@ export const ProjectListView: React.FC = () => {
           >
             <Button
               onClick={handleOpenFolder}
-              disabled={isOpeningFolder}
+              disabled={isOpeningFolder || isInstallingAnyon}
               className="flex items-center gap-2"
             >
               {isOpeningFolder ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isInstallingAnyon ? (
+                <>
+                  <Download className="h-4 w-4 animate-pulse" />
+                  Installing...
+                </>
               ) : (
-                <FolderOpen className="h-4 w-4" />
+                <>
+                  <FolderOpen className="h-4 w-4" />
+                  Open Folder
+                </>
               )}
-              Open Folder
             </Button>
           </motion.div>
         </div>
@@ -174,15 +230,22 @@ export const ProjectListView: React.FC = () => {
               >
                 <Button
                   onClick={handleOpenFolder}
-                  disabled={isOpeningFolder}
+                  disabled={isOpeningFolder || isInstallingAnyon}
                   className="flex items-center gap-2"
                 >
                   {isOpeningFolder ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isInstallingAnyon ? (
+                    <>
+                      <Download className="h-4 w-4 animate-pulse" />
+                      Installing...
+                    </>
                   ) : (
-                    <Plus className="h-4 w-4" />
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Open Your First Project
+                    </>
                   )}
-                  Open Your First Project
                 </Button>
               </motion.div>
             </div>

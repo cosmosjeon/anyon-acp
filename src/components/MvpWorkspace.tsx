@@ -1,11 +1,13 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Lightbulb, Loader2, FileText, Code, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SplitPane } from '@/components/ui/split-pane';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
+import { PlanningDocsPanel } from '@/components/planning';
 import type { Project } from '@/lib/api';
+import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 
 // Lazy load ClaudeCodeSession for better performance
 const ClaudeCodeSession = lazy(() =>
@@ -13,16 +15,6 @@ const ClaudeCodeSession = lazy(() =>
 );
 
 type MvpTabType = 'planning' | 'development' | 'preview';
-type PlanningDocType = 'prd' | 'ux-design' | 'design-guide' | 'trd' | 'architecture' | 'erd';
-
-const PLANNING_DOCS: { id: PlanningDocType; label: string }[] = [
-  { id: 'prd', label: 'PRD' },
-  { id: 'ux-design', label: 'UX Design' },
-  { id: 'design-guide', label: 'Design Guide' },
-  { id: 'trd', label: 'TRD' },
-  { id: 'architecture', label: 'Architecture' },
-  { id: 'erd', label: 'ERD' },
-];
 
 interface MvpWorkspaceProps {
   projectId: string;
@@ -31,15 +23,20 @@ interface MvpWorkspaceProps {
 /**
  * MvpWorkspace - MVP Development workspace
  *
- * Currently: Displays ClaudeCodeSession with MVP header
- * Future: Will include planning documents, development docs, etc.
+ * Features:
+ * - Left panel: ClaudeCodeSession (AI chat)
+ * - Right panel: Planning docs, Development docs, Preview tabs
+ * - Planning docs panel with workflow automation
  */
 export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const { goToProject, goToProjectList } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<MvpTabType>('planning');
-  const [activePlanningDoc, setActivePlanningDoc] = useState<PlanningDocType>('prd');
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
+
+  // Ref for ClaudeCodeSession to send prompts programmatically
+  const claudeSessionRef = useRef<ClaudeCodeSessionRef>(null);
 
   useEffect(() => {
     if (projectId && projects.length > 0) {
@@ -55,6 +52,18 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
       goToProjectList();
     }
   };
+
+  // Handle streaming state changes from ClaudeCodeSession
+  const handleStreamingChange = useCallback((isStreaming: boolean) => {
+    setIsSessionLoading(isStreaming);
+  }, []);
+
+  // Send prompt to ClaudeCodeSession from PlanningDocsPanel
+  const handleSendPlanningPrompt = useCallback((prompt: string) => {
+    if (claudeSessionRef.current) {
+      claudeSessionRef.current.sendPrompt(prompt);
+    }
+  }, []);
 
   const projectName = project?.path.split('/').pop() || 'Project';
 
@@ -124,86 +133,70 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               }
             >
               <ClaudeCodeSession
+                ref={claudeSessionRef}
                 initialProjectPath={project?.path}
                 onBack={handleBack}
                 onProjectPathChange={() => {}}
+                onStreamingChange={handleStreamingChange}
                 embedded={true}
               />
             </Suspense>
           }
           right={
-            <div className="h-full flex flex-col bg-background">
-              {/* Tab Header */}
-              <div className="flex-shrink-0 border-b px-4 py-2">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MvpTabType)}>
-                  <TabsList className="bg-muted/50">
-                    <TabsTrigger value="planning" className="gap-1.5">
-                      <FileText className="w-3.5 h-3.5" />
-                      기획문서
-                    </TabsTrigger>
-                    <TabsTrigger value="development" className="gap-1.5">
-                      <Code className="w-3.5 h-3.5" />
-                      개발문서
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="gap-1.5">
-                      <Eye className="w-3.5 h-3.5" />
-                      프리뷰
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+            <div className="h-full p-3">
+              <div className="h-full flex flex-col rounded-lg border border-border bg-muted/30 shadow-sm overflow-hidden">
+                {/* Tab Header */}
+                <div className="flex-shrink-0 border-b border-border bg-muted/50 px-3 py-2">
+                  <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MvpTabType)}>
+                    <TabsList className="bg-background/50">
+                      <TabsTrigger value="planning" className="gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        기획문서
+                      </TabsTrigger>
+                      <TabsTrigger value="development" className="gap-1.5">
+                        <Code className="w-3.5 h-3.5" />
+                        개발문서
+                      </TabsTrigger>
+                      <TabsTrigger value="preview" className="gap-1.5">
+                        <Eye className="w-3.5 h-3.5" />
+                        프리뷰
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
 
-              {/* Tab Content */}
-              <div className="flex-1 overflow-hidden">
-                {activeTab === 'planning' && (
-                  <div className="h-full flex">
-                    {/* Vertical Sub-tabs (Sidebar) */}
-                    <div className="w-36 flex-shrink-0 border-r bg-muted/30 py-2">
-                      {PLANNING_DOCS.map((doc) => (
-                        <button
-                          key={doc.id}
-                          onClick={() => setActivePlanningDoc(doc.id)}
-                          className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                            activePlanningDoc === doc.id
-                              ? 'bg-primary/10 text-primary font-medium border-r-2 border-primary'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                          }`}
-                        >
-                          {doc.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Document Content Area */}
-                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                {/* Tab Content */}
+                <div className="flex-1 overflow-hidden">
+                  {activeTab === 'planning' && (
+                    <PlanningDocsPanel
+                      projectPath={project?.path}
+                      onSendPrompt={handleSendPlanningPrompt}
+                      isSessionLoading={isSessionLoading}
+                    />
+                  )}
+                  {activeTab === 'development' && (
+                    <div className="h-full flex items-center justify-center text-muted-foreground bg-background">
                       <div className="text-center">
-                        <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p className="text-sm font-medium">
-                          {PLANNING_DOCS.find(d => d.id === activePlanningDoc)?.label}
-                        </p>
-                        <p className="text-xs mt-1 opacity-70">문서 내용이 여기에 표시됩니다</p>
+                        <div className="w-16 h-16 rounded-xl bg-muted/50 flex items-center justify-center mb-4 mx-auto">
+                          <Code className="w-8 h-8" />
+                        </div>
+                        <p className="text-sm font-medium mb-1">개발문서 패널</p>
+                        <p className="text-xs opacity-70">코드 에디터가 여기에 추가됩니다</p>
                       </div>
                     </div>
-                  </div>
-                )}
-                {activeTab === 'development' && (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <Code className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm">개발문서 패널</p>
-                      <p className="text-xs mt-1 opacity-70">코드 에디터가 여기에 추가됩니다</p>
+                  )}
+                  {activeTab === 'preview' && (
+                    <div className="h-full flex items-center justify-center text-muted-foreground bg-background">
+                      <div className="text-center">
+                        <div className="w-16 h-16 rounded-xl bg-muted/50 flex items-center justify-center mb-4 mx-auto">
+                          <Eye className="w-8 h-8" />
+                        </div>
+                        <p className="text-sm font-medium mb-1">프리뷰 패널</p>
+                        <p className="text-xs opacity-70">웹뷰 프리뷰가 여기에 추가됩니다</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {activeTab === 'preview' && (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <Eye className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm">프리뷰 패널</p>
-                      <p className="text-xs mt-1 opacity-70">웹뷰 프리뷰가 여기에 추가됩니다</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           }

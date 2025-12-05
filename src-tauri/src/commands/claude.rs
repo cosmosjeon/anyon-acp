@@ -1574,6 +1574,39 @@ pub async fn read_file_content(file_path: String) -> Result<String, String> {
     Ok(content)
 }
 
+/// Checks if a file exists at the given path
+#[tauri::command]
+pub async fn check_file_exists(file_path: String) -> Result<bool, String> {
+    let path = PathBuf::from(&file_path);
+    Ok(path.exists() && path.is_file())
+}
+
+/// Lists files in the anyon-docs/conversation directory of a project
+#[tauri::command]
+pub async fn list_anyon_docs(project_path: String) -> Result<Vec<String>, String> {
+    let docs_path = PathBuf::from(&project_path).join("anyon-docs").join("conversation");
+
+    if !docs_path.exists() {
+        return Ok(vec![]);
+    }
+
+    let entries = fs::read_dir(&docs_path)
+        .map_err(|e| format!("Failed to read directory: {}", e))?
+        .filter_map(|entry| {
+            entry.ok().and_then(|e| {
+                let path = e.path();
+                if path.is_file() {
+                    e.file_name().to_str().map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+
+    Ok(entries)
+}
+
 /// Creates a checkpoint for the current session state
 #[tauri::command]
 pub async fn create_checkpoint(
@@ -2227,6 +2260,113 @@ pub async fn validate_hook_command(command: String) -> Result<serde_json::Value,
         }
         Err(e) => Err(format!("Failed to validate command: {}", e)),
     }
+}
+
+/// Result of checking anyon installation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnyonInstallationStatus {
+    /// Whether .anyon directory exists
+    pub is_installed: bool,
+    /// Whether .claude directory exists
+    pub has_claude_dir: bool,
+    /// List of missing directories
+    pub missing_dirs: Vec<String>,
+}
+
+/// Check if anyon-agents is installed in the project
+#[tauri::command]
+pub async fn check_anyon_installed(project_path: String) -> Result<AnyonInstallationStatus, String> {
+    let path = PathBuf::from(&project_path);
+    
+    let anyon_dir = path.join(".anyon");
+    let claude_dir = path.join(".claude");
+    
+    let has_anyon = anyon_dir.exists() && anyon_dir.is_dir();
+    let has_claude = claude_dir.exists() && claude_dir.is_dir();
+    
+    let mut missing_dirs = Vec::new();
+    if !has_anyon {
+        missing_dirs.push(".anyon".to_string());
+    }
+    if !has_claude {
+        missing_dirs.push(".claude".to_string());
+    }
+    
+    Ok(AnyonInstallationStatus {
+        is_installed: has_anyon,
+        has_claude_dir: has_claude,
+        missing_dirs,
+    })
+}
+
+/// Result of running npx anyon-agents
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NpxRunResult {
+    /// Whether the command succeeded
+    pub success: bool,
+    /// stdout output
+    pub stdout: String,
+    /// stderr output
+    pub stderr: String,
+    /// Exit code if available
+    pub exit_code: Option<i32>,
+}
+
+/// Run npx anyon-agents@latest in the specified project directory
+#[tauri::command]
+pub async fn run_npx_anyon_agents(
+    project_path: String,
+    app_handle: AppHandle,
+) -> Result<NpxRunResult, String> {
+    use tokio::io::AsyncWriteExt;
+    
+    let path = PathBuf::from(&project_path);
+    
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+    
+    // Emit start event
+    let _ = app_handle.emit("anyon-install-start", &project_path);
+    
+    // Run npx anyon-agents@latest with stdin piped for auto-confirmation
+    let mut child = Command::new("npx")
+        .arg("anyon-agents@latest")
+        .current_dir(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn npx command: {}", e))?;
+    
+    // Write "y" to stdin for auto-confirmation of "Ok to proceed? (y)"
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(b"y\n").await;
+        let _ = stdin.flush().await;
+    }
+    
+    // Wait for the process to complete
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("Failed to wait for npx command: {}", e))?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let success = output.status.success();
+    let exit_code = output.status.code();
+    
+    let result = NpxRunResult {
+        success,
+        stdout,
+        stderr,
+        exit_code,
+    };
+    
+    // Emit completion event
+    let _ = app_handle.emit("anyon-install-complete", &result);
+    
+    Ok(result)
 }
 
 #[cfg(test)]

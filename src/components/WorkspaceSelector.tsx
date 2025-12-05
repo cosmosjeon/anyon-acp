@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Lightbulb, Wrench, Loader2 } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Wrench, Loader2, Download, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
+import { api } from '@/lib/api';
 import type { Project } from '@/lib/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface WorkspaceSelectorProps {
   projectId: string;
@@ -21,6 +30,9 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
   const { goToProjectList, goToMvp, goToMaintenance } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installMessage, setInstallMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
     if (projectId && projects.length > 0) {
@@ -28,6 +40,44 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
       setProject(found);
     }
   }, [projectId, projects, getProjectById]);
+
+  // Check anyon installation when project is loaded
+  useEffect(() => {
+    const checkAnyonInstallation = async () => {
+      if (project?.path) {
+        const status = await api.checkAnyonInstalled(project.path);
+        if (!status.is_installed) {
+          setShowInstallDialog(true);
+        }
+      }
+    };
+    checkAnyonInstallation();
+  }, [project?.path]);
+
+  const handleInstallAnyon = async () => {
+    if (!project?.path) return;
+    
+    setIsInstalling(true);
+    setShowInstallDialog(false);
+    setInstallMessage({ type: 'info', text: 'Installing ANYON agents...' });
+    
+    try {
+      const result = await api.runNpxAnyonAgents(project.path);
+      if (result.success) {
+        setInstallMessage({ type: 'success', text: 'ANYON agents installed successfully!' });
+        setTimeout(() => setInstallMessage(null), 3000);
+      } else {
+        setInstallMessage({ type: 'error', text: result.stderr || 'Installation completed with warnings' });
+        setTimeout(() => setInstallMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error('Failed to install anyon-agents:', err);
+      setInstallMessage({ type: 'error', text: 'Installation failed. Please try again or install manually.' });
+      setTimeout(() => setInstallMessage(null), 5000);
+    } finally {
+      setIsInstalling(false);
+    }
+  };
 
   const handleBack = () => {
     goToProjectList();
@@ -69,32 +119,88 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-          className="mb-12"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBack}
-              className="h-8 w-8"
-            >
-              <ArrowLeft className="h-4 w-4" />
+    <>
+      {/* ANYON Installation Dialog */}
+      <Dialog open={showInstallDialog} onOpenChange={setShowInstallDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              ANYON Agents Not Installed
+            </DialogTitle>
+            <DialogDescription>
+              This project doesn't have ANYON agents installed. ANYON agents provide enhanced AI-assisted development workflows.
+              <br /><br />
+              Would you like to install them now?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInstallDialog(false)}>
+              Later
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold">{projectName}</h1>
-              <p className="text-sm text-muted-foreground">
-                {project?.path}
-              </p>
+            <Button onClick={handleInstallAnyon}>
+              <Download className="mr-2 h-4 w-4" />
+              Install Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-6">
+          {/* Installing indicator / Status message */}
+          {(isInstalling || installMessage) && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`mb-4 p-3 rounded-lg flex items-center gap-3 ${
+                installMessage?.type === 'error' 
+                  ? 'bg-destructive/10 border border-destructive/20' 
+                  : installMessage?.type === 'success'
+                  ? 'bg-green-500/10 border border-green-500/20'
+                  : 'bg-primary/10 border border-primary/20'
+              }`}
+            >
+              {isInstalling ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm">Installing ANYON agents...</span>
+                </>
+              ) : installMessage && (
+                <span className={`text-sm ${
+                  installMessage.type === 'error' ? 'text-destructive' : 
+                  installMessage.type === 'success' ? 'text-green-500' : ''
+                }`}>
+                  {installMessage.text}
+                </span>
+              )}
+            </motion.div>
+          )}
+
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+            className="mb-12"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBack}
+                className="h-8 w-8"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">{projectName}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {project?.path}
+                </p>
+              </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
 
         {/* Selection prompt */}
         <motion.div
@@ -138,6 +244,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
         </div>
       </div>
     </div>
+    </>
   );
 };
 

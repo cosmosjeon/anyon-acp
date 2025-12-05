@@ -111,6 +111,32 @@ export interface ClaudeInstallation {
   installation_type: "System" | "Custom";
 }
 
+/**
+ * Status of anyon-agents installation in a project
+ */
+export interface AnyonInstallationStatus {
+  /** Whether .anyon directory exists */
+  is_installed: boolean;
+  /** Whether .claude directory exists */
+  has_claude_dir: boolean;
+  /** List of missing directories */
+  missing_dirs: string[];
+}
+
+/**
+ * Result of running npx anyon-agents
+ */
+export interface NpxRunResult {
+  /** Whether the command succeeded */
+  success: boolean;
+  /** stdout output */
+  stdout: string;
+  /** stderr output */
+  stderr: string;
+  /** Exit code if available */
+  exit_code?: number;
+}
+
 // Agent API types
 export interface Agent {
   id?: number;
@@ -2028,4 +2054,89 @@ export const api = {
     }
   },
 
+  // ===== Anyon Agents Installation =====
+
+  /**
+   * Check if anyon-agents is installed in the project
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to installation status
+   */
+  async checkAnyonInstalled(projectPath: string): Promise<AnyonInstallationStatus> {
+    try {
+      return await apiCall<AnyonInstallationStatus>('check_anyon_installed', { projectPath });
+    } catch (error) {
+      console.error('Failed to check anyon installation:', error);
+      return {
+        is_installed: false,
+        has_claude_dir: false,
+        missing_dirs: ['.anyon', '.claude'],
+      };
+    }
+  },
+
+  /**
+   * Run npx anyon-agents@latest in the project directory
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to the command result
+   */
+  async runNpxAnyonAgents(projectPath: string): Promise<NpxRunResult> {
+    try {
+      return await apiCall<NpxRunResult>('run_npx_anyon_agents', { projectPath });
+    } catch (error) {
+      console.error('Failed to run npx anyon-agents:', error);
+      throw error;
+    }
+  },
+
+};
+
+/**
+ * Planning Documents API
+ * For managing planning workflow documents in anyon-docs directory
+ */
+export const planningApi = {
+  /**
+   * Check if a file exists at the given path
+   * @param filePath - The absolute path to check
+   * @returns Promise resolving to true if file exists
+   */
+  async checkFileExists(filePath: string): Promise<boolean> {
+    try {
+      return await apiCall<boolean>('check_file_exists', { filePath });
+    } catch (error) {
+      console.error('Failed to check file exists:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Read the content of a file
+   * @param filePath - The absolute path to the file
+   * @returns Promise resolving to the file content
+   */
+  async readFileContent(filePath: string): Promise<string> {
+    try {
+      return await apiCall<string>('read_file_content', { filePath });
+    } catch (error) {
+      console.error('Failed to read file content:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * List all files in the anyon-docs directory of a project
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to array of filenames
+   */
+  async listAnyonDocs(projectPath: string): Promise<string[]> {
+    try {
+      console.log('[planningApi.listAnyonDocs] Calling with projectPath:', projectPath);
+      const result = await apiCall<string[]>('list_anyon_docs', { projectPath });
+      console.log('[planningApi.listAnyonDocs] Result:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to list anyon docs:', error);
+      return [];
+    }
+  },
 };
