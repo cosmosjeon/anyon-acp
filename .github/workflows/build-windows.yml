@@ -46,7 +46,7 @@ jobs:
 
           # Server Configuration
           PORT=4000
-          NODE_ENV=production
+          NODE_ENV=development
           JWT_SECRET=${{ secrets.JWT_SECRET }}
 
           # OAuth Redirect URIs
