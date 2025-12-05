@@ -2441,7 +2441,13 @@ pub async fn run_npx_anyon_agents(
 
     log::info!("[Rust] Using system npx command");
 
-    let mut cmd = Command::new("npx");
+    // Windows: Use npx.cmd explicitly
+    #[cfg(target_os = "windows")]
+    let npx_cmd = "npx.cmd";
+    #[cfg(not(target_os = "windows"))]
+    let npx_cmd = "npx";
+
+    let mut cmd = Command::new(npx_cmd);
     cmd.arg("anyon-agents@latest")
         .current_dir(&path)
         .stdin(Stdio::piped())

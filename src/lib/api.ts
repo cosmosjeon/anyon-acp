@@ -1818,15 +1818,20 @@ export const api = {
           // best-effort; continue to persist in DB
         }
       }
-      // Try to update first
-      try {
+      
+      // Check if row exists first
+      const result = await this.storageReadTable('app_settings', 1, 1000);
+      const existingRow = result?.rows?.find((row: any) => row.key === key);
+      
+      if (existingRow) {
+        // Row exists, update it
         await this.storageUpdateRow(
           'app_settings',
           { key },
           { value }
         );
-      } catch (updateError) {
-        // If update fails (row doesn't exist), insert new row
+      } else {
+        // Row doesn't exist, insert new row
         await this.storageInsertRow('app_settings', { key, value });
       }
     } catch (error) {
@@ -2038,8 +2043,8 @@ export const api = {
         console.log('[api] Verification - projects after save:', verify);
       } else {
         console.log('[api] IS a duplicate! Project already registered:', projectPath);
-        console.log('[api] registeredLower:', registeredLower);
-        console.log('[api] projectPath.toLowerCase():', projectPath.toLowerCase());
+        console.log('[api] registeredNormalized:', registeredNormalized);
+        console.log('[api] normalizedProjectPath:', normalizedProjectPath);
       }
     } catch (error) {
       console.error('Failed to register project:', error);
