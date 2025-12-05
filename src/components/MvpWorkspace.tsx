@@ -98,6 +98,14 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   }, []);
 
+  // Send prompt to existing session (for development workflow)
+  const handleSendPlanningPrompt = useCallback((prompt: string) => {
+    if (claudeSessionRef.current) {
+      // Send prompt to current session
+      claudeSessionRef.current.sendPrompt(prompt);
+    }
+  }, []);
+
   const projectName = project?.path.split('/').pop() || 'Project';
 
   if (loading) {
