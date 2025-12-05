@@ -4,6 +4,7 @@
 mod checkpoint;
 mod claude_binary;
 mod commands;
+mod portable_deps;
 mod process;
 
 use checkpoint::state::CheckpointState;

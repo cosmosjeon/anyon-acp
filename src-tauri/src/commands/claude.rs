@@ -10,6 +10,11 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
+// Windows-specific imports for hiding console window
+#[cfg(target_os = "windows")]
+#[allow(unused_imports)]
+use std::os::windows::process::CommandExt;
+
 /// Global state to track current Claude process
 pub struct ClaudeProcessState {
     pub current_process: Arc<Mutex<Option<Child>>>,
@@ -286,6 +291,15 @@ fn create_command_with_env(program: &str) -> Command {
         }
     }
 
+    // Windows: Hide console window when spawning child process
+    // This prevents a separate terminal window from appearing when Claude CLI is executed
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        tokio_cmd.creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS);
+    }
+
     tokio_cmd
 }
 
@@ -299,8 +313,16 @@ fn create_system_command(claude_path: &str, args: Vec<String>, project_path: &st
     }
 
     cmd.current_dir(project_path)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // Windows: Hide console window
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     cmd
 }
@@ -2416,26 +2438,17 @@ pub async fn run_npx_anyon_agents(
     
     // Emit start event
     let _ = app_handle.emit("anyon-install-start", &project_path);
-    
-    // Run npx anyon-agents@latest with stdin piped for auto-confirmation
-    // On Windows, we need to use cmd.exe to run npx (which is a .cmd file)
-    #[cfg(target_os = "windows")]
-    let mut child = Command::new("cmd")
-        .args(&["/C", "npx", "anyon-agents@latest"])
-        .current_dir(&path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn npx command: {}", e))?;
 
-    #[cfg(not(target_os = "windows"))]
-    let mut child = Command::new("npx")
-        .arg("anyon-agents@latest")
+    log::info!("[Rust] Using system npx command");
+
+    let mut cmd = Command::new("npx");
+    cmd.arg("anyon-agents@latest")
         .current_dir(&path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn npx command: {}", e))?;
     
@@ -2505,11 +2518,14 @@ pub async fn init_git_repo(
     
     // Run git init
     log::info!("[Rust] Running 'git init' command...");
-    let output = Command::new("git")
-        .arg("init")
+
+    let mut cmd = Command::new("git");
+    cmd.arg("init")
         .current_dir(&path)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    
+    let output = cmd
         .output()
         .await
         .map_err(|e| {

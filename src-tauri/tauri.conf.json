@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -75,7 +75,10 @@
       "icons/icon.ico",
       "icons/icon.icns"
     ],
-    "resources": [],
+    "resources": [
+      "resources/git-portable",
+      "resources/node-portable"
+    ],
     "externalBin": [],
     "copyright": "© 2025 ANYON. All rights reserved.",
     "category": "DeveloperTool",
