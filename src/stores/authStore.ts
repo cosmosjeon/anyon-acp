@@ -30,6 +30,11 @@ interface AuthState {
   checkAuth: () => Promise<boolean>;
   canCreateProject: () => boolean;
   refreshUserData: () => Promise<void>;
+
+  // Settings
+  getUserSettings: () => Promise<any>;
+  saveUserSettings: (settings: any) => Promise<void>;
+  updateUserSetting: (key: string, value: any) => Promise<void>;
 }
 
 const API_URL = 'http://localhost:4000';
@@ -144,6 +149,83 @@ export const useAuthStore = create<AuthState>()(
           }
         } catch (error) {
           console.error('Failed to refresh user data:', error);
+        }
+      },
+
+      // 사용자 설정 가져오기
+      getUserSettings: async () => {
+        const { accessToken } = get();
+        if (!accessToken) throw new Error('Not authenticated');
+
+        try {
+          const response = await tauriFetch(`${API_URL}/api/settings`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch settings');
+          }
+
+          const data = await response.json();
+          return data.settings;
+        } catch (error) {
+          console.error('Failed to get user settings:', error);
+          throw error;
+        }
+      },
+
+      // 사용자 설정 저장 (전체 교체)
+      saveUserSettings: async (settings: any) => {
+        const { accessToken } = get();
+        if (!accessToken) throw new Error('Not authenticated');
+
+        try {
+          const response = await tauriFetch(`${API_URL}/api/settings`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ settings }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to save settings');
+          }
+
+          console.log('Settings saved successfully');
+        } catch (error) {
+          console.error('Failed to save user settings:', error);
+          throw error;
+        }
+      },
+
+      // 특정 설정 업데이트
+      updateUserSetting: async (key: string, value: any) => {
+        const { accessToken } = get();
+        if (!accessToken) throw new Error('Not authenticated');
+
+        try {
+          const response = await tauriFetch(`${API_URL}/api/settings/${key}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ value }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to update setting');
+          }
+
+          console.log(`Setting ${key} updated successfully`);
+        } catch (error) {
+          console.error(`Failed to update setting ${key}:`, error);
+          throw error;
         }
       },
     }),

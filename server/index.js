@@ -2,10 +2,23 @@ import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import { OAuth2Client } from 'google-auth-library';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config({ path: '../.env' });
 
 const app = express();
-const PORT = 4000;
-const JWT_SECRET = 'dev-secret-key-change-in-production';
+const PORT = process.env.PORT || 4000;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Google OAuth Client
+const oauth2Client = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.OAUTH_REDIRECT_URI || 'http://localhost:4000/auth/google/callback'
+);
 
 // Middleware
 app.use(cors());
@@ -14,6 +27,7 @@ app.use(express.json());
 // Mock database (in-memory for development)
 const users = new Map();
 const sessions = new Map();
+const userSettings = new Map(); // userId -> settings object
 
 // Helper: Generate JWT token
 function generateToken(userId) {
@@ -56,63 +70,113 @@ function authenticate(req, res, next) {
 
 // Get Google OAuth URL
 app.get('/auth/google/url', (req, res) => {
-  // In production, this would redirect to actual Google OAuth
-  // For development, we create a user and return the token directly
-  const userId = uuidv4();
-  const user = {
-    id: userId,
-    email: 'dev@example.com',
-    name: 'Dev User',
-    profilePicture: 'https://via.placeholder.com/150',
-    subscription: {
-      planType: 'FREE',
-      status: 'ACTIVE',
-    },
-  };
+  // Development mode: Return mock user with token
+  if (NODE_ENV === 'development') {
+    console.log('🔧 Development mode: Creating mock user');
+    const userId = uuidv4();
+    const user = {
+      id: userId,
+      email: 'dev@example.com',
+      name: 'Dev User',
+      profilePicture: 'https://via.placeholder.com/150',
+      subscription: {
+        planType: 'FREE',
+        status: 'ACTIVE',
+      },
+    };
 
-  users.set(userId, user);
-  const token = generateToken(userId);
+    users.set(userId, user);
+    const token = generateToken(userId);
 
-  // For development, return token directly (no OAuth flow needed)
+    return res.json({
+      url: null,
+      devMode: true,
+      token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        profilePicture: user.profilePicture,
+      },
+      subscription: user.subscription,
+    });
+  }
+
+  // Production mode: Generate Google OAuth URL
+  const scopes = [
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+  ];
+
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: scopes,
+    prompt: 'consent',
+  });
+
   res.json({
-    url: null,
-    devMode: true,
-    token: token,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      profilePicture: user.profilePicture,
-    },
-    subscription: user.subscription,
+    url: authUrl,
+    devMode: false,
   });
 });
 
-// Google OAuth callback (for development)
-app.get('/auth/google/callback', (req, res) => {
+// Google OAuth callback
+app.get('/auth/google/callback', async (req, res) => {
   const { code } = req.query;
 
-  // In production, exchange code for Google tokens
-  // For development, create a mock user
-  const userId = uuidv4();
-  const user = {
-    id: userId,
-    email: 'dev@example.com',
-    name: 'Dev User',
-    profilePicture: 'https://via.placeholder.com/150',
-  };
+  if (!code) {
+    return res.status(400).send('Authorization code is missing');
+  }
 
-  const subscription = {
-    planType: 'FREE',
-    status: 'ACTIVE',
-  };
+  try {
+    // Exchange authorization code for tokens
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
 
-  users.set(userId, { ...user, subscription });
+    // Get user info from Google
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
 
-  const token = generateToken(userId);
+    const payload = ticket.getPayload();
+    const googleId = payload.sub;
+    const email = payload.email;
+    const name = payload.name;
+    const picture = payload.picture;
 
-  // Redirect to deep link
-  res.redirect(`anyon://auth/callback?token=${token}`);
+    // Check if user exists
+    let user = Array.from(users.values()).find(u => u.email === email);
+
+    if (!user) {
+      // Create new user
+      const userId = uuidv4();
+      user = {
+        id: userId,
+        googleId: googleId,
+        email: email,
+        name: name,
+        profilePicture: picture,
+        subscription: {
+          planType: 'FREE',
+          status: 'ACTIVE',
+        },
+      };
+      users.set(userId, user);
+      console.log('✅ New user created:', email);
+    } else {
+      console.log('✅ Existing user logged in:', email);
+    }
+
+    // Generate JWT token
+    const jwtToken = generateToken(user.id);
+
+    // Redirect to deep link with token
+    res.redirect(`anyon://auth/callback?token=${jwtToken}`);
+  } catch (error) {
+    console.error('❌ OAuth callback error:', error);
+    res.status(500).send('Authentication failed');
+  }
 });
 
 // Get current user info
@@ -199,6 +263,47 @@ app.get('/dev/users', (req, res) => {
   res.json({ users: allUsers });
 });
 
+// Get user settings
+app.get('/api/settings', authenticate, (req, res) => {
+  const settings = userSettings.get(req.user.id) || {};
+  res.json({ settings });
+});
+
+// Save user settings (full replace)
+app.post('/api/settings', authenticate, (req, res) => {
+  const { settings } = req.body;
+
+  if (!settings || typeof settings !== 'object') {
+    return res.status(400).json({ error: 'Invalid settings object' });
+  }
+
+  userSettings.set(req.user.id, settings);
+  res.json({ success: true, settings });
+});
+
+// Update specific setting
+app.patch('/api/settings/:key', authenticate, (req, res) => {
+  const { key } = req.params;
+  const { value } = req.body;
+
+  const settings = userSettings.get(req.user.id) || {};
+  settings[key] = value;
+  userSettings.set(req.user.id, settings);
+
+  res.json({ success: true, key, value });
+});
+
+// Delete specific setting
+app.delete('/api/settings/:key', authenticate, (req, res) => {
+  const { key } = req.params;
+
+  const settings = userSettings.get(req.user.id) || {};
+  delete settings[key];
+  userSettings.set(req.user.id, settings);
+
+  res.json({ success: true });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -207,6 +312,8 @@ app.get('/health', (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`\n🚀 Auth Server running on http://localhost:${PORT}`);
+  console.log(`📦 Environment: ${NODE_ENV}`);
+  console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Configured' : '❌ Not configured'}`);
   console.log(`\n📝 Development endpoints:`);
   console.log(`   POST /dev/create-user - Create test user`);
   console.log(`   GET  /dev/users - List all users`);
@@ -214,5 +321,10 @@ app.listen(PORT, () => {
   console.log(`   GET  /auth/google/url - Get OAuth URL`);
   console.log(`   GET  /auth/me - Get current user`);
   console.log(`   GET  /auth/verify - Verify token`);
-  console.log(`   POST /auth/subscription - Update subscription\n`);
+  console.log(`   POST /auth/subscription - Update subscription`);
+  console.log(`\n⚙️  Settings endpoints:`);
+  console.log(`   GET    /api/settings - Get user settings`);
+  console.log(`   POST   /api/settings - Save user settings`);
+  console.log(`   PATCH  /api/settings/:key - Update specific setting`);
+  console.log(`   DELETE /api/settings/:key - Delete specific setting\n`);
 });

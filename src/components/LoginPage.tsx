@@ -97,9 +97,9 @@ export const LoginPage: React.FC = () => {
       <Card className="max-w-md w-full p-8 space-y-6">
         {/* 로고 */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Opcode</h1>
+          <h1 className="text-4xl font-bold tracking-tight">ANYON</h1>
           <p className="text-muted-foreground">
-            AI 기반 코딩 IDE
+            AI 기반 개발 플랫폼
           </p>
         </div>
 
