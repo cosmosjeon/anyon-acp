@@ -53,6 +53,9 @@
     },
     "shell": {
       "open": true
+    },
+    "deepLink": {
+      "schemes": ["anyon"]
     }
   },
   "bundle": {
