@@ -564,17 +564,18 @@ function App() {
   }
 
   // Show login page if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <HashRouter>
-        <ThemeProvider>
-          <LoginPage />
-        </ThemeProvider>
-      </HashRouter>
-    );
-  }
+  // TEMPORARILY DISABLED: Login requirement removed for standalone app
+  // if (!isAuthenticated) {
+  //   return (
+  //     <HashRouter>
+  //       <ThemeProvider>
+  //         <LoginPage />
+  //       </ThemeProvider>
+  //     </HashRouter>
+  //   );
+  // }
 
-  // Show main app if authenticated
+  // Show main app (login temporarily disabled)
   return (
     <HashRouter>
       <ThemeProvider>
