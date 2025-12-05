@@ -4,11 +4,11 @@ on:
   workflow_call:
     secrets:
       GOOGLE_CLIENT_ID:
-        required: true
+        required: false
       GOOGLE_CLIENT_SECRET:
-        required: true
+        required: false
       JWT_SECRET:
-        required: true
+        required: false
   workflow_dispatch:
   push:
     branches: [main]
