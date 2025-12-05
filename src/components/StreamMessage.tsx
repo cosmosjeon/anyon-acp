@@ -51,6 +51,34 @@ import {
   WebFetchWidget,
   CollapsibleToolWidget
 } from "./ToolWidgets";
+import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
+import { 
+  FileText as FileTextIcon, 
+  Palette, 
+  Paintbrush, 
+  Settings, 
+  Boxes, 
+  Database, 
+  LayoutList, 
+  Rocket, 
+  CheckCircle 
+} from "lucide-react";
+
+// Icon mapping for workflow prompts
+const WorkflowIcon: React.FC<{ icon: PromptIconType | null; className?: string }> = ({ icon, className = "h-4 w-4" }) => {
+  switch (icon) {
+    case 'file-text': return <FileTextIcon className={className} />;
+    case 'palette': return <Palette className={className} />;
+    case 'paintbrush': return <Paintbrush className={className} />;
+    case 'settings': return <Settings className={className} />;
+    case 'boxes': return <Boxes className={className} />;
+    case 'database': return <Database className={className} />;
+    case 'layout-list': return <LayoutList className={className} />;
+    case 'rocket': return <Rocket className={className} />;
+    case 'check-circle': return <CheckCircle className={className} />;
+    default: return null;
+  }
+};
 
 interface StreamMessageProps {
   message: ClaudeStreamMessage;
@@ -502,6 +530,17 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                       return <CommandOutputWidget output={output} onLinkDetected={onLinkDetected} />;
                     }
                     
+                    // Check if it's an anyon workflow command - show friendly display text with icon
+                    if (isAnyonWorkflowCommand(contentStr.trim())) {
+                      const { text, icon } = getPromptDisplayInfo(contentStr.trim());
+                      return (
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                          <WorkflowIcon icon={icon} className="h-4 w-4" />
+                          <span>{text}</span>
+                        </div>
+                      );
+                    }
+                    
                     // Otherwise render as plain text
                     return (
                       <div className="text-sm">
@@ -756,10 +795,22 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                   // Text content
                   if (content.type === "text") {
                     // Handle both string and object formats
-                    const textContent = typeof content.text === 'string' 
-                      ? content.text 
+                    const textContent = typeof content.text === 'string'
+                      ? content.text
                       : (content.text?.text || JSON.stringify(content.text));
-                    
+
+                    // Check if it's an anyon workflow command - show friendly display text with icon
+                    if (isAnyonWorkflowCommand(textContent.trim())) {
+                      const { text, icon } = getPromptDisplayInfo(textContent.trim());
+                      renderedSomething = true;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 text-sm font-medium text-primary">
+                          <WorkflowIcon icon={icon} className="h-4 w-4" />
+                          <span>{text}</span>
+                        </div>
+                      );
+                    }
+
                     renderedSomething = true;
                     return (
                       <div key={idx} className="text-sm">

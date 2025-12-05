@@ -1,12 +1,13 @@
 import React, { useEffect, useState, Suspense, lazy, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Lightbulb, Loader2, FileText, Code, Eye } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Loader2, FileText, Code, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SplitPane } from '@/components/ui/split-pane';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
 import { DevDocsPanel } from '@/components/development';
+import { PreviewPanel } from '@/components/PreviewPanel';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
 import type { Project } from '@/lib/api';
 import { api } from '@/lib/api';
@@ -199,7 +200,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                         개발문서
                       </TabsTrigger>
                       <TabsTrigger value="preview" className="gap-1.5">
-                        <Eye className="w-3.5 h-3.5" />
+                        <Monitor className="w-3.5 h-3.5" />
                         프리뷰
                       </TabsTrigger>
                     </TabsList>
@@ -223,15 +224,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                     />
                   )}
                   {activeTab === 'preview' && (
-                    <div className="h-full flex items-center justify-center text-muted-foreground bg-background">
-                      <div className="text-center">
-                        <div className="w-16 h-16 rounded-xl bg-muted/50 flex items-center justify-center mb-4 mx-auto">
-                          <Eye className="w-8 h-8" />
-                        </div>
-                        <p className="text-sm font-medium mb-1">프리뷰 패널</p>
-                        <p className="text-xs opacity-70">웹뷰 프리뷰가 여기에 추가됩니다</p>
-                      </div>
-                    </div>
+                    <PreviewPanel />
                   )}
                 </div>
               </div>

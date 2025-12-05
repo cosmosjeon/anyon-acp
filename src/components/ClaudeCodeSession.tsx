@@ -7,7 +7,16 @@ import {
   ChevronUp,
   X,
   Hash,
-  Wrench
+  Wrench,
+  FileText as FileTextIcon,
+  Palette,
+  Paintbrush,
+  Settings,
+  Boxes,
+  Database,
+  LayoutList,
+  Rocket,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +46,23 @@ import type { ClaudeStreamMessage } from "./AgentExecution";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
 import { SessionPersistenceService } from "@/services/sessionPersistence";
+import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
+
+// Icon mapping for workflow prompts
+const WorkflowIcon: React.FC<{ icon: PromptIconType | null; className?: string }> = ({ icon, className = "h-4 w-4" }) => {
+  switch (icon) {
+    case 'file-text': return <FileTextIcon className={className} />;
+    case 'palette': return <Palette className={className} />;
+    case 'paintbrush': return <Paintbrush className={className} />;
+    case 'settings': return <Settings className={className} />;
+    case 'boxes': return <Boxes className={className} />;
+    case 'database': return <Database className={className} />;
+    case 'layout-list': return <LayoutList className={className} />;
+    case 'rocket': return <Rocket className={className} />;
+    case 'check-circle': return <CheckCircle className={className} />;
+    default: return null;
+  }
+};
 
 interface ClaudeCodeSessionProps {
   /**
@@ -119,7 +145,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const [forkSessionName, setForkSessionName] = useState("");
   
   // Queued prompts state
-  const [queuedPrompts, setQueuedPrompts] = useState<Array<{ id: string; prompt: string; model: "sonnet" | "opus" }>>([]);
+  const [queuedPrompts, setQueuedPrompts] = useState<Array<{ id: string; prompt: string; displayText?: string; icon?: PromptIconType | null; model: "sonnet" | "opus" }>>([]);
   
   // New state for preview feature
   const [showPreview, setShowPreview] = useState(false);
@@ -135,7 +161,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const hasActiveSessionRef = useRef(false);
   const floatingPromptRef = useRef<FloatingPromptInputRef>(null);
-  const queuedPromptsRef = useRef<Array<{ id: string; prompt: string; model: "sonnet" | "opus" }>>([]);
+  const queuedPromptsRef = useRef<Array<{ id: string; prompt: string; displayText?: string; icon?: PromptIconType | null; model: "sonnet" | "opus" }>>([]);
   const isMountedRef = useRef(true);
   const isListeningRef = useRef(false);
   const sessionStartTime = useRef<number>(Date.now());
@@ -509,9 +535,12 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
     // If already loading, queue the prompt
     if (isLoading) {
+      const displayInfo = isAnyonWorkflowCommand(prompt) ? getPromptDisplayInfo(prompt) : null;
       const newPrompt = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         prompt,
+        displayText: displayInfo?.text,
+        icon: displayInfo?.icon,
         model
       };
       setQueuedPrompts(prev => [...prev, newPrompt]);
@@ -1426,7 +1455,10 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                             {queuedPrompt.model === "opus" ? "Opus" : "Sonnet"}
                           </span>
                         </div>
-                        <p className="text-sm line-clamp-2 break-words">{queuedPrompt.prompt}</p>
+                        <div className="flex items-center gap-2 text-sm line-clamp-2 break-words">
+                          {queuedPrompt.icon && <WorkflowIcon icon={queuedPrompt.icon} className="h-3.5 w-3.5 flex-shrink-0 text-primary" />}
+                          <span>{queuedPrompt.displayText || queuedPrompt.prompt}</span>
+                        </div>
                       </div>
                       <motion.div
                         whileTap={{ scale: 0.97 }}
