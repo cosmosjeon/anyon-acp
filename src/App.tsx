@@ -3,7 +3,7 @@ import { HashRouter } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Bot, FolderCode, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-import { LoginPage } from "@/components/LoginPage";
+// import { LoginPage } from "@/components/LoginPage"; // Temporarily disabled for standalone app
 import { api, type Project, type Session, type ClaudeMdFile } from "@/lib/api";
 import { initializeWebMode } from "@/lib/apiAdapter";
 import { OutputCacheProvider } from "@/lib/outputCache";
@@ -498,7 +498,7 @@ function AppContent() {
  * Main App component - Wraps the app with providers and auth gate
  */
 function App() {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const { /* isAuthenticated, */ checkAuth } = useAuthStore(); // isAuthenticated temporarily unused
   const [isChecking, setIsChecking] = useState(true);
   const [showIntro, setShowIntro] = useState(() => {
     // Read cached preference synchronously to avoid any initial flash
