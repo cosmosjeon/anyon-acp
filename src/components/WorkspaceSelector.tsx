@@ -35,9 +35,21 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
   const [installMessage, setInstallMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
+    console.log('[WorkspaceSelector] useEffect triggered', {
+      projectId,
+      projectsLength: projects.length,
+      projects: projects.map(p => ({ id: p.id, path: p.path }))
+    });
+
     if (projectId && projects.length > 0) {
       const found = getProjectById(projectId);
+      console.log('[WorkspaceSelector] Found project:', found);
       setProject(found);
+    } else {
+      console.log('[WorkspaceSelector] Conditions not met:', {
+        hasProjectId: !!projectId,
+        hasProjects: projects.length > 0
+      });
     }
   }, [projectId, projects, getProjectById]);
 

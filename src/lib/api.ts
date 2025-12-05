@@ -1773,17 +1773,13 @@ export const api = {
    */
   async getSetting(key: string): Promise<string | null> {
     try {
-      // Fast path: check localStorage mirror to avoid startup flicker
-      if (typeof window !== 'undefined' && 'localStorage' in window) {
-        const cached = window.localStorage.getItem(`app_setting:${key}`);
-        if (cached !== null) {
-          return cached;
-        }
-      }
-      // Use storageReadTable to safely query the app_settings table
+      // Always read from DB to ensure we have the latest data
+      // (localStorage is updated by saveSetting, not used for reading)
       const result = await this.storageReadTable('app_settings', 1, 1000);
-      const setting = result?.data?.find((row: any) => row.key === key);
-      return setting?.value || null;
+      const setting = result?.rows?.find((row: any) => row.key === key);
+      const value = setting?.value || null;
+
+      return value;
     } catch (error) {
       console.error(`Failed to get setting ${key}:`, error);
       return null;

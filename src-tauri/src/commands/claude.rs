@@ -427,7 +427,11 @@ pub async fn create_project(path: String) -> Result<Project, String> {
     log::info!("Creating project for path: {}", path);
 
     // Encode the path to create a project ID
-    let project_id = path.replace('/', "-");
+    // Replace both forward and backward slashes, and colons (for Windows drive letters)
+    let project_id = path
+        .replace('/', "-")
+        .replace('\\', "-")
+        .replace(':', "-");
 
     // Get claude directory
     let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;

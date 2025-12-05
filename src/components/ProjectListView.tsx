@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FolderOpen, Search, Loader2, Plus, Download, CheckCircle, AlertCircle } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -49,14 +50,30 @@ export const ProjectListView: React.FC = () => {
       });
 
       if (selected && typeof selected === 'string') {
+        console.log('[ProjectListView] Creating project for path:', selected);
         const project = await api.createProject(selected);
+        console.log('[ProjectListView] Created project:', project);
+
         // Register the project so it appears in the list
         await api.registerProject(selected);
-        
-        // Run npx anyon-agents@latest automatically
+        console.log('[ProjectListView] Registered project');
+
+        // Refresh project list immediately after registration
+        await refreshProjects();
+        console.log('[ProjectListView] Refreshed projects');
+
+        // Small delay to ensure React state updates
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Navigate to the project BEFORE starting installation
+        // This ensures the UI updates with the new project immediately
+        console.log('[ProjectListView] Navigating to project:', project.id);
+        goToProject(project.id);
+
+        // Run npx anyon-agents@latest automatically (optional, won't block project creation)
         setIsInstallingAnyon(true);
         setInstallStatus({ type: 'info', text: 'Installing ANYON agents...' });
-        
+
         try {
           const result = await api.runNpxAnyonAgents(selected);
           if (result.success) {
@@ -73,9 +90,6 @@ export const ProjectListView: React.FC = () => {
         } finally {
           setIsInstallingAnyon(false);
         }
-        
-        await refreshProjects();
-        goToProject(project.id);
       }
     } catch (err) {
       console.error('Failed to open folder picker:', err);
@@ -93,6 +107,30 @@ export const ProjectListView: React.FC = () => {
       } catch (err) {
         console.error('Failed to remove project:', err);
       }
+    }
+  };
+
+  const handleRegisterAllProjects = async () => {
+    try {
+      setInstallStatus({ type: 'info', text: 'Registering all projects...' });
+
+      // Get all projects from ~/.claude/projects
+      const allProjects = await api.listProjects();
+
+      // Register each project
+      for (const project of allProjects) {
+        await api.registerProject(project.path);
+      }
+
+      // Refresh the project list
+      await refreshProjects();
+
+      setInstallStatus({ type: 'success', text: `Registered ${allProjects.length} projects!` });
+      setTimeout(() => setInstallStatus(null), 3000);
+    } catch (err) {
+      console.error('Failed to register all projects:', err);
+      setInstallStatus({ type: 'error', text: 'Failed to register projects' });
+      setTimeout(() => setInstallStatus(null), 5000);
     }
   };
 
@@ -140,30 +178,46 @@ export const ProjectListView: React.FC = () => {
               Select a project to start working
             </p>
           </div>
-          <motion.div
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-          >
-            <Button
-              onClick={handleOpenFolder}
-              disabled={isOpeningFolder || isInstallingAnyon}
-              className="flex items-center gap-2"
+          <div className="flex items-center gap-2">
+            <motion.div
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.15 }}
             >
-              {isOpeningFolder ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isInstallingAnyon ? (
-                <>
-                  <Download className="h-4 w-4 animate-pulse" />
-                  Installing...
-                </>
-              ) : (
-                <>
-                  <FolderOpen className="h-4 w-4" />
-                  Open Folder
-                </>
-              )}
-            </Button>
-          </motion.div>
+              <Button
+                onClick={handleRegisterAllProjects}
+                variant="outline"
+                disabled={isOpeningFolder || isInstallingAnyon}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Register All
+              </Button>
+            </motion.div>
+            <motion.div
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.15 }}
+            >
+              <Button
+                onClick={handleOpenFolder}
+                disabled={isOpeningFolder || isInstallingAnyon}
+                className="flex items-center gap-2"
+              >
+                {isOpeningFolder ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isInstallingAnyon ? (
+                  <>
+                    <Download className="h-4 w-4 animate-pulse" />
+                    Installing...
+                  </>
+                ) : (
+                  <>
+                    <FolderOpen className="h-4 w-4" />
+                    Open Folder
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          </div>
         </div>
 
         {/* Search */}
