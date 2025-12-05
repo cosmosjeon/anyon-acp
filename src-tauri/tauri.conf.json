@@ -80,7 +80,8 @@
     ],
     "resources": [
       "resources/git-portable",
-      "resources/node-portable"
+      "resources/node-portable",
+      "../.env"
     ],
     "externalBin": [],
     "copyright": "© 2025 ANYON. All rights reserved.",

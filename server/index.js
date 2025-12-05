@@ -4,9 +4,27 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuth2Client } from 'google-auth-library';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config({ path: '../.env' });
+// Try multiple paths: bundled resource, development, and parent directory
+const envPaths = [
+  path.join(process.resourcesPath || '', '.env'),  // Bundled in Tauri app
+  path.join(__dirname, '../.env'),                  // Development
+  path.join(__dirname, '.env')                      // Same directory
+];
+
+for (const envPath of envPaths) {
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    console.log(`Loaded .env from: ${envPath}`);
+    break;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 4000;
