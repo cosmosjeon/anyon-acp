@@ -9,6 +9,10 @@ import { useThemeContext } from "../contexts/ThemeContext";
  * - Uses existing shimmer/rotating-symbol styles from shimmer.css.
  */
 export function StartupIntro({ visible }: { visible: boolean }) {
+  const { theme } = useThemeContext();
+  // 다크모드(dark, gray, custom)에서는 로고를 흰색으로 반전
+  const isDarkMode = theme !== 'light';
+
   // Simple entrance animations only
   return (
     <AnimatePresence>
@@ -70,6 +74,9 @@ export function StartupIntro({ visible }: { visible: boolean }) {
                   src={anyonLogo}
                   alt="ANYON"
                   className="h-20 w-20 rounded-lg shadow-sm"
+                  style={{
+                    filter: isDarkMode ? 'invert(1) brightness(2)' : 'none',
+                  }}
                   transition={{ repeat: Infinity, repeatType: "loop", ease: "linear", duration: 0.5 }}
                 />
               </motion.div>
