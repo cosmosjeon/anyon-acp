@@ -1,6 +1,11 @@
 import { apiCall } from './apiAdapter';
 import type { HooksConfiguration } from '@/types/hooks';
 
+// Normalize project paths for cross-platform comparisons (slashes + casing)
+const normalizeProjectPath = (projectPath: string): string =>
+  projectPath.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+
+
 /** Process type for tracking in ProcessRegistry */
 export type ProcessType =
   | { AgentRun: { agent_id: number; agent_name: string } }
@@ -1784,17 +1789,13 @@ export const api = {
    */
   async getSetting(key: string): Promise<string | null> {
     try {
-      // Fast path: check localStorage mirror to avoid startup flicker
-      if (typeof window !== 'undefined' && 'localStorage' in window) {
-        const cached = window.localStorage.getItem(`app_setting:${key}`);
-        if (cached !== null) {
-          return cached;
-        }
-      }
-      // Use storageReadTable to safely query the app_settings table
+      // Always read from DB to ensure we have the latest data
+      // (localStorage is updated by saveSetting, not used for reading)
       const result = await this.storageReadTable('app_settings', 1, 1000);
-      const setting = result?.data?.find((row: any) => row.key === key);
-      return setting?.value || null;
+      const setting = result?.rows?.find((row: any) => row.key === key);
+      const value = setting?.value || null;
+
+      return value;
     } catch (error) {
       console.error(`Failed to get setting ${key}:`, error);
       return null;
@@ -2014,11 +2015,31 @@ export const api = {
    */
   async registerProject(projectPath: string): Promise<void> {
     try {
+      console.log('[api] registerProject called with:', projectPath);
       const registered = await this.getRegisteredProjects();
-      // Avoid duplicates
-      if (!registered.includes(projectPath)) {
+      console.log('[api] Current registered projects:', registered);
+
+      // Avoid duplicates (normalize slashes + casing for Windows/macOS)
+      const normalizedProjectPath = normalizeProjectPath(projectPath);
+      const registeredNormalized = registered.map(normalizeProjectPath);
+      console.log('[api] registeredNormalized:', registeredNormalized);
+      console.log('[api] Checking if includes:', normalizedProjectPath);
+
+      if (!registeredNormalized.includes(normalizedProjectPath)) {
+        console.log('[api] NOT a duplicate, adding to list');
         registered.push(projectPath);
+        console.log('[api] About to save:', registered);
         await this.saveSetting('registered_projects', JSON.stringify(registered));
+        console.log('[api] Successfully saved! Registered project:', projectPath);
+        console.log('[api] New registered list:', registered);
+
+        // Verify it was actually saved
+        const verify = await this.getRegisteredProjects();
+        console.log('[api] Verification - projects after save:', verify);
+      } else {
+        console.log('[api] IS a duplicate! Project already registered:', projectPath);
+        console.log('[api] registeredLower:', registeredLower);
+        console.log('[api] projectPath.toLowerCase():', projectPath.toLowerCase());
       }
     } catch (error) {
       console.error('Failed to register project:', error);
@@ -2034,7 +2055,11 @@ export const api = {
   async unregisterProject(projectPath: string): Promise<void> {
     try {
       const registered = await this.getRegisteredProjects();
-      const filtered = registered.filter(p => p !== projectPath);
+      // Use normalized comparison for cross-platform compatibility
+      const normalizedProjectPath = normalizeProjectPath(projectPath);
+      const filtered = registered.filter(
+        p => normalizeProjectPath(p) !== normalizedProjectPath
+      );
       await this.saveSetting('registered_projects', JSON.stringify(filtered));
     } catch (error) {
       console.error('Failed to unregister project:', error);
@@ -2053,12 +2078,13 @@ export const api = {
       if (registeredPaths.length === 0) {
         return [];
       }
-      
+
       // Get all projects from ~/.claude/projects
       const allProjects = await this.listProjects();
-      
-      // Filter to only registered ones
-      return allProjects.filter(p => registeredPaths.includes(p.path));
+
+      // Filter to only registered ones (normalized comparison for Windows/macOS paths)
+      const registeredNormalized = registeredPaths.map(normalizeProjectPath);
+      return allProjects.filter(p => registeredNormalized.includes(normalizeProjectPath(p.path)));
     } catch (error) {
       console.error('Failed to list registered projects:', error);
       return [];

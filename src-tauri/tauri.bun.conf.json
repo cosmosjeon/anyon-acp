@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "opcode",
+  "productName": "ANYON",
   "version": "0.2.1",
-  "identifier": "opcode.asterisk.so",
+  "identifier": "com.anyon.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "opcode",
+        "title": "ANYON",
         "width": 800,
         "height": 600,
         "decorations": false,
@@ -75,10 +75,10 @@
     ],
     "resources": [],
     "externalBin": [],
-    "copyright": "© 2025 Asterisk. All rights reserved.",
+    "copyright": "© 2025 ANYON. All rights reserved.",
     "category": "DeveloperTool",
-    "shortDescription": "GUI app and Toolkit for Claude Code",
-    "longDescription": "opcode is a comprehensive GUI application and toolkit for working with Claude Code, providing an intuitive interface for AI-assisted development.",
+    "shortDescription": "AI-Powered Development Platform",
+    "longDescription": "ANYON is a comprehensive AI-powered development platform that provides an intuitive interface for AI-assisted software development and project management.",
     "linux": {
       "appimage": {
         "bundleMediaFramework": true

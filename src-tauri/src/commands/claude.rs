@@ -354,14 +354,58 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
                 .unwrap_or_default()
                 .as_secs();
 
-            // Get the actual project path from JSONL files
-            let project_path = match get_project_path_from_sessions(&path) {
-                Ok(path) => path,
-                Err(e) => {
-                    log::warn!("Failed to get project path from sessions for {}: {}, falling back to decode", dir_name, e);
-                    decode_project_path(dir_name)
+            // Try to get project path from metadata file first (for new projects without sessions)
+            let meta_file = path.join(".project_meta.json");
+            let project_path = if meta_file.exists() {
+                // Read from metadata file
+                match fs::read_to_string(&meta_file) {
+                    Ok(content) => {
+                        match serde_json::from_str::<serde_json::Value>(&content) {
+                            Ok(meta) => {
+                                meta.get("path")
+                                    .and_then(|p| p.as_str())
+                                    .map(|s| s.to_string())
+                                    .unwrap_or_else(|| {
+                                        log::warn!("Invalid metadata file format, falling back to sessions");
+                                        match get_project_path_from_sessions(&path) {
+                                            Ok(path) => path,
+                                            Err(_) => decode_project_path(dir_name)
+                                        }
+                                    })
+                            }
+                            Err(_) => {
+                                log::warn!("Failed to parse metadata file, falling back to sessions");
+                                match get_project_path_from_sessions(&path) {
+                                    Ok(path) => path,
+                                    Err(_) => decode_project_path(dir_name)
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        log::warn!("Failed to read metadata file, falling back to sessions");
+                        match get_project_path_from_sessions(&path) {
+                            Ok(path) => path,
+                            Err(_) => decode_project_path(dir_name)
+                        }
+                    }
+                }
+            } else {
+                // No metadata file, try to get from JSONL sessions
+                match get_project_path_from_sessions(&path) {
+                    Ok(path) => path,
+                    Err(e) => {
+                        log::warn!("Failed to get project path from sessions for {}: {}, falling back to decode", dir_name, e);
+                        decode_project_path(dir_name)
+                    }
                 }
             };
+
+            // Check if the actual project folder still exists
+            if !PathBuf::from(&project_path).exists() {
+                log::warn!("Project folder no longer exists: {}, skipping", project_path);
+                continue;
+            }
 
             // List all JSONL files (sessions) in this project directory
             let mut sessions = Vec::new();
@@ -397,7 +441,7 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
             }
 
             projects.push(Project {
-                id: dir_name.to_string(),
+                id: dir_name.to_lowercase(),
                 path: project_path,
                 sessions,
                 created_at,
@@ -427,7 +471,13 @@ pub async fn create_project(path: String) -> Result<Project, String> {
     log::info!("Creating project for path: {}", path);
 
     // Encode the path to create a project ID
-    let project_id = path.replace('/', "-");
+    // Replace both forward and backward slashes, and colons (for Windows drive letters)
+    // Use lowercase for Windows case-insensitivity
+    let project_id = path
+        .to_lowercase()
+        .replace('/', "-")
+        .replace('\\', "-")
+        .replace(':', "-");
 
     // Get claude directory
     let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
@@ -445,6 +495,16 @@ pub async fn create_project(path: String) -> Result<Project, String> {
         fs::create_dir_all(&project_dir)
             .map_err(|e| format!("Failed to create project directory: {}", e))?;
     }
+
+    // Save project metadata file with the original path
+    // This allows us to retrieve the correct path even when there are no sessions yet
+    let meta_file = project_dir.join(".project_meta.json");
+    let meta_data = serde_json::json!({
+        "path": path,
+        "project_id": project_id,
+    });
+    fs::write(&meta_file, serde_json::to_string_pretty(&meta_data).unwrap())
+        .map_err(|e| format!("Failed to write project metadata: {}", e))?;
 
     // Get creation time
     let metadata = fs::metadata(&project_dir)
@@ -2358,6 +2418,18 @@ pub async fn run_npx_anyon_agents(
     let _ = app_handle.emit("anyon-install-start", &project_path);
     
     // Run npx anyon-agents@latest with stdin piped for auto-confirmation
+    // On Windows, we need to use cmd.exe to run npx (which is a .cmd file)
+    #[cfg(target_os = "windows")]
+    let mut child = Command::new("cmd")
+        .args(&["/C", "npx", "anyon-agents@latest"])
+        .current_dir(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn npx command: {}", e))?;
+
+    #[cfg(not(target_os = "windows"))]
     let mut child = Command::new("npx")
         .arg("anyon-agents@latest")
         .current_dir(&path)

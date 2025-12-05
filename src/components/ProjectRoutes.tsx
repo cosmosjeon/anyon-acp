@@ -48,13 +48,13 @@ export const ProjectsContext = createContext<{
   projects: Project[];
   loading: boolean;
   error: string | null;
-  refreshProjects: () => Promise<void>;
+  refreshProjects: () => Promise<Project[]>;
   getProjectById: (id: string) => Project | undefined;
 }>({
   projects: [],
   loading: false,
   error: null,
-  refreshProjects: async () => {},
+  refreshProjects: async () => [],
   getProjectById: () => undefined,
 });
 
@@ -162,16 +162,18 @@ export const ProjectRoutes: React.FC<ProjectRoutesProps> = ({ tabId }) => {
     navigate({ type: 'maintenance', projectId });
   }, [navigate]);
 
-  const loadProjects = async () => {
+  const loadProjects = async (): Promise<Project[]> => {
     try {
       setLoading(true);
       setError(null);
       // Only load registered projects (user-added projects)
       const projectList = await api.listRegisteredProjects();
       setProjects(projectList);
+      return projectList;
     } catch (err) {
       console.error("Failed to load projects:", err);
       setError("Failed to load projects. Please ensure ~/.claude directory exists.");
+      return [];
     } finally {
       setLoading(false);
     }

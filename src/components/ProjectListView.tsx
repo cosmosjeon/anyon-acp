@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FolderOpen, Search, Loader2, Plus, Download, CheckCircle, AlertCircle } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { ProjectCard } from '@/components/ProjectCard';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { api, type Project } from '@/lib/api';
+
+// Cross-platform project name extractor (handles / and \\)
+const getProjectName = (path: string): string => {
+  const segments = path.split(/[/\\\\]+/);
+  return segments[segments.length - 1] || '';
+};
 
 /**
  * ProjectListView - Grid card view of all projects
@@ -28,7 +35,7 @@ export const ProjectListView: React.FC = () => {
 
   // Filter projects by search query
   const filteredProjects = projects.filter((project) => {
-    const projectName = project.path.split('/').pop() || '';
+    const projectName = getProjectName(project.path);
     return projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            project.path.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -49,11 +56,54 @@ export const ProjectListView: React.FC = () => {
       });
 
       if (selected && typeof selected === 'string') {
+        console.log('[ProjectListView] Creating project for path:', selected);
         const project = await api.createProject(selected);
+        console.log('[ProjectListView] Created project:', project);
+
         // Register the project so it appears in the list
         await api.registerProject(selected);
-        
+        console.log('[ProjectListView] Registered project');
+
+        // Refresh project list and get the updated list directly
+        const updatedProjects = await refreshProjects();
+        console.log('[ProjectListView] Refreshed projects, count:', updatedProjects.length);
+        console.log('[ProjectListView] Looking for project ID:', project.id);
+        console.log('[ProjectListView] Available project IDs:', updatedProjects.map(p => p.id));
+        console.log('[ProjectListView] Available project paths:', updatedProjects.map(p => p.path));
+
+        // Verify the project exists in the updated list
+        const foundProject = updatedProjects.find(p => p.id === project.id);
+        if (foundProject) {
+          console.log('[ProjectListView] Project found in refreshed list, navigating...');
+        } else {
+          console.error('[ProjectListView] Project not found in refreshed list!');
+          console.error('[ProjectListView] Trying to find by path instead...');
+          console.error('[ProjectListView] Looking for path:', project.path.toLowerCase());
+          console.error('[ProjectListView] Available paths:', updatedProjects.map(p => p.path.toLowerCase()));
+          // Case-insensitive path comparison for Windows
+          const foundByPath = updatedProjects.find(p => {
+            const match = p.path.toLowerCase() === project.path.toLowerCase();
+            console.log(`[ProjectListView] Comparing "${p.path.toLowerCase()}" === "${project.path.toLowerCase()}" -> ${match}`);
+            return match;
+          });
+          console.error('[ProjectListView] foundByPath result:', foundByPath);
+          if (foundByPath) {
+            console.log('[ProjectListView] Found project by path! Using ID:', foundByPath.id);
+            // Navigate with the correct ID
+            goToProject(foundByPath.id);
+            return; // Skip the normal navigation below
+          } else {
+            console.error('[ProjectListView] Could not find project by path either!');
+          }
+        }
+
+        // Navigate to the project BEFORE starting installation
+        // This ensures the UI updates with the new project immediately
+        console.log('[ProjectListView] Navigating to project:', project.id);
+        goToProject(project.id);
+
         // Check if it's a git repository, if not, initialize it
+        // Run npx anyon-agents@latest automatically (optional, won't block project creation)
         setIsInstallingAnyon(true);
         setInstallStatus({ type: 'info', text: 'Checking git repository...' });
         
@@ -86,7 +136,7 @@ export const ProjectListView: React.FC = () => {
         
         // Run npx anyon-agents@latest automatically
         setInstallStatus({ type: 'info', text: 'Installing ANYON agents...' });
-        
+
         try {
           const result = await api.runNpxAnyonAgents(selected);
           if (result.success) {
@@ -103,9 +153,6 @@ export const ProjectListView: React.FC = () => {
         } finally {
           setIsInstallingAnyon(false);
         }
-        
-        await refreshProjects();
-        goToProject(project.id);
       }
     } catch (err) {
       console.error('Failed to open folder picker:', err);
@@ -170,30 +217,32 @@ export const ProjectListView: React.FC = () => {
               Select a project to start working
             </p>
           </div>
-          <motion.div
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-          >
-            <Button
-              onClick={handleOpenFolder}
-              disabled={isOpeningFolder || isInstallingAnyon}
-              className="flex items-center gap-2"
+          <div className="flex items-center gap-2">
+            <motion.div
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.15 }}
             >
-              {isOpeningFolder ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isInstallingAnyon ? (
-                <>
-                  <Download className="h-4 w-4 animate-pulse" />
-                  Installing...
-                </>
-              ) : (
-                <>
-                  <FolderOpen className="h-4 w-4" />
-                  Open Folder
-                </>
-              )}
-            </Button>
-          </motion.div>
+              <Button
+                onClick={handleOpenFolder}
+                disabled={isOpeningFolder || isInstallingAnyon}
+                className="flex items-center gap-2"
+              >
+                {isOpeningFolder ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isInstallingAnyon ? (
+                  <>
+                    <Download className="h-4 w-4 animate-pulse" />
+                    Installing...
+                  </>
+                ) : (
+                  <>
+                    <FolderOpen className="h-4 w-4" />
+                    Open Folder
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          </div>
         </div>
 
         {/* Search */}

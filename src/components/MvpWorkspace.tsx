@@ -90,9 +90,18 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     setIsSessionLoading(isStreaming);
   }, []);
 
-  // Send prompt to ClaudeCodeSession from PlanningDocsPanel
+  // Start a new workflow (new conversation) from PlanningDocsPanel
+  const handleStartNewWorkflow = useCallback((workflowPrompt: string) => {
+    if (claudeSessionRef.current) {
+      // Start a new session with the workflow prompt
+      claudeSessionRef.current.startNewSession(workflowPrompt);
+    }
+  }, []);
+
+  // Send prompt to existing session (for development workflow)
   const handleSendPlanningPrompt = useCallback((prompt: string) => {
     if (claudeSessionRef.current) {
+      // Send prompt to current session
       claudeSessionRef.current.sendPrompt(prompt);
     }
   }, []);
@@ -202,7 +211,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                   {activeTab === 'planning' && (
                     <PlanningDocsPanel
                       projectPath={project?.path}
-                      onSendPrompt={handleSendPlanningPrompt}
+                      onStartNewWorkflow={handleStartNewWorkflow}
                       isSessionLoading={isSessionLoading}
                     />
                   )}
