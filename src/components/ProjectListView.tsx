@@ -9,6 +9,12 @@ import { ProjectCard } from '@/components/ProjectCard';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { api, type Project } from '@/lib/api';
 
+// Cross-platform project name extractor (handles / and \\)
+const getProjectName = (path: string): string => {
+  const segments = path.split(/[/\\\\]+/);
+  return segments[segments.length - 1] || '';
+};
+
 /**
  * ProjectListView - Grid card view of all projects
  *
@@ -29,7 +35,7 @@ export const ProjectListView: React.FC = () => {
 
   // Filter projects by search query
   const filteredProjects = projects.filter((project) => {
-    const projectName = project.path.split('/').pop() || '';
+    const projectName = getProjectName(project.path);
     return projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            project.path.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -58,12 +64,38 @@ export const ProjectListView: React.FC = () => {
         await api.registerProject(selected);
         console.log('[ProjectListView] Registered project');
 
-        // Refresh project list immediately after registration
-        await refreshProjects();
-        console.log('[ProjectListView] Refreshed projects');
+        // Refresh project list and get the updated list directly
+        const updatedProjects = await refreshProjects();
+        console.log('[ProjectListView] Refreshed projects, count:', updatedProjects.length);
+        console.log('[ProjectListView] Looking for project ID:', project.id);
+        console.log('[ProjectListView] Available project IDs:', updatedProjects.map(p => p.id));
+        console.log('[ProjectListView] Available project paths:', updatedProjects.map(p => p.path));
 
-        // Small delay to ensure React state updates
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Verify the project exists in the updated list
+        const foundProject = updatedProjects.find(p => p.id === project.id);
+        if (foundProject) {
+          console.log('[ProjectListView] Project found in refreshed list, navigating...');
+        } else {
+          console.error('[ProjectListView] Project not found in refreshed list!');
+          console.error('[ProjectListView] Trying to find by path instead...');
+          console.error('[ProjectListView] Looking for path:', project.path.toLowerCase());
+          console.error('[ProjectListView] Available paths:', updatedProjects.map(p => p.path.toLowerCase()));
+          // Case-insensitive path comparison for Windows
+          const foundByPath = updatedProjects.find(p => {
+            const match = p.path.toLowerCase() === project.path.toLowerCase();
+            console.log(`[ProjectListView] Comparing "${p.path.toLowerCase()}" === "${project.path.toLowerCase()}" -> ${match}`);
+            return match;
+          });
+          console.error('[ProjectListView] foundByPath result:', foundByPath);
+          if (foundByPath) {
+            console.log('[ProjectListView] Found project by path! Using ID:', foundByPath.id);
+            // Navigate with the correct ID
+            goToProject(foundByPath.id);
+            return; // Skip the normal navigation below
+          } else {
+            console.error('[ProjectListView] Could not find project by path either!');
+          }
+        }
 
         // Navigate to the project BEFORE starting installation
         // This ensures the UI updates with the new project immediately
@@ -107,30 +139,6 @@ export const ProjectListView: React.FC = () => {
       } catch (err) {
         console.error('Failed to remove project:', err);
       }
-    }
-  };
-
-  const handleRegisterAllProjects = async () => {
-    try {
-      setInstallStatus({ type: 'info', text: 'Registering all projects...' });
-
-      // Get all projects from ~/.claude/projects
-      const allProjects = await api.listProjects();
-
-      // Register each project
-      for (const project of allProjects) {
-        await api.registerProject(project.path);
-      }
-
-      // Refresh the project list
-      await refreshProjects();
-
-      setInstallStatus({ type: 'success', text: `Registered ${allProjects.length} projects!` });
-      setTimeout(() => setInstallStatus(null), 3000);
-    } catch (err) {
-      console.error('Failed to register all projects:', err);
-      setInstallStatus({ type: 'error', text: 'Failed to register projects' });
-      setTimeout(() => setInstallStatus(null), 5000);
     }
   };
 
@@ -179,20 +187,6 @@ export const ProjectListView: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <motion.div
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.15 }}
-            >
-              <Button
-                onClick={handleRegisterAllProjects}
-                variant="outline"
-                disabled={isOpeningFolder || isInstallingAnyon}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Register All
-              </Button>
-            </motion.div>
             <motion.div
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.15 }}
