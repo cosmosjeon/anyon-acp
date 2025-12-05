@@ -1810,30 +1810,37 @@ export const api = {
    */
   async saveSetting(key: string, value: string): Promise<void> {
     try {
+      console.log('[api] saveSetting called:', key, 'value length:', value.length);
       // Mirror to localStorage for instant availability on next startup
       if (typeof window !== 'undefined' && 'localStorage' in window) {
         try {
           window.localStorage.setItem(`app_setting:${key}`, value);
+          console.log('[api] Saved to localStorage');
         } catch (_ignore) {
           // best-effort; continue to persist in DB
         }
       }
-      
-      // Check if row exists first
-      const result = await this.storageReadTable('app_settings', 1, 1000);
-      const existingRow = result?.rows?.find((row: any) => row.key === key);
-      
-      if (existingRow) {
-        // Row exists, update it
-        await this.storageUpdateRow(
+      // Check if row exists first (don't use getSetting as it would cause recursion)
+      const checkResult = await this.storageReadTable('app_settings', 1, 1000);
+      const exists = checkResult?.rows?.some((row: any) => row.key === key);
+      console.log('[api] Row exists:', exists);
+
+      if (exists) {
+        // Update existing row
+        console.log('[api] Trying updateRow...');
+        const updateResult = await this.storageUpdateRow(
           'app_settings',
           { key },
           { value }
         );
+        console.log('[api] updateRow result:', updateResult);
       } else {
-        // Row doesn't exist, insert new row
-        await this.storageInsertRow('app_settings', { key, value });
+        // Insert new row
+        console.log('[api] Row does not exist, trying insertRow...');
+        const insertResult = await this.storageInsertRow('app_settings', { key, value });
+        console.log('[api] insertRow result:', insertResult);
       }
+      console.log('[api] saveSetting completed successfully');
     } catch (error) {
       console.error(`Failed to save setting ${key}:`, error);
       throw error;
@@ -2003,10 +2010,16 @@ export const api = {
   async getRegisteredProjects(): Promise<string[]> {
     try {
       const setting = await this.getSetting('registered_projects');
-      if (!setting) {
+      console.log('[api] getRegisteredProjects - raw setting:', setting);
+      if (!setting || setting === '""' || setting === 'null') {
         return [];
       }
-      return JSON.parse(setting) as string[];
+      const parsed = JSON.parse(setting) as string[];
+      console.log('[api] getRegisteredProjects - parsed:', parsed);
+      // Filter out empty strings
+      const filtered = parsed.filter(p => p && p.trim().length > 0);
+      console.log('[api] getRegisteredProjects - filtered:', filtered);
+      return filtered;
     } catch (error) {
       console.error('Failed to get registered projects:', error);
       return [];

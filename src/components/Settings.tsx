@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Plus, 
-  Trash2, 
-  Save, 
+import {
+  Plus,
+  Trash2,
+  Save,
   AlertCircle,
   Loader2,
   Shield,
   Check,
+  User,
+  Mail,
+  Crown,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +34,7 @@ import { ProxySettings } from "./ProxySettings";
 import { useTheme, useTrackEvent } from "@/hooks";
 import { analytics } from "@/lib/analytics";
 import { TabPersistenceService } from "@/services/tabPersistence";
+import { useAuthStore } from "@/stores/authStore";
 
 interface SettingsProps {
   /**
@@ -96,6 +101,9 @@ export const Settings: React.FC<SettingsProps> = ({
   const [tabPersistenceEnabled, setTabPersistenceEnabled] = useState(true);
   // Startup intro preference
   const [startupIntroEnabled, setStartupIntroEnabled] = useState(true);
+
+  // Auth store
+  const { user, logout, getUserSettings, saveUserSettings, updateUserSetting } = useAuthStore();
   
   // Load settings on mount
   useEffect(() => {
@@ -140,15 +148,74 @@ export const Settings: React.FC<SettingsProps> = ({
     try {
       setLoading(true);
       setError(null);
+
+      // Try to load from server first (user settings)
+      try {
+        const userSettings = await getUserSettings();
+        if (userSettings && typeof userSettings === 'object') {
+          console.log('Loaded settings from server:', userSettings);
+          setSettings(userSettings);
+
+          // Parse permissions
+          if (userSettings.permissions && typeof userSettings.permissions === 'object') {
+            if (Array.isArray(userSettings.permissions.allow)) {
+              setAllowRules(
+                userSettings.permissions.allow.map((rule: string, index: number) => ({
+                  id: `allow-${index}`,
+                  value: rule,
+                }))
+              );
+            }
+            if (Array.isArray(userSettings.permissions.deny)) {
+              setDenyRules(
+                userSettings.permissions.deny.map((rule: string, index: number) => ({
+                  id: `deny-${index}`,
+                  value: rule,
+                }))
+              );
+            }
+          }
+
+          // Parse environment variables
+          if (userSettings.env && typeof userSettings.env === 'object' && !Array.isArray(userSettings.env)) {
+            setEnvVars(
+              Object.entries(userSettings.env).map(([key, value], index) => ({
+                id: `env-${index}`,
+                key,
+                value: value as string,
+              }))
+            );
+          }
+
+          // Load UI preferences from server
+          if (userSettings.startup_intro_enabled !== undefined) {
+            setStartupIntroEnabled(userSettings.startup_intro_enabled === true);
+          }
+          if (userSettings.analytics_enabled !== undefined) {
+            setAnalyticsEnabled(userSettings.analytics_enabled === true);
+          }
+          if (userSettings.tab_persistence_enabled !== undefined) {
+            setTabPersistenceEnabled(userSettings.tab_persistence_enabled === true);
+            TabPersistenceService.setEnabled(userSettings.tab_persistence_enabled === true);
+          }
+
+          setLoading(false);
+          return;
+        }
+      } catch (serverError) {
+        console.warn('Failed to load from server, falling back to local:', serverError);
+      }
+
+      // Fallback to local settings
       const loadedSettings = await api.getClaudeSettings();
-      
+
       // Ensure loadedSettings is an object
       if (!loadedSettings || typeof loadedSettings !== 'object') {
         console.warn("Loaded settings is not an object:", loadedSettings);
         setSettings({});
         return;
       }
-      
+
       setSettings(loadedSettings);
 
       // Parse permissions
@@ -199,7 +266,7 @@ export const Settings: React.FC<SettingsProps> = ({
       setError(null);
       setToast(null);
 
-      // Build the settings object
+      // Build the settings object (include ALL settings)
       const updatedSettings: ClaudeSettings = {
         ...settings,
         permissions: {
@@ -212,9 +279,22 @@ export const Settings: React.FC<SettingsProps> = ({
           }
           return acc;
         }, {} as Record<string, string>),
+        // Include UI preferences
+        analytics_enabled: analyticsEnabled,
+        tab_persistence_enabled: tabPersistenceEnabled,
+        startup_intro_enabled: startupIntroEnabled,
       };
 
-      await api.saveClaudeSettings(updatedSettings);
+      // Save to server (user settings)
+      try {
+        await saveUserSettings(updatedSettings);
+        console.log('Settings saved to server');
+      } catch (serverError) {
+        console.warn('Failed to save to server, falling back to local:', serverError);
+        // Fallback to local save
+        await api.saveClaudeSettings(updatedSettings);
+      }
+
       setSettings(updatedSettings);
 
       // Save Claude binary path if changed
@@ -393,7 +473,8 @@ export const Settings: React.FC<SettingsProps> = ({
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-8 w-full mb-6 h-auto p-1">
+            <TabsList className="grid grid-cols-9 w-full mb-6 h-auto p-1">
+              <TabsTrigger value="account" className="py-2.5 px-3">Account</TabsTrigger>
               <TabsTrigger value="general" className="py-2.5 px-3">General</TabsTrigger>
               <TabsTrigger value="permissions" className="py-2.5 px-3">Permissions</TabsTrigger>
               <TabsTrigger value="environment" className="py-2.5 px-3">Environment</TabsTrigger>
@@ -403,7 +484,100 @@ export const Settings: React.FC<SettingsProps> = ({
               <TabsTrigger value="storage" className="py-2.5 px-3">Storage</TabsTrigger>
               <TabsTrigger value="proxy" className="py-2.5 px-3">Proxy</TabsTrigger>
             </TabsList>
-            
+
+            {/* Account Settings */}
+            <TabsContent value="account" className="space-y-6 mt-6">
+              <Card className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-heading-4 mb-4">계정 정보</h3>
+
+                  <div className="space-y-6">
+                    {/* User Profile */}
+                    {user && (
+                      <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
+                        {user.profilePicture ? (
+                          <img
+                            src={user.profilePicture}
+                            alt={user.name}
+                            className="w-16 h-16 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User size={24} className="text-primary" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <User size={16} className="text-muted-foreground" />
+                            <div>
+                              <p className="text-caption text-muted-foreground">이름</p>
+                              <p className="text-body font-medium">{user.name}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Mail size={16} className="text-muted-foreground" />
+                            <div>
+                              <p className="text-caption text-muted-foreground">이메일</p>
+                              <p className="text-body font-medium">{user.email}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Subscription Info */}
+              <Card className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-heading-4 mb-4">구독 정보</h3>
+
+                  <div className="p-4 bg-muted/30 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Crown size={20} className="text-yellow-500" />
+                        <span className="text-body font-medium">현재 플랜</span>
+                      </div>
+                      <div className="px-3 py-1 rounded-full bg-muted border border-border">
+                        <span className="text-sm font-medium">출시 예정</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-border">
+                      <p className="text-body-small text-muted-foreground">
+                        Pro 플랜이 곧 출시될 예정입니다.
+                        <br />
+                        프로젝트 무제한, 우선 지원 등 다양한 혜택을 누리실 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Logout Section */}
+              <Card className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-heading-4">로그아웃</h3>
+                    <p className="text-body-small text-muted-foreground mt-1">
+                      계정에서 로그아웃합니다
+                    </p>
+                  </div>
+                  <Button
+                    onClick={logout}
+                    variant="destructive"
+                    className="flex items-center gap-2"
+                  >
+                    <LogOut size={16} />
+                    로그아웃
+                  </Button>
+                </div>
+              </Card>
+            </TabsContent>
+
             {/* General Settings */}
             <TabsContent value="general" className="space-y-6 mt-6">
               <Card className="p-6 space-y-6">
@@ -675,23 +849,31 @@ export const Settings: React.FC<SettingsProps> = ({
                       <div className="space-y-1">
                         <Label htmlFor="analytics-enabled">Enable Analytics</Label>
                         <p className="text-caption text-muted-foreground">
-                          Help improve opcode by sharing anonymous usage data
+                          Help improve ANYON by sharing anonymous usage data
                         </p>
                       </div>
                       <Switch
                         id="analytics-enabled"
                         checked={analyticsEnabled}
                         onCheckedChange={async (checked) => {
-                          if (checked) {
-                            await analytics.enable();
-                            setAnalyticsEnabled(true);
-                            trackEvent.settingsChanged('analytics_enabled', true);
-                            setToast({ message: "Analytics enabled", type: "success" });
-                          } else {
-                            await analytics.disable();
-                            setAnalyticsEnabled(false);
-                            trackEvent.settingsChanged('analytics_enabled', false);
-                            setToast({ message: "Analytics disabled", type: "success" });
+                          try {
+                            if (checked) {
+                              await analytics.enable();
+                              setAnalyticsEnabled(true);
+                              // Save to server
+                              await updateUserSetting('analytics_enabled', true);
+                              trackEvent.settingsChanged('analytics_enabled', true);
+                              setToast({ message: "Analytics enabled", type: "success" });
+                            } else {
+                              await analytics.disable();
+                              setAnalyticsEnabled(false);
+                              // Save to server
+                              await updateUserSetting('analytics_enabled', false);
+                              trackEvent.settingsChanged('analytics_enabled', false);
+                              setToast({ message: "Analytics disabled", type: "success" });
+                            }
+                          } catch (e) {
+                            setToast({ message: 'Failed to update analytics preference', type: 'error' });
                           }
                         }}
                       />
@@ -725,16 +907,22 @@ export const Settings: React.FC<SettingsProps> = ({
                       <Switch
                         id="tab-persistence"
                         checked={tabPersistenceEnabled}
-                        onCheckedChange={(checked) => {
+                        onCheckedChange={async (checked) => {
                           TabPersistenceService.setEnabled(checked);
                           setTabPersistenceEnabled(checked);
-                          trackEvent.settingsChanged('tab_persistence_enabled', checked);
-                          setToast({ 
-                            message: checked 
-                              ? "Tab persistence enabled - your tabs will be restored on restart" 
-                              : "Tab persistence disabled - tabs will not be saved", 
-                            type: "success" 
-                          });
+                          try {
+                            // Save to server
+                            await updateUserSetting('tab_persistence_enabled', checked);
+                            trackEvent.settingsChanged('tab_persistence_enabled', checked);
+                            setToast({
+                              message: checked
+                                ? "Tab persistence enabled - your tabs will be restored on restart"
+                                : "Tab persistence disabled - tabs will not be saved",
+                              type: "success"
+                            });
+                          } catch (e) {
+                            setToast({ message: 'Failed to update preference', type: 'error' });
+                          }
                         }}
                       />
                     </div>
@@ -753,13 +941,16 @@ export const Settings: React.FC<SettingsProps> = ({
                         onCheckedChange={async (checked) => {
                           setStartupIntroEnabled(checked);
                           try {
+                            // Save to server
+                            await updateUserSetting('startup_intro_enabled', checked);
+                            // Also save to local for immediate use
                             await api.saveSetting('startup_intro_enabled', checked ? 'true' : 'false');
                             trackEvent.settingsChanged('startup_intro_enabled', checked);
-                            setToast({ 
-                              message: checked 
-                                ? 'Welcome intro enabled' 
-                                : 'Welcome intro disabled', 
-                              type: 'success' 
+                            setToast({
+                              message: checked
+                                ? 'Welcome intro enabled'
+                                : 'Welcome intro disabled',
+                              type: 'success'
                             });
                           } catch (e) {
                             setToast({ message: 'Failed to update preference', type: 'error' });
