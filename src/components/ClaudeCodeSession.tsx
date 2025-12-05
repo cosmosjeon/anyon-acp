@@ -91,6 +91,11 @@ interface ClaudeCodeSessionProps {
    * Callback when project path changes
    */
   onProjectPathChange?: (path: string) => void;
+  /**
+   * Whether to use embedded mode for input (not fixed position)
+   * When true, the input will be positioned within its container instead of fixed at bottom
+   */
+  embedded?: boolean;
 }
 
 /**
@@ -105,6 +110,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   className,
   onStreamingChange,
   onProjectPathChange,
+  embedded = false,
 }) => {
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
@@ -1376,7 +1382,11 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4"
+                className={cn(
+                  embedded
+                    ? "w-full px-4 pb-2"
+                    : "fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4"
+                )}
               >
                 <div className="bg-background/95 backdrop-blur-md border rounded-lg shadow-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1433,7 +1443,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           </AnimatePresence>
 
           {/* Navigation Arrows - positioned above prompt bar with spacing */}
-          {displayableMessages.length > 5 && (
+          {displayableMessages.length > 5 && !embedded && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1517,8 +1527,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           )}
 
           <div className={cn(
-            "fixed bottom-0 left-0 right-0 transition-all duration-300 z-50",
-            showTimeline && "sm:right-96"
+            embedded
+              ? "w-full transition-all duration-300"
+              : "fixed bottom-0 left-0 right-0 transition-all duration-300 z-50",
+            showTimeline && !embedded && "sm:right-96"
           )}>
             <FloatingPromptInput
               ref={floatingPromptRef}
@@ -1527,6 +1539,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               isLoading={isLoading}
               disabled={!projectPath}
               projectPath={projectPath}
+              embedded={embedded}
               extraMenuItems={
                 <>
                   {effectiveSession && (

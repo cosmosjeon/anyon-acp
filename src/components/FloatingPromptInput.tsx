@@ -70,6 +70,11 @@ interface FloatingPromptInputProps {
    * Extra menu items to display in the prompt bar
    */
   extraMenuItems?: React.ReactNode;
+  /**
+   * Whether to use embedded mode (not fixed position)
+   * When true, the input will be positioned within its container instead of fixed at bottom
+   */
+  embedded?: boolean;
 }
 
 export interface FloatingPromptInputRef {
@@ -221,6 +226,7 @@ const FloatingPromptInputInner = (
     className,
     onCancel,
     extraMenuItems,
+    embedded = false,
   }: FloatingPromptInputProps,
   ref: React.Ref<FloatingPromptInputRef>,
 ) => {
@@ -1056,10 +1062,12 @@ const FloatingPromptInputInner = (
         )}
       </AnimatePresence>
 
-      {/* Fixed Position Input Bar */}
+      {/* Fixed Position Input Bar (or embedded when in split view) */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border shadow-lg",
+          embedded
+            ? "w-full bg-background/95 backdrop-blur-sm border-t border-border"
+            : "fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border shadow-lg",
           dragActive && "ring-2 ring-primary ring-offset-2",
           className
         )}

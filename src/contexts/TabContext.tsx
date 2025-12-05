@@ -13,6 +13,8 @@ export interface Tab {
   claudeFileId?: string; // for claude-file tabs
   initialProjectPath?: string; // for chat tabs
   projectPath?: string; // for agent-execution tabs
+  projectsRoute?: string; // for projects tabs - internal route state (e.g., '/projects', '/project/123/maintenance')
+  projectsRouteParams?: Record<string, string>; // for projects tabs - route params
   status: 'active' | 'idle' | 'running' | 'complete' | 'error';
   hasUnsavedChanges: boolean;
   order: number;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { HashRouter } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Bot, FolderCode } from "lucide-react";
 import { api, type Project, type Session, type ClaudeMdFile } from "@/lib/api";
@@ -431,6 +432,8 @@ function AppContent() {
                   // Create or open a project for this directory
                   try {
                     const project = await api.createProject(entry.path);
+                    // Register the project so it appears in the list
+                    await api.registerProject(entry.path);
                     setShowProjectPicker(false);
                     await loadProjects();
                     await handleProjectClick(project);
@@ -468,6 +471,8 @@ function AppContent() {
                   // Create or open a project for this directory
                   try {
                     const project = await api.createProject(entry.path);
+                    // Register the project so it appears in the list
+                    await api.registerProject(entry.path);
                     setShowProjectPicker(false);
                     await loadProjects();
                     // Load sessions for the selected project
@@ -527,14 +532,16 @@ function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <OutputCacheProvider>
-        <TabProvider>
-          <AppContent />
-          <StartupIntro visible={showIntro} />
-        </TabProvider>
-      </OutputCacheProvider>
-    </ThemeProvider>
+    <HashRouter>
+      <ThemeProvider>
+        <OutputCacheProvider>
+          <TabProvider>
+            <AppContent />
+            <StartupIntro visible={showIntro} />
+          </TabProvider>
+        </OutputCacheProvider>
+      </ThemeProvider>
+    </HashRouter>
   );
 }
 

@@ -1086,6 +1086,13 @@ export const api = {
   },
 
   /**
+   * Reads the content of a file
+   */
+  async readFileContent(filePath: string): Promise<string> {
+    return apiCall("read_file_content", { filePath });
+  },
+
+  /**
    * Gets overall usage statistics
    * @returns Promise resolving to usage statistics
    */
@@ -1939,6 +1946,85 @@ export const api = {
     } catch (error) {
       console.error("Failed to delete slash command:", error);
       throw error;
+    }
+  },
+
+  // ===== Registered Projects Management =====
+  // Projects are stored in app_settings under key 'registered_projects' as JSON array of project paths
+
+  /**
+   * Gets the list of registered project paths
+   * Only these projects will be shown in the project list
+   * @returns Promise resolving to array of registered project paths
+   */
+  async getRegisteredProjects(): Promise<string[]> {
+    try {
+      const setting = await this.getSetting('registered_projects');
+      if (!setting) {
+        return [];
+      }
+      return JSON.parse(setting) as string[];
+    } catch (error) {
+      console.error('Failed to get registered projects:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Registers a new project path
+   * @param projectPath - The project path to register
+   * @returns Promise resolving when the project is registered
+   */
+  async registerProject(projectPath: string): Promise<void> {
+    try {
+      const registered = await this.getRegisteredProjects();
+      // Avoid duplicates
+      if (!registered.includes(projectPath)) {
+        registered.push(projectPath);
+        await this.saveSetting('registered_projects', JSON.stringify(registered));
+      }
+    } catch (error) {
+      console.error('Failed to register project:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Unregisters a project path (removes it from the list)
+   * @param projectPath - The project path to unregister
+   * @returns Promise resolving when the project is unregistered
+   */
+  async unregisterProject(projectPath: string): Promise<void> {
+    try {
+      const registered = await this.getRegisteredProjects();
+      const filtered = registered.filter(p => p !== projectPath);
+      await this.saveSetting('registered_projects', JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Failed to unregister project:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Lists projects that are registered in the app
+   * Filters the full project list from ~/.claude/projects to only include registered ones
+   * @returns Promise resolving to array of registered Project objects
+   */
+  async listRegisteredProjects(): Promise<Project[]> {
+    try {
+      const registeredPaths = await this.getRegisteredProjects();
+      if (registeredPaths.length === 0) {
+        return [];
+      }
+      
+      // Get all projects from ~/.claude/projects
+      const allProjects = await this.listProjects();
+      
+      // Filter to only registered ones
+      return allProjects.filter(p => registeredPaths.includes(p.path));
+    } catch (error) {
+      console.error('Failed to list registered projects:', error);
+      return [];
     }
   },
 

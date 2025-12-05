@@ -1533,6 +1533,47 @@ fn search_files_recursive(
     Ok(())
 }
 
+/// Reads the content of a file
+#[tauri::command]
+pub async fn read_file_content(file_path: String) -> Result<String, String> {
+    log::info!("Reading file content: '{}'", file_path);
+
+    // Check if path is empty
+    if file_path.trim().is_empty() {
+        log::error!("File path is empty or whitespace");
+        return Err("File path cannot be empty".to_string());
+    }
+
+    let path = PathBuf::from(&file_path);
+    log::debug!("Resolved path: {:?}", path);
+
+    if !path.exists() {
+        log::error!("File does not exist: {:?}", path);
+        return Err(format!("File does not exist: {}", file_path));
+    }
+
+    if !path.is_file() {
+        log::error!("Path is not a file: {:?}", path);
+        return Err(format!("Path is not a file: {}", file_path));
+    }
+
+    // Check file size to prevent reading very large files
+    let metadata = fs::metadata(&path)
+        .map_err(|e| format!("Failed to read file metadata: {}", e))?;
+
+    const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB limit
+    if metadata.len() > MAX_FILE_SIZE {
+        log::warn!("File is too large: {} bytes", metadata.len());
+        return Err(format!("File is too large (max {}MB)", MAX_FILE_SIZE / 1024 / 1024));
+    }
+
+    // Read the file content
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+
+    Ok(content)
+}
+
 /// Creates a checkpoint for the current session state
 #[tauri::command]
 pub async fn create_checkpoint(
