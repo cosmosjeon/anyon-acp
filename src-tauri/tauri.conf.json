@@ -79,8 +79,6 @@
       "icons/icon.icns"
     ],
     "resources": [
-      "resources/git-portable",
-      "resources/node-portable",
       "../.env"
     ],
     "externalBin": [],
