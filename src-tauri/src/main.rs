@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod auth_server;
 mod checkpoint;
 mod claude_binary;
 mod commands;
@@ -203,6 +204,18 @@ fn main() {
 
             // Initialize Claude process state
             app.manage(ClaudeProcessState::default());
+
+            // Start auth server in background
+            let jwt_secret = std::env::var("JWT_SECRET")
+                .unwrap_or_else(|_| "dev-secret-key-change-in-production".to_string());
+            let node_env = std::env::var("NODE_ENV")
+                .unwrap_or_else(|_| "development".to_string());
+
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = auth_server::start_auth_server(4000, jwt_secret, node_env).await {
+                    log::error!("Failed to start auth server: {}", e);
+                }
+            });
 
             // Apply window vibrancy with rounded corners on macOS
             #[cfg(target_os = "macos")]
