@@ -2,6 +2,13 @@ name: Build Windows
 
 on:
   workflow_call:
+    secrets:
+      GOOGLE_CLIENT_ID:
+        required: true
+      GOOGLE_CLIENT_SECRET:
+        required: true
+      JWT_SECRET:
+        required: true
   workflow_dispatch:
   push:
     branches: [main]
