@@ -1,30 +1,109 @@
-import React from 'react';
-import { PlayCircle, Square, CheckCircle2, Circle, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { PlayCircle, Square, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useDevWorkflow } from '@/hooks/useDevWorkflow';
 import { DEV_WORKFLOW_SEQUENCE } from '@/constants/development';
+import { api } from '@/lib/api';
+
+const DEV_COMPLETE_FILE = 'anyon-docs/conversation/DEVELOPMENT_COMPLETE.md';
 
 interface DevDocsPanelProps {
   projectPath: string | undefined;
   isPlanningComplete: boolean;
   onSendPrompt: (prompt: string) => void;
+  onStartNewSession?: (prompt: string) => void;
+  isSessionLoading?: boolean;
 }
+
+/**
+ * Get next workflow step based on current step
+ * Orchestrator → Executor → Reviewer → Executor → Reviewer ... (cycle)
+ */
+const getNextStep = (currentStepId: string): typeof DEV_WORKFLOW_SEQUENCE[0] | null => {
+  // Orchestrator → Executor
+  if (currentStepId === 'pm-orchestrator') {
+    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
+  }
+  // Executor → Reviewer
+  if (currentStepId === 'pm-executor') {
+    return DEV_WORKFLOW_SEQUENCE[2]; // pm-reviewer
+  }
+  // Reviewer → Executor (cycle back)
+  if (currentStepId === 'pm-reviewer') {
+    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
+  }
+  return null;
+};
 
 export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
   projectPath,
   isPlanningComplete,
-  onSendPrompt,
+  onStartNewSession,
+  isSessionLoading = false,
 }) => {
-  const {
-    status,
-    currentStep,
-    cycleCount,
-    error,
-    isLoading,
-    start,
-    stop,
-  } = useDevWorkflow(projectPath);
+  // Current running step
+  const [currentRunningStep, setCurrentRunningStep] = useState<string | null>(null);
+  // Track previous loading state to detect completion
+  const prevLoadingRef = useRef(isSessionLoading);
+  // Use ref for stop flag to avoid stale closure in setTimeout
+  const isStoppedRef = useRef(false);
+  // For UI display
+  const [isStopped, setIsStopped] = useState(false);
+  // Development complete state
+  const [isDevComplete, setIsDevComplete] = useState(false);
+
+  // Handle session completion - trigger next step (unless manually stopped or dev complete)
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    const isNowDone = wasLoading && !isSessionLoading;
+    prevLoadingRef.current = isSessionLoading;
+
+    if (isNowDone && currentRunningStep && !isStoppedRef.current) {
+      // Check if development is complete before continuing
+      const checkAndContinue = async () => {
+        if (!projectPath) return;
+
+        const completeFilePath = `${projectPath}/${DEV_COMPLETE_FILE}`;
+        const isComplete = await api.checkFileExists(completeFilePath);
+
+        if (isComplete) {
+          setIsDevComplete(true);
+          setCurrentRunningStep(null);
+          return;
+        }
+
+        const nextStep = getNextStep(currentRunningStep);
+        if (nextStep) {
+          // Small delay before starting next step
+          setTimeout(() => {
+            // Check again in case stop was pressed during the delay
+            if (!isStoppedRef.current) {
+              setCurrentRunningStep(nextStep.id);
+              onStartNewSession?.(nextStep.prompt);
+            }
+          }, 500);
+        }
+      };
+
+      checkAndContinue();
+    }
+  }, [isSessionLoading, currentRunningStep, onStartNewSession, projectPath]);
+
+  // Start a step (clicking any step starts and continues from there)
+  const handleStart = (stepId: string, prompt: string) => {
+    isStoppedRef.current = false;
+    setIsStopped(false);
+    setIsDevComplete(false);
+    setCurrentRunningStep(stepId);
+    onStartNewSession?.(prompt);
+  };
+
+  // Stop - prevents next step from running
+  const handleStop = () => {
+    isStoppedRef.current = true;
+    setIsStopped(true);
+    setCurrentRunningStep(null);
+  };
 
   if (!projectPath) {
     return (
@@ -48,115 +127,84 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
     );
   }
 
+  const isRunningWorkflow = currentRunningStep !== null && isSessionLoading;
+
   return (
     <div className="h-full flex flex-col p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium">개발 워크플로우</h3>
-          {status === 'running' && (
-            <span className="text-xs text-muted-foreground">Cycle {cycleCount}</span>
-          )}
-        </div>
+        <h3 className="font-medium">개발 워크플로우</h3>
 
-        {status === 'idle' && (
-          <Button
-            onClick={() => {
-              // Start dev workflow (calls start_dev_workflow Rust command)
-              start();
-              // Also send the first prompt to chat
-              const firstStep = DEV_WORKFLOW_SEQUENCE[0];
-              onSendPrompt(firstStep.prompt);
-            }}
-            disabled={isLoading}
-            size="sm"
-            className="gap-2"
-          >
-            <PlayCircle className="h-4 w-4" />
-            {isLoading ? '시작 중...' : '개발 시작'}
-          </Button>
-        )}
-
-        {status === 'running' && (
-          <Button onClick={stop} variant="outline" size="sm" className="gap-2">
+        {isRunningWorkflow && (
+          <Button onClick={handleStop} variant="outline" size="sm" className="gap-2">
             <Square className="h-4 w-4" />
             중지
-          </Button>
-        )}
-
-        {status === 'completed' && (
-          <span className="text-sm text-primary font-medium flex items-center gap-1">
-            <CheckCircle2 className="h-4 w-4" />
-            완료!
-          </span>
-        )}
-
-        {status === 'error' && (
-          <Button onClick={() => start()} size="sm" variant="destructive" className="gap-2">
-            다시 시작
           </Button>
         )}
       </div>
 
       {/* Workflow Steps */}
-      <div className="flex items-center gap-2 justify-center mb-4">
+      <div className="flex items-center gap-3 justify-center mb-4">
         {DEV_WORKFLOW_SEQUENCE.map((step, index) => {
-          const isCurrent = currentStep?.id === step.id;
-          const currentIndex = currentStep
-            ? DEV_WORKFLOW_SEQUENCE.findIndex((s) => s.id === currentStep.id)
-            : -1;
-          const isPast = currentIndex > index;
+          const isRunning = currentRunningStep === step.id && isSessionLoading;
 
           return (
             <React.Fragment key={step.id}>
-              <div
+              <button
+                onClick={() => handleStart(step.id, step.prompt)}
+                disabled={!onStartNewSession || isRunningWorkflow}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all',
-                  isCurrent && 'bg-primary/10'
+                  'flex flex-col items-center gap-1.5 px-4 py-3 rounded-lg transition-all',
+                  'hover:bg-muted/80 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed',
+                  'border border-transparent hover:border-border',
+                  isRunning && 'bg-primary/10 border-primary/20'
                 )}
               >
-                {isPast || status === 'completed' ? (
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                ) : isCurrent ? (
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                {isRunning ? (
+                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
                 ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground/40" />
+                  <PlayCircle className="h-6 w-6 text-muted-foreground/60" />
                 )}
                 <span
                   className={cn(
                     'text-xs font-medium',
-                    (isPast || isCurrent) && 'text-primary',
-                    !isPast && !isCurrent && 'text-muted-foreground/60'
+                    isRunning && 'text-primary',
+                    !isRunning && 'text-muted-foreground'
                   )}
                 >
                   {step.title}
                 </span>
-              </div>
+              </button>
               {index < DEV_WORKFLOW_SEQUENCE.length - 1 && (
-                <div
-                  className={cn(
-                    'w-8 h-px',
-                    isPast ? 'bg-primary' : 'bg-muted-foreground/20'
-                  )}
-                />
+                <div className="w-6 h-px bg-muted-foreground/20" />
               )}
             </React.Fragment>
           );
         })}
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="p-3 bg-destructive/10 text-destructive text-sm rounded mb-4">
-          {error}
-        </div>
-      )}
-
       {/* Status Message */}
-      <div className="flex-1 flex items-center justify-center text-muted-foreground">
-        {status === 'idle' && <p>개발 시작 버튼을 눌러 워크플로우를 시작하세요</p>}
-        {status === 'running' && currentStep && <p>{currentStep.title} 실행 중...</p>}
-        {status === 'completed' && <p>모든 개발 워크플로우가 완료되었습니다! 🎉</p>}
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        {isDevComplete && (
+          <div className="text-center">
+            <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-2" />
+            <p className="text-green-600 font-medium">개발이 완료되었습니다!</p>
+          </div>
+        )}
+        {!isDevComplete && !currentRunningStep && !isStopped && (
+          <p>워크플로우 단계를 클릭하여 시작하세요</p>
+        )}
+        {!isDevComplete && !currentRunningStep && isStopped && (
+          <p>중지됨 - 다시 시작하려면 단계를 클릭하세요</p>
+        )}
+        {!isDevComplete && currentRunningStep && isSessionLoading && (
+          <p>
+            {DEV_WORKFLOW_SEQUENCE.find((s) => s.id === currentRunningStep)?.title} 실행 중...
+          </p>
+        )}
+        {!isDevComplete && currentRunningStep && !isSessionLoading && (
+          <p>다음 단계 준비 중...</p>
+        )}
       </div>
     </div>
   );
