@@ -35,12 +35,20 @@ interface ProjectsNavigationContextType {
 
 const ProjectsNavigationContext = createContext<ProjectsNavigationContextType | null>(null);
 
+// Default navigation functions for when context is not available
+const defaultNavigationContext: ProjectsNavigationContextType = {
+  currentRoute: { type: 'list' },
+  navigate: () => console.warn('Navigation not available outside ProjectRoutes'),
+  goToProjectList: () => console.warn('Navigation not available outside ProjectRoutes'),
+  goToProject: () => console.warn('Navigation not available outside ProjectRoutes'),
+  goToMvp: () => console.warn('Navigation not available outside ProjectRoutes'),
+  goToMaintenance: () => console.warn('Navigation not available outside ProjectRoutes'),
+};
+
 export const useProjectsNavigation = () => {
   const context = useContext(ProjectsNavigationContext);
-  if (!context) {
-    throw new Error('useProjectsNavigation must be used within ProjectRoutes');
-  }
-  return context;
+  // Return default context if not within provider (e.g., during lazy loading)
+  return context || defaultNavigationContext;
 };
 
 // Context for sharing projects data across routes
