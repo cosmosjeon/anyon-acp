@@ -56,6 +56,52 @@ fn main() {
     // Initialize logger
     env_logger::init();
 
+    // Set IME environment variables for Linux
+    // This must be done before any GTK initialization
+    #[cfg(target_os = "linux")]
+    {
+        // Try multiple IME backends for better compatibility
+        // Priority: fcitx5 > fcitx > ibus > xim
+        let ime_module = if std::process::Command::new("which")
+            .arg("fcitx5")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            "fcitx5"
+        } else if std::process::Command::new("which")
+            .arg("fcitx")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            "fcitx"
+        } else if std::process::Command::new("which")
+            .arg("ibus")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            "ibus"
+        } else {
+            "xim" // fallback to X Input Method
+        };
+
+        log::info!("Using IME module: {}", ime_module);
+
+        std::env::set_var("GTK_IM_MODULE", ime_module);
+        std::env::set_var("QT_IM_MODULE", ime_module);
+        std::env::set_var("XMODIFIERS", format!("@im={}", ime_module));
+
+        if ime_module == "ibus" {
+            std::env::set_var("IBUS_ENABLE_SYNC_MODE", "1");
+            std::env::set_var("IBUS_USE_PORTAL", "0");
+        }
+
+        std::env::set_var("GDK_BACKEND", "x11");
+        log::info!("IME environment variables set for Linux with {}", ime_module);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())

@@ -80,6 +80,7 @@ interface ClaudeCodeSessionProps {
  */
 export interface ClaudeCodeSessionRef {
   sendPrompt: (prompt: string, model?: "sonnet" | "opus") => void;
+  startNewSession: (initialPrompt: string) => void;
   isLoading: boolean;
 }
 
@@ -484,6 +485,16 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   useImperativeHandle(ref, () => ({
     sendPrompt: (prompt: string, model: "sonnet" | "opus" = "sonnet") => {
       handleSendPrompt(prompt, model);
+    },
+    startNewSession: (initialPrompt: string) => {
+      // Clear current session and start a new one
+      setMessages([]);
+      setRawJsonlOutput([]);
+      setError(null);
+      setIsFirstPrompt(true);
+      setTotalTokens(0);
+      // Send the initial prompt
+      handleSendPrompt(initialPrompt, "sonnet");
     },
     isLoading,
   }), [isLoading]);
