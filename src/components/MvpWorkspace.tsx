@@ -269,6 +269,8 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                       projectPath={project?.path}
                       isPlanningComplete={isPlanningComplete}
                       onSendPrompt={handleSendPlanningPrompt}
+                      onStartNewSession={handleStartNewWorkflow}
+                      isSessionLoading={isSessionLoading}
                     />
                   )}
                   {activeTab === 'preview' && (
