@@ -45,7 +45,7 @@ import { WebviewPreview } from "./WebviewPreview";
 import type { ClaudeStreamMessage } from "./AgentExecution";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
-import { SessionPersistenceService } from "@/services/sessionPersistence";
+import { SessionPersistenceService, type TabType } from "@/services/sessionPersistence";
 import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
 
 // Icon mapping for workflow prompts
@@ -98,6 +98,14 @@ interface ClaudeCodeSessionProps {
    * When true, the input will be positioned within its container instead of fixed at bottom
    */
   embedded?: boolean;
+  /**
+   * Tab type for session persistence (mvp or maintenance)
+   */
+  tabType?: TabType;
+  /**
+   * Callback when a new session is created
+   */
+  onSessionCreated?: (sessionId: string, firstMessage?: string) => void;
 }
 
 /**
@@ -125,6 +133,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   onStreamingChange,
   onProjectPathChange,
   embedded = false,
+  tabType,
+  onSessionCreated,
 }, ref) => {
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
@@ -623,14 +633,29 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                 if (!extractedSessionInfo) {
                   const projectId = projectPath.replace(/[^a-zA-Z0-9]/g, '-');
                   setExtractedSessionInfo({ sessionId: msg.session_id, projectId });
-                  
-                  // Save session data for restoration
-                  SessionPersistenceService.saveSession(
-                    msg.session_id,
-                    projectId,
-                    projectPath,
-                    messages.length
-                  );
+
+                  // Save session data for restoration (tab-specific if tabType provided)
+                  if (tabType) {
+                    SessionPersistenceService.saveSessionForTab(
+                      msg.session_id,
+                      projectId,
+                      projectPath,
+                      tabType,
+                      undefined, // firstMessage will be updated later
+                      messages.length
+                    );
+                    SessionPersistenceService.saveLastSessionForTab(projectPath, tabType, msg.session_id);
+                  } else {
+                    SessionPersistenceService.saveSession(
+                      msg.session_id,
+                      projectId,
+                      projectPath,
+                      messages.length
+                    );
+                  }
+
+                  // Notify parent about new session
+                  onSessionCreated?.(msg.session_id);
                 }
 
                 // Switch to session-specific listeners
@@ -868,7 +893,14 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           }
         };
         setMessages(prev => [...prev, userMessage]);
-        
+
+        // Update first message for session if this is the first prompt
+        if (isFirstPrompt && tabType && claudeSessionId) {
+          const truncatedPrompt = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+          SessionPersistenceService.updateSessionFirstMessage(claudeSessionId, truncatedPrompt);
+          onSessionCreated?.(claudeSessionId, truncatedPrompt);
+        }
+
         // Update session metrics
         sessionMetrics.current.promptsSent += 1;
         sessionMetrics.current.lastActivityTime = Date.now();

@@ -8,10 +8,12 @@ import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
 import { DevDocsPanel } from '@/components/development';
 import { PreviewPanel } from '@/components/PreviewPanel';
+import { SessionDropdown } from '@/components/SessionDropdown';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
-import type { Project } from '@/lib/api';
+import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
+import { SessionPersistenceService } from '@/services/sessionPersistence';
 
 // Lazy load ClaudeCodeSession for better performance
 const ClaudeCodeSession = lazy(() =>
@@ -38,6 +40,8 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const [project, setProject] = useState<Project | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<MvpTabType>('planning');
   const [isSessionLoading, setIsSessionLoading] = useState(false);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [sessionKey, setSessionKey] = useState(0); // Key to force re-mount ClaudeCodeSession
 
   // Ref for ClaudeCodeSession to send prompts programmatically
   const claudeSessionRef = useRef<ClaudeCodeSessionRef>(null);
@@ -52,6 +56,17 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
       setProject(found);
     }
   }, [projectId, projects, getProjectById]);
+
+  // Load last session for this tab when project is set
+  useEffect(() => {
+    if (project?.path) {
+      const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
+      if (lastSessionData) {
+        const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+        setCurrentSession(session);
+      }
+    }
+  }, [project?.path]);
 
   // Check and initialize git repo if needed
   useEffect(() => {
@@ -107,6 +122,24 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   }, []);
 
+  // Handle session selection from dropdown
+  const handleSessionSelect = useCallback((session: Session | null) => {
+    setCurrentSession(session);
+    setSessionKey(prev => prev + 1); // Force re-mount
+
+    // Save as last session if selecting an existing session
+    if (session && project?.path) {
+      SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', session.id);
+    }
+  }, [project?.path]);
+
+  // Handle new session created
+  const handleSessionCreated = useCallback((sessionId: string, firstMessage?: string) => {
+    if (project?.path) {
+      SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId);
+    }
+  }, [project?.path]);
+
   const projectName = project?.path.split('/').pop() || 'Project';
 
   if (loading) {
@@ -157,6 +190,17 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               <p className="text-xs text-muted-foreground">MVP Development</p>
             </div>
           </div>
+
+          {/* Session Dropdown */}
+          {project?.path && (
+            <SessionDropdown
+              projectPath={project.path}
+              tabType="mvp"
+              currentSessionId={currentSession?.id || null}
+              onSessionSelect={handleSessionSelect}
+              className="ml-auto"
+            />
+          )}
         </div>
       </motion.div>
 
@@ -175,12 +219,16 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               }
             >
               <ClaudeCodeSession
+                key={sessionKey}
                 ref={claudeSessionRef}
+                session={currentSession || undefined}
                 initialProjectPath={project?.path}
                 onBack={handleBack}
                 onProjectPathChange={() => {}}
                 onStreamingChange={handleStreamingChange}
                 embedded={true}
+                tabType="mvp"
+                onSessionCreated={handleSessionCreated}
               />
             </Suspense>
           }

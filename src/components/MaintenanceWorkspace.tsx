@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Wrench, Loader2, Code, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,9 +6,11 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SplitPane } from '@/components/ui/split-pane';
 import { FileExplorer } from '@/components/FileExplorer';
 import { PreviewPanel } from '@/components/PreviewPanel';
+import { SessionDropdown } from '@/components/SessionDropdown';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
-import type { Project } from '@/lib/api';
+import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
+import { SessionPersistenceService } from '@/services/sessionPersistence';
 
 // Lazy load ClaudeCodeSession for better performance
 const ClaudeCodeSession = lazy(() =>
@@ -35,6 +37,8 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<MaintenanceTabType>('code');
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [sessionKey, setSessionKey] = useState(0); // Key to force re-mount ClaudeCodeSession
 
   useEffect(() => {
     if (projectId && projects.length > 0) {
@@ -42,6 +46,17 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
       setProject(found);
     }
   }, [projectId, projects, getProjectById]);
+
+  // Load last session for this tab when project is set
+  useEffect(() => {
+    if (project?.path) {
+      const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'maintenance');
+      if (lastSessionData) {
+        const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+        setCurrentSession(session);
+      }
+    }
+  }, [project?.path]);
 
   // Check and initialize git repo if needed
   useEffect(() => {
@@ -75,6 +90,24 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
       goToProjectList();
     }
   };
+
+  // Handle session selection from dropdown
+  const handleSessionSelect = useCallback((session: Session | null) => {
+    setCurrentSession(session);
+    setSessionKey(prev => prev + 1); // Force re-mount
+
+    // Save as last session if selecting an existing session
+    if (session && project?.path) {
+      SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', session.id);
+    }
+  }, [project?.path]);
+
+  // Handle new session created
+  const handleSessionCreated = useCallback((sessionId: string, firstMessage?: string) => {
+    if (project?.path) {
+      SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId);
+    }
+  }, [project?.path]);
 
   const projectName = project?.path.split('/').pop() || 'Project';
 
@@ -126,6 +159,17 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               <p className="text-xs text-muted-foreground">Maintenance</p>
             </div>
           </div>
+
+          {/* Session Dropdown */}
+          {project?.path && (
+            <SessionDropdown
+              projectPath={project.path}
+              tabType="maintenance"
+              currentSessionId={currentSession?.id || null}
+              onSessionSelect={handleSessionSelect}
+              className="ml-auto"
+            />
+          )}
         </div>
       </motion.div>
 
@@ -144,10 +188,14 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               }
             >
               <ClaudeCodeSession
+                key={sessionKey}
+                session={currentSession || undefined}
                 initialProjectPath={project?.path}
                 onBack={handleBack}
                 onProjectPathChange={() => {}}
                 embedded={true}
+                tabType="maintenance"
+                onSessionCreated={handleSessionCreated}
               />
             </Suspense>
           }
