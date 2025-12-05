@@ -69,15 +69,25 @@ export const LoginPage: React.FC = () => {
       }
 
       const data = await response.json();
+
+      // 개발 모드: 토큰이 직접 반환되면 바로 로그인
+      if (data.devMode && data.token) {
+        console.log('Dev mode: logging in with token');
+        await login(data.token);
+        console.log('Login successful!');
+        setIsLoading(false);
+        return;
+      }
+
+      // 프로덕션 모드: OAuth URL로 리다이렉트
       const { url } = data as { url: string };
-
-      // 외부 브라우저로 열기
-      await open(url);
-
-      console.log('Opened Google login page');
+      if (url) {
+        await open(url);
+        console.log('Opened Google login page');
+      }
     } catch (error) {
       console.error('Failed to open Google login:', error);
-      setError('로그인 페이지를 열 수 없습니다.');
+      setError('로그인에 실패했습니다. 다시 시도해주세요.');
       setIsLoading(false);
     }
   };
