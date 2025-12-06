@@ -96,7 +96,7 @@ app.get('/auth/google/url', (req, res) => {
       id: userId,
       email: 'dev@example.com',
       name: 'Dev User',
-      profilePicture: 'https://via.placeholder.com/150',
+      profilePicture: 'https://ui-avatars.com/api/?name=Dev+User&background=6366f1&color=fff&size=150',
       subscription: {
         planType: 'FREE',
         status: 'ACTIVE',
@@ -240,11 +240,12 @@ app.post('/dev/create-user', (req, res) => {
   const { email, name, planType = 'FREE' } = req.body;
 
   const userId = uuidv4();
+  const userName = name || 'Test User';
   const user = {
     id: userId,
     email: email || `test-${Date.now()}@example.com`,
-    name: name || 'Test User',
-    profilePicture: 'https://via.placeholder.com/150',
+    name: userName,
+    profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=6366f1&color=fff&size=150`,
     subscription: {
       planType,
       status: 'ACTIVE',
