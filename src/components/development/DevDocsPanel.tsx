@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { DEV_WORKFLOW_SEQUENCE } from '@/constants/development';
 import { api } from '@/lib/api';
 
-const DEV_COMPLETE_FILE = 'anyon-docs/conversation/DEVELOPMENT_COMPLETE.md';
+const DEV_COMPLETE_FILE = 'anyon-docs/dev-plan/DEVELOPMENT_COMPLETE.md';
 
 interface DevDocsPanelProps {
   projectPath: string | undefined;
