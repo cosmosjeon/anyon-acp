@@ -80,9 +80,7 @@
       "icons/icon.ico",
       "icons/icon.icns"
     ],
-    "resources": [
-      "../.env"
-    ],
+    "resources": [],
     "externalBin": [],
     "copyright": "© 2025 ANYON. All rights reserved.",
     "category": "DeveloperTool",

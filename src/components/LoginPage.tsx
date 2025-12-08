@@ -15,10 +15,10 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Deep Link 이벤트 리스너 등록 (Tauri Deep Link 플러그인)
+    // Deep Link 이벤트 리스너 등록 (Tauri Deep Link 플러그인 v2)
     const setupListener = async () => {
-      const unlisten = await listen<string[]>('deep-link://new-url', async (event) => {
-        console.log('Deep link received:', event.payload);
+      const unlisten = await listen<string[]>('plugin:deep-link://urls', async (event) => {
+        console.log('Deep link received (plugin:deep-link://urls):', event.payload);
 
         try {
           // Tauri Deep Link 플러그인은 URL을 배열로 전달

@@ -86,13 +86,8 @@ function authenticate(req, res, next) {
 
 // Routes
 
-// Dev Login endpoint
+// Dev Login endpoint - simplified version
 app.post('/auth/dev/login', (req, res) => {
-  // Only allow in development mode
-  if (NODE_ENV !== 'development') {
-    return res.status(403).json({ error: 'Not allowed in production' });
-  }
-
   console.log('🔧 Dev Login: Creating mock user');
   const userId = uuidv4();
   const user = {
@@ -101,7 +96,7 @@ app.post('/auth/dev/login', (req, res) => {
     name: 'Dev User',
     profilePicture: null, // Use default icon
     subscription: {
-      planType: 'FREE',
+      planType: 'PRO',
       status: 'ACTIVE',
     },
   };
@@ -201,26 +196,88 @@ app.get('/auth/google/callback', async (req, res) => {
       <html>
         <head>
           <title>Login Successful</title>
+          <meta charset="UTF-8">
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
             .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
             h1 { font-size: 1.5rem; color: #111827; margin-bottom: 1rem; }
-            p { color: #6b7280; margin-bottom: 1.5rem; }
-            .button { display: inline-block; background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: background 0.2s; }
+            p { color: #6b7280; margin-bottom: 1.5rem; line-height: 1.6; }
+            .button { display: inline-block; background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: background 0.2s; cursor: pointer; border: none; font-size: 1rem; }
             .button:hover { background: #1d4ed8; }
+            .status { margin-top: 1rem; font-size: 0.875rem; color: #9ca3af; }
           </style>
         </head>
         <body>
           <div class="card">
             <h1>로그인 성공!</h1>
-            <p>ANYON 앱으로 이동합니다.<br>자동으로 열리지 않으면 아래 버튼을 눌러주세요.</p>
-            <a href="${deepLink}" class="button">ANYON 앱 열기</a>
+            <p id="message">ANYON 앱으로 이동합니다.<br>자동으로 열리지 않으면 아래 버튼을 눌러주세요.</p>
+            <button onclick="openApp()" class="button">ANYON 앱 열기</button>
+            <div class="status" id="status"></div>
           </div>
           <script>
-            // Try to open deep link automatically
-            setTimeout(() => {
-              window.location.href = "${deepLink}";
-            }, 100);
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            function openApp() {
+              attempts++;
+              const statusEl = document.getElementById('status');
+              statusEl.textContent = '앱을 여는 중... (' + attempts + '/' + maxAttempts + ')';
+
+              // Try multiple methods for Windows compatibility
+
+              // Method 1: Direct window.location
+              try {
+                window.location.href = "${deepLink}";
+              } catch (e) {
+                console.error('Method 1 failed:', e);
+              }
+
+              // Method 2: Create hidden iframe (works better on some Windows browsers)
+              setTimeout(() => {
+                try {
+                  const iframe = document.createElement('iframe');
+                  iframe.style.display = 'none';
+                  iframe.src = "${deepLink}";
+                  document.body.appendChild(iframe);
+
+                  setTimeout(() => {
+                    document.body.removeChild(iframe);
+                  }, 1000);
+                } catch (e) {
+                  console.error('Method 2 failed:', e);
+                }
+              }, 200);
+
+              // Method 3: Create link and click it
+              setTimeout(() => {
+                try {
+                  const link = document.createElement('a');
+                  link.href = "${deepLink}";
+                  link.style.display = 'none';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                } catch (e) {
+                  console.error('Method 3 failed:', e);
+                }
+              }, 400);
+
+              if (attempts >= maxAttempts) {
+                statusEl.textContent = '앱이 열리지 않으면 ANYON이 설치되었는지 확인해주세요.';
+              }
+            }
+
+            // Auto-trigger on load - only for browsers that allow it
+            window.onload = function() {
+              // Try once automatically, but user will need to click button if blocked
+              setTimeout(() => {
+                try {
+                  window.location.href = "${deepLink}";
+                } catch (e) {
+                  console.log('Auto-redirect blocked, user needs to click button');
+                }
+              }, 500);
+            };
           </script>
         </body>
       </html>

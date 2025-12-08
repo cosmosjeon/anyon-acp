@@ -124,7 +124,7 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
                 }}
               >
                 <div className="px-4 py-2">
-                  <StreamMessage 
+                  <StreamMessage
                     message={message}
                     streamMessages={messages}
                     onLinkDetected={onLinkDetected}
