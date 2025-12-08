@@ -429,6 +429,63 @@ async fn list_dev_users(
     Ok(Json(user_list))
 }
 
+// Dev Login endpoint - used by LoginPage
+async fn dev_login(
+    AxumState(state): AxumState<AuthState>,
+) -> Result<Json<serde_json::Value>, Response> {
+    if state.node_env != "development" {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: "Only available in development".to_string(),
+            }),
+        )
+            .into_response());
+    }
+
+    log::info!("🔧 Dev Login: Creating mock user");
+
+    let user_id = Uuid::new_v4().to_string();
+    let user = User {
+        id: user_id.clone(),
+        email: "dev@example.com".to_string(),
+        name: "Dev User".to_string(),
+        profile_picture: "".to_string(),
+        subscription: Subscription {
+            tier: "pro".to_string(),
+            status: "active".to_string(),
+        },
+    };
+
+    let token = generate_token(&user_id, &state.jwt_secret).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Failed to generate token: {}", e),
+            }),
+        )
+            .into_response()
+    })?;
+
+    // Store user and session
+    let mut users = state.users.lock().await;
+    users.insert(user_id.clone(), user.clone());
+
+    let mut sessions = state.sessions.lock().await;
+    sessions.insert(token.clone(), user_id);
+
+    Ok(Json(serde_json::json!({
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "profilePicture": user.profile_picture,
+        },
+        "subscription": user.subscription,
+    })))
+}
+
 // Health check
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
@@ -454,6 +511,7 @@ pub async fn start_auth_server(port: u16, jwt_secret: String, node_env: String) 
         .route("/auth/me", get(get_me))
         .route("/auth/verify", get(verify_token_endpoint))
         .route("/auth/subscription", post(update_subscription))
+        .route("/auth/dev/login", post(dev_login))
         // Settings routes
         .route("/api/settings", get(get_settings))
         .route("/api/settings", post(save_settings))

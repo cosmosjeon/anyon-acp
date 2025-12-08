@@ -1,5 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Temporarily hide console in dev mode too
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod auth_server;
 mod checkpoint;
@@ -110,8 +111,52 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            eprintln!("🔄 [SINGLE-INSTANCE] Triggered with args: {:?}", args);
+            log::info!("🔄 Single instance triggered with args: {:?}", args);
+
+            // Forward Deep Link URLs to existing instance
+            for arg in args {
+                if arg.starts_with("anyon://") {
+                    eprintln!("📥 [SINGLE-INSTANCE] Received deep link: {}", arg);
+                    log::info!("📥 Received deep link via single-instance: {}", arg);
+
+                    // Emit the deep link event to the frontend
+                    let urls = vec![arg.clone()];
+                    if let Err(e) = app.emit("plugin:deep-link://urls", urls) {
+                        eprintln!("❌ [SINGLE-INSTANCE] Failed to emit deep link event: {}", e);
+                        log::error!("Failed to emit deep link event: {}", e);
+                    } else {
+                        eprintln!("✅ [SINGLE-INSTANCE] Emitted deep link event successfully");
+                        log::info!("✅ Emitted deep link event successfully");
+                    }
+
+                    // Focus the main window
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.set_focus();
+                        let _ = window.unminimize();
+                    }
+                }
+            }
+        }))
         .setup(|app| {
-            // Deep Link is automatically registered by the plugin
+            use tauri_plugin_deep_link::DeepLinkExt;
+
+            // Deep Link runtime registration - ALWAYS attempt for debugging
+            eprintln!("🔧 [SETUP] Starting Deep Link registration...");
+            log::info!("🔧 [SETUP] Starting Deep Link registration...");
+
+            match app.deep_link().register_all() {
+                Ok(_) => {
+                    eprintln!("✅ [SETUP] Deep link protocols registered successfully");
+                    log::info!("✅ Deep link protocols registered successfully");
+                },
+                Err(e) => {
+                    eprintln!("⚠️ [SETUP] Failed to register deep link protocols: {}", e);
+                    log::warn!("⚠️ Failed to register deep link protocols: {}", e);
+                }
+            }
+
             // Initialize agents database
             let conn = init_database(&app.handle()).expect("Failed to initialize agents database");
 
