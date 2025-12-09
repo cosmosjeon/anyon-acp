@@ -56,45 +56,109 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
+          VERSION="${{ steps.version.outputs.version }}"
+          CLEAN_VERSION="${VERSION#v}"
 
           # Linux artifacts
           if [ -d "artifacts/linux-x86_64" ]; then
-            cp artifacts/linux-x86_64/*.deb release-assets/ANYON_${{ steps.version.outputs.version }}_linux_x86_64.deb || true
-            cp artifacts/linux-x86_64/*.AppImage release-assets/ANYON_${{ steps.version.outputs.version }}_linux_x86_64.AppImage || true
+            cp artifacts/linux-x86_64/*.deb release-assets/ANYON_${VERSION}_linux_x86_64.deb || true
+            cp artifacts/linux-x86_64/*.AppImage release-assets/ANYON_${VERSION}_linux_x86_64.AppImage || true
+            cp artifacts/linux-x86_64/*.AppImage.sig release-assets/ANYON_${VERSION}_linux_x86_64.AppImage.sig || true
           fi
 
           # macOS artifacts
           if [ -d "artifacts/macos-universal" ]; then
-            cp artifacts/macos-universal/ANYON.dmg release-assets/ANYON_${{ steps.version.outputs.version }}_macos_universal.dmg || true
-            cp artifacts/macos-universal/ANYON.app.zip release-assets/ANYON_${{ steps.version.outputs.version }}_macos_universal.app.tar.gz || true
+            cp artifacts/macos-universal/ANYON.dmg release-assets/ANYON_${VERSION}_macos_universal.dmg || true
+            cp artifacts/macos-universal/ANYON.app.zip release-assets/ANYON_${VERSION}_macos_universal.app.tar.gz || true
+          fi
+
+          # macOS updater artifacts (from arch-specific builds)
+          if [ -d "artifacts/macos-aarch64" ]; then
+            cp artifacts/macos-aarch64/*.tar.gz release-assets/ANYON_${VERSION}_macos_aarch64.app.tar.gz || true
+            cp artifacts/macos-aarch64/*.tar.gz.sig release-assets/ANYON_${VERSION}_macos_aarch64.app.tar.gz.sig || true
+          fi
+          if [ -d "artifacts/macos-x86_64" ]; then
+            cp artifacts/macos-x86_64/*.tar.gz release-assets/ANYON_${VERSION}_macos_x86_64.app.tar.gz || true
+            cp artifacts/macos-x86_64/*.tar.gz.sig release-assets/ANYON_${VERSION}_macos_x86_64.app.tar.gz.sig || true
           fi
 
           # Windows artifacts
           if [ -d "artifacts/windows-x86_64" ]; then
-            cp artifacts/windows-x86_64/*.msi release-assets/ANYON_${{ steps.version.outputs.version }}_windows_x86_64.msi || true
-            cp artifacts/windows-x86_64/*.exe release-assets/ANYON_${{ steps.version.outputs.version }}_windows_x86_64.exe || true
+            cp artifacts/windows-x86_64/*.msi release-assets/ANYON_${VERSION}_windows_x86_64.msi || true
+            cp artifacts/windows-x86_64/*.msi.sig release-assets/ANYON_${VERSION}_windows_x86_64.msi.sig || true
+            cp artifacts/windows-x86_64/*.exe release-assets/ANYON_${VERSION}_windows_x86_64.exe || true
+            cp artifacts/windows-x86_64/*-setup.exe.sig release-assets/ANYON_${VERSION}_windows_x86_64-setup.exe.sig || true
           fi
-          
-          # Create source code archives
-          # Clean version without 'v' prefix for archive names
-          CLEAN_VERSION="${{ steps.version.outputs.version }}"
-          CLEAN_VERSION="${CLEAN_VERSION#v}"
-          
+
           # Create source code archives (excluding .git and other unnecessary files)
           echo "Creating source code archives..."
-          
-          # Create a clean export of the repository
           git archive --format=tar.gz --prefix=ANYON-${CLEAN_VERSION}/ -o release-assets/ANYON-${CLEAN_VERSION}.tar.gz HEAD
           git archive --format=zip --prefix=ANYON-${CLEAN_VERSION}/ -o release-assets/ANYON-${CLEAN_VERSION}.zip HEAD
 
-          # Generate signatures for all files
+          # Generate SHA256 checksums for all files
           cd release-assets
           for file in *; do
-            if [ -f "$file" ]; then
+            if [ -f "$file" ] && [[ "$file" != *.sha256 ]]; then
               sha256sum "$file" > "$file.sha256"
             fi
           done
           cd ..
+
+      - name: Generate latest.json for auto-updater
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CLEAN_VERSION="${VERSION#v}"
+          REPO="${{ github.repository }}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Read signatures
+          LINUX_SIG=""
+          MACOS_AARCH64_SIG=""
+          MACOS_X86_64_SIG=""
+          WINDOWS_SIG=""
+
+          if [ -f "release-assets/ANYON_${VERSION}_linux_x86_64.AppImage.sig" ]; then
+            LINUX_SIG=$(cat "release-assets/ANYON_${VERSION}_linux_x86_64.AppImage.sig")
+          fi
+          if [ -f "release-assets/ANYON_${VERSION}_macos_aarch64.app.tar.gz.sig" ]; then
+            MACOS_AARCH64_SIG=$(cat "release-assets/ANYON_${VERSION}_macos_aarch64.app.tar.gz.sig")
+          fi
+          if [ -f "release-assets/ANYON_${VERSION}_macos_x86_64.app.tar.gz.sig" ]; then
+            MACOS_X86_64_SIG=$(cat "release-assets/ANYON_${VERSION}_macos_x86_64.app.tar.gz.sig")
+          fi
+          if [ -f "release-assets/ANYON_${VERSION}_windows_x86_64.msi.sig" ]; then
+            WINDOWS_SIG=$(cat "release-assets/ANYON_${VERSION}_windows_x86_64.msi.sig")
+          fi
+
+          # Create latest.json
+          cat > release-assets/latest.json << EOF
+          {
+            "version": "${CLEAN_VERSION}",
+            "notes": "ANYON ${VERSION} - See release notes on GitHub",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "${MACOS_AARCH64_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/${VERSION}/ANYON_${VERSION}_macos_aarch64.app.tar.gz"
+              },
+              "darwin-x86_64": {
+                "signature": "${MACOS_X86_64_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/${VERSION}/ANYON_${VERSION}_macos_x86_64.app.tar.gz"
+              },
+              "linux-x86_64": {
+                "signature": "${LINUX_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/${VERSION}/ANYON_${VERSION}_linux_x86_64.AppImage"
+              },
+              "windows-x86_64": {
+                "signature": "${WINDOWS_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/${VERSION}/ANYON_${VERSION}_windows_x86_64.msi"
+              }
+            }
+          }
+          EOF
+
+          echo "Generated latest.json:"
+          cat release-assets/latest.json
       
       - name: Create Release
         uses: softprops/action-gh-release@v1

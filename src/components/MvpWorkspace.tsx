@@ -2,7 +2,6 @@ import React, { useEffect, useState, Suspense, lazy, useRef, useCallback } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Lightbulb,
-  Loader2,
   FileText,
   Code,
   Monitor,
@@ -10,13 +9,13 @@ import {
   FolderOpen,
   ArrowLeft,
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
 import { DevDocsPanel } from '@/components/development';
-import { PreviewPanel } from '@/components/PreviewPanel';
+import { EnhancedPreviewPanel } from '@/components/preview';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
@@ -26,12 +25,65 @@ import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
 import { cn } from '@/lib/utils';
 import { shouldUseSdkForWorkflow } from '@/config/featureFlags';
+import { usePreviewStore } from '@/stores/previewStore';
 
 // Lazy load components
 const ClaudeCodeSession = lazy(() =>
   import('@/components/ClaudeCodeSession').then(m => ({ default: m.ClaudeCodeSession }))
 );
 const FileTree = lazy(() => import('@/components/FileTree'));
+
+// Preview Tab Button with live status from store
+const PreviewTabButton: React.FC<{ isActive: boolean; onClick: () => void }> = ({ isActive, onClick }) => {
+  const { devServerRunning, isLoading, previewError } = usePreviewStore();
+  
+  const getStatusBadge = () => {
+    if (isLoading) {
+      return (
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          시작중
+        </span>
+      );
+    }
+    if (previewError) {
+      return (
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+          에러
+        </span>
+      );
+    }
+    if (devServerRunning) {
+      return (
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          연결됨
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+        오프라인
+      </span>
+    );
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+        isActive
+          ? "border-primary text-primary bg-primary/5"
+          : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+      )}
+    >
+      <Monitor className="w-4 h-4" />
+      <span>프리뷰</span>
+      {getStatusBadge()}
+    </button>
+  );
+};
 
 type MvpTabType = 'planning' | 'development' | 'preview';
 
@@ -198,12 +250,6 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   }, [project?.path]);
 
-  const handleSendPlanningPrompt = useCallback((prompt: string) => {
-    if (claudeSessionRef.current) {
-      claudeSessionRef.current.sendPrompt(prompt);
-    }
-  }, []);
-
   const handleSessionSelect = useCallback((session: Session | null) => {
     setCurrentSession(session);
     setSessionKey(prev => prev + 1);
@@ -228,7 +274,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <VideoLoader size="lg" />
       </div>
     );
   }
@@ -307,7 +353,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div>}>
+              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -348,7 +394,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               ref={claudeSessionRef}
@@ -385,24 +431,67 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               transition={{ duration: 0.2 }}
               className="h-full bg-background border-l border-border overflow-hidden flex flex-col"
             >
-              {/* Tabs Header */}
-              <div className="flex-shrink-0 border-b border-border px-3 py-2">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MvpTabType)}>
-                  <TabsList className="bg-muted/50">
-                    <TabsTrigger value="planning" className="gap-1.5 text-xs">
-                      <FileText className="w-3.5 h-3.5" />
-                      기획문서
-                    </TabsTrigger>
-                    <TabsTrigger value="development" className="gap-1.5 text-xs">
-                      <Code className="w-3.5 h-3.5" />
-                      개발문서
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="gap-1.5 text-xs">
-                      <Monitor className="w-3.5 h-3.5" />
-                      프리뷰
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+              {/* Tabs Header with Status Badges */}
+              <div className="flex-shrink-0 border-b border-border">
+                <div className="flex">
+                  {/* 기획문서 탭 */}
+                  <button
+                    onClick={() => setActiveTab('planning')}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'planning'
+                        ? "border-primary text-primary bg-primary/5"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>기획문서</span>
+                    {/* 진행률 배지 */}
+                    <span className={cn(
+                      "text-xs px-1.5 py-0.5 rounded-full",
+                      progress.isAllComplete 
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      {progress.completed}/{progress.total}
+                    </span>
+                  </button>
+
+                  {/* 개발문서 탭 */}
+                  <button
+                    onClick={() => setActiveTab('development')}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'development'
+                        ? "border-primary text-primary bg-primary/5"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <Code className="w-4 h-4" />
+                    <span>개발문서</span>
+                    {/* 상태 배지 */}
+                    {!isPlanningComplete ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                        대기
+                      </span>
+                    ) : isSessionLoading && activeTab === 'development' ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                        실행중
+                      </span>
+                    ) : (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                        준비
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 프리뷰 탭 */}
+                  <PreviewTabButton 
+                    isActive={activeTab === 'preview'}
+                    onClick={() => setActiveTab('preview')}
+                  />
+                </div>
               </div>
 
               {/* Tab Content */}
@@ -418,12 +507,11 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                   <DevDocsPanel
                     projectPath={project?.path}
                     isPlanningComplete={isPlanningComplete}
-                    onSendPrompt={handleSendPlanningPrompt}
                     onStartNewSession={handleStartNewWorkflow}
                     isSessionLoading={isSessionLoading}
                   />
                 )}
-                {activeTab === 'preview' && <PreviewPanel />}
+                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
               </div>
             </motion.div>
           </>

@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTabState } from '@/hooks/useTabState';
 import { useScreenTracking } from '@/hooks/useAnalytics';
 import { Tab } from '@/contexts/TabContext';
-import { Loader2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { ProjectRoutes } from '@/components/ProjectRoutes';
 import { Button } from '@/components/ui/button';
 
@@ -184,7 +185,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
         <Suspense
           fallback={
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              <VideoLoader size="lg" />
             </div>
           }
         >

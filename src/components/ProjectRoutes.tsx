@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useState, useCallback, createContext, useContext } from 'react';
-import { Loader2 } from 'lucide-react';
 import { api, type Project } from '@/lib/api';
 import { useTabContext } from '@/contexts/TabContext';
+import { VideoLoader } from '@/components/VideoLoader';
 
 // Lazy load components
 const ProjectListView = React.lazy(() => import('@/components/ProjectListView'));
@@ -12,7 +12,7 @@ const MaintenanceWorkspace = React.lazy(() => import('@/components/MaintenanceWo
 // Loading fallback
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
-    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    <VideoLoader size="lg" />
   </div>
 );
 

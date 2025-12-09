@@ -6,12 +6,16 @@ import {
   ChevronRight,
   Folder,
   ChevronDown,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
+import { useTheme } from '@/hooks/useTheme';
 import { api, type Project } from '@/lib/api';
 import logoAnyon from '@/assets/logo-anyon.png';
+import logoText from '@/assets/anyon-logo-text.png';
 
 interface MinimalSidebarProps {
   /** Whether settings is active */
@@ -41,6 +45,7 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
   const [expanded, setExpanded] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // Load recent projects when expanded
   useEffect(() => {
@@ -73,39 +78,23 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
         {/* Header - Logo */}
         <div className="h-14 flex items-center border-b border-border/30 px-3 gap-2">
           {expanded ? (
-            <motion.button
+            <button
               onClick={onLogoClick}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="p-1 rounded-lg hover:bg-muted/50 transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 rounded-lg flex-shrink-0 cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
-            </motion.button>
+              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+              <img src={logoText} alt="ANYON" className="h-5 object-contain" />
+            </button>
           ) : (
             <TooltipSimple content="Home" side="right">
-              <motion.button
+              <button
                 onClick={onLogoClick}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-1 rounded-lg hover:bg-muted/50 transition-colors flex-shrink-0"
+                className="p-1 rounded-lg flex-shrink-0 cursor-pointer"
               >
-                <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
-              </motion.button>
+                <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+              </button>
             </TooltipSimple>
           )}
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-sm font-semibold whitespace-nowrap"
-              >
-                ANYON
-              </motion.span>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Expand/Collapse Toggle */}
@@ -204,6 +193,38 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
           'flex flex-col py-2 border-t border-border/30',
           expanded ? 'px-2' : ''
         )}>
+          {/* Theme Toggle */}
+          {expanded ? (
+            <motion.button
+              onClick={toggleTheme}
+              whileTap={{ scale: 0.95 }}
+              className="h-10 flex items-center gap-2 transition-colors rounded-md px-2 w-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 flex-shrink-0" />
+              ) : (
+                <Moon className="w-5 h-5 flex-shrink-0" />
+              )}
+              <span className="text-sm whitespace-nowrap">
+                {theme === 'dark' ? '라이트 모드' : '다크 모드'}
+              </span>
+            </motion.button>
+          ) : (
+            <TooltipSimple content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} side="right">
+              <motion.button
+                onClick={toggleTheme}
+                whileTap={{ scale: 0.95 }}
+                className="h-10 flex items-center gap-2 transition-colors rounded-md w-full justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5 flex-shrink-0" />
+                ) : (
+                  <Moon className="w-5 h-5 flex-shrink-0" />
+                )}
+              </motion.button>
+            </TooltipSimple>
+          )}
+
           {/* Settings */}
           {expanded ? (
             <motion.button

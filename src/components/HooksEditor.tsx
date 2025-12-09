@@ -19,8 +19,9 @@ import {
   PlayCircle,
   Info,
   Save,
-  Loader2
+  
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -735,8 +736,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
       {/* Loading State */}
       {isLoading && (
         <div className="flex items-center justify-center p-8">
-          <Loader2 className="h-6 w-6 animate-spin mr-2" />
-          <span className="text-sm text-muted-foreground">Loading hooks configuration...</span>
+          <VideoLoader size="md" />
         </div>
       )}
       
@@ -777,7 +777,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
                         disabled={!hasUnsavedChanges || isSaving || !projectPath}
                       >
                         {isSaving ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <VideoLoader size="sm" />
                         ) : (
                           <Save className="h-4 w-4 mr-2" />
                         )}

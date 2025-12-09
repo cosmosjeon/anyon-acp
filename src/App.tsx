@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { HashRouter } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import logoAnyon from "@/assets/logo-anyon.png";
 import { useAuthStore } from "@/stores/authStore";
 import { LoginPage } from "@/components/LoginPage";
 import { api } from "@/lib/api";
@@ -14,6 +14,7 @@ import { NFOCredits } from "@/components/NFOCredits";
 import { ClaudeBinaryDialog } from "@/components/ClaudeBinaryDialog";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { StartupIntro } from "@/components/StartupIntro";
+import { UpdateNotification } from "@/components/UpdateNotification";
 import { useAppLifecycle } from "@/hooks";
 
 /**
@@ -152,8 +153,7 @@ function App() {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
+          <img src={logoAnyon} alt="Anyon Logo" className="w-16 h-16 logo-invert" />
         </div>
       </div>
     );
@@ -178,6 +178,7 @@ function App() {
           <TabProvider>
             <AppContent />
             <StartupIntro visible={showIntro} />
+            <UpdateNotification />
           </TabProvider>
         </OutputCacheProvider>
       </ThemeProvider>

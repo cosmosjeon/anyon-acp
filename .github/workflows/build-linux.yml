@@ -66,6 +66,9 @@ jobs:
           EOF
 
       - name: Build Tauri app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri build --target x86_64-unknown-linux-gnu
       
       - name: Create artifacts directory
@@ -73,6 +76,7 @@ jobs:
           mkdir -p dist/linux-x86_64
           cp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb dist/linux-x86_64/ || true
           cp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage dist/linux-x86_64/ || true
+          cp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig dist/linux-x86_64/ || true
           
           # Generate checksums
           cd dist/linux-x86_64

@@ -3,17 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Wrench,
-  Loader2,
+  
   Code,
   Monitor,
   X,
   FolderOpen,
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { FileExplorer } from '@/components/FileExplorer';
-import { PreviewPanel } from '@/components/PreviewPanel';
+import { EnhancedPreviewPanel } from '@/components/preview';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
@@ -183,7 +184,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <VideoLoader size="lg" />
       </div>
     );
   }
@@ -262,7 +263,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div>}>
+              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -303,7 +304,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               session={currentSession || undefined}
@@ -359,7 +360,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                 {activeTab === 'code' && (
                   <FileExplorer rootPath={project?.path} />
                 )}
-                {activeTab === 'preview' && <PreviewPanel />}
+                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
               </div>
             </motion.div>
           </>

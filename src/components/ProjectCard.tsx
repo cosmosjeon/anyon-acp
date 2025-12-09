@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Folder, MoreVertical, Trash2, Clock } from 'lucide-react';
+import { Folder, MoreVertical, Trash2, Clock, CheckSquare, Square } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,9 @@ interface ProjectCardProps {
   onClick: () => void;
   onDelete?: (project: Project) => void;
   className?: string;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 /**
@@ -80,6 +83,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onClick,
   onDelete,
   className,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
 }) => {
   const projectName = getProjectName(project.path);
   const displayPath = getDisplayPath(project.path);
@@ -90,6 +96,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete?.(project);
+  };
+
+  const handleClick = () => {
+    if (isSelectMode && onToggleSelect) {
+      onToggleSelect();
+    } else {
+      onClick();
+    }
   };
 
   return (
@@ -105,37 +119,48 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           "p-4 h-[140px]",
           "transition-all duration-200",
           "hover:shadow-lg hover:border-primary/50",
-          "flex flex-col justify-between"
+          "flex flex-col justify-between",
+          isSelectMode && isSelected && "border-primary bg-primary/5"
         )}
-        onClick={onClick}
+        onClick={handleClick}
       >
         {/* Top section - Icon and menu */}
         <div className="flex items-start justify-between">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Folder className="w-5 h-5 text-primary" />
+            {isSelectMode ? (
+              isSelected ? (
+                <CheckSquare className="w-5 h-5 text-primary" />
+              ) : (
+                <Square className="w-5 h-5 text-muted-foreground" />
+              )
+            ) : (
+              <Folder className="w-5 h-5 text-primary" />
+            )}
           </div>
 
-          {/* 3-dot menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={handleDelete}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* 3-dot menu - hide in select mode */}
+          {!isSelectMode && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Bottom section - Name and info */}

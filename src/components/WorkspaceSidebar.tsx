@@ -10,13 +10,18 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
-  Loader2,
+  
+  Sun,
+  Moon,
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
 import { api, type Session, type Project } from '@/lib/api';
+import { useTheme } from '@/hooks/useTheme';
 import logoAnyon from '@/assets/logo-anyon.png';
+import logoText from '@/assets/anyon-logo-text.png';
 
 interface WorkspaceSidebarProps {
   /** Current project path */
@@ -73,6 +78,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // Load sessions for current project
   useEffect(() => {
@@ -109,8 +115,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     loadProjects();
   }, []);
 
-  const currentProjectName = projectPath.split('/').pop() || 'Project';
-
   const handleSessionClick = (session: Session) => {
     onSessionSelect?.(session);
   };
@@ -128,21 +132,19 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           className
         )}
       >
-        {/* Header - Logo & Project Name */}
+        {/* Header - Logo */}
         <div className="h-14 flex items-center gap-2 px-3 border-b border-border/30">
           <TooltipSimple content="Back to Projects" side="right">
-            <motion.button
+            <button
               onClick={onLogoClick}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="p-1 rounded-lg hover:bg-muted/50 transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 rounded-lg flex-shrink-0 cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-7 h-7 object-contain" />
-            </motion.button>
+              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+              {!collapsed && (
+                <img src={logoText} alt="ANYON" className="h-5 object-contain" />
+              )}
+            </button>
           </TooltipSimple>
-          {!collapsed && (
-            <span className="text-sm font-medium truncate flex-1">{currentProjectName}</span>
-          )}
         </div>
 
         {/* Collapse Toggle */}
@@ -210,7 +212,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             )}
             {loadingSessions ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <VideoLoader size="sm" />
               </div>
             ) : sessions.length === 0 ? (
               !collapsed && (
@@ -354,6 +356,17 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               )}
             >
               {rightPanelVisible ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+            </motion.button>
+          </TooltipSimple>
+
+          {/* Theme Toggle */}
+          <TooltipSimple content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} side={collapsed ? 'right' : 'top'}>
+            <motion.button
+              onClick={toggleTheme}
+              whileTap={{ scale: 0.95 }}
+              className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </motion.button>
           </TooltipSimple>
 

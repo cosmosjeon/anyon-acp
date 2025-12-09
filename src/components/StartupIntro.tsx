@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
-import anyonLogo from "../../src-tauri/icons/icon.png";
+import logoSpiral from "../assets/logo-anyon.png";
+import logoText from "../../ANYON.png";
 import type { CSSProperties } from "react";
-import { useThemeContext } from "../contexts/ThemeContext";
+
 
 /**
  * StartupIntro - a lightweight startup overlay shown on app launch.
@@ -9,9 +10,6 @@ import { useThemeContext } from "../contexts/ThemeContext";
  * - Uses existing shimmer/rotating-symbol styles from shimmer.css.
  */
 export function StartupIntro({ visible }: { visible: boolean }) {
-  const { theme } = useThemeContext();
-  // 다크모드(dark, gray, custom)에서는 로고를 흰색으로 반전
-  const isDarkMode = theme !== 'light';
 
   // Simple entrance animations only
   return (
@@ -55,42 +53,24 @@ export function StartupIntro({ visible }: { visible: boolean }) {
             className="relative flex flex-col items-center justify-center gap-1"
           >
 
-            {/* ANYON logo slides left; brand text reveals to the right */}
-            <div className="relative flex items-center justify-center">
-              {/* Logo wrapper that gently slides left */}
-              <motion.div
-                className="relative z-10"
-                initial={{ opacity: 0, scale: 1, x: 0 }}
-                animate={{ opacity: 1, scale: 1, x: -14 }}
-                transition={{ duration: 0.35, ease: "easeOut", delay: 0.2 }}
-              >
-                <motion.div
-                  className="absolute inset-0 rounded-full bg-primary/15 blur-2xl"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 1, 0.9] }}
-                  transition={{ duration: 0.9, ease: "easeOut" }}
-                />
-                <motion.img
-                  src={anyonLogo}
-                  alt="ANYON"
-                  className="h-20 w-20 rounded-lg shadow-sm"
-                  style={{
-                    filter: isDarkMode ? 'invert(1) brightness(2)' : 'none',
-                  }}
-                  transition={{ repeat: Infinity, repeatType: "loop", ease: "linear", duration: 0.5 }}
-                />
-              </motion.div>
-
-              {/* Brand text reveals left-to-right in the freed space */}
-              <motion.div
-                initial={{ x: -35, opacity: 0, clipPath: "inset(0 100% 0 0)" }}
-                animate={{ x: 2, opacity: 1, clipPath: "inset(0 0% 0 0)" }}
-                transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
-                style={{ willChange: "transform, opacity, clip-path" }}
-              >
-                <BrandText />
-              </motion.div>
-            </div>
+            {/* ANYON logos - spiral left, text right */}
+            <motion.div
+              className="relative z-10 flex items-center gap-4"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, ease: "easeOut", delay: 0.2 }}
+            >
+              <img
+                src={logoSpiral}
+                alt="ANYON"
+                className="h-20 w-20 logo-invert"
+              />
+              <img
+                src={logoText}
+                alt="ANYON"
+                className="h-12 logo-invert"
+              />
+            </motion.div>
 
 
           </motion.div>
@@ -101,12 +81,3 @@ export function StartupIntro({ visible }: { visible: boolean }) {
 }
 
 export default StartupIntro;
-
-function BrandText() {
-  return (
-    <div className="text-5xl font-extrabold tracking-tight brand-text">
-      <span className="brand-text-solid">ANYON</span>
-      <span aria-hidden="true" className="brand-text-shimmer">ANYON</span>
-    </div>
-  );
-}

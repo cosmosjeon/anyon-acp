@@ -3,7 +3,11 @@ import { motion } from "framer-motion";
 import { 
   FolderOpen,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  X,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,6 +27,10 @@ interface ProjectListProps {
    * Callback when open project is clicked
    */
   onOpenProject?: () => void | Promise<void>;
+  /**
+   * Callback when projects are deleted
+   */
+  onDeleteProjects?: (projectIds: string[]) => void | Promise<void>;
   /**
    * Whether the list is currently loading
    */
@@ -87,10 +95,49 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   projects,
   onProjectClick,
   onOpenProject,
+  onDeleteProjects,
   className,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+
+  const toggleSelectMode = () => {
+    if (isSelectMode) {
+      setSelectedProjects(new Set());
+    }
+    setIsSelectMode(!isSelectMode);
+  };
+
+  const toggleProjectSelection = (projectId: string) => {
+    const newSelected = new Set(selectedProjects);
+    if (newSelected.has(projectId)) {
+      newSelected.delete(projectId);
+    } else {
+      newSelected.add(projectId);
+    }
+    setSelectedProjects(newSelected);
+  };
+
+  const selectAllDisplayed = () => {
+    const newSelected = new Set(selectedProjects);
+    displayedProjects.forEach(p => newSelected.add(p.id));
+    setSelectedProjects(newSelected);
+  };
+
+  const deselectAll = () => {
+    setSelectedProjects(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedProjects.size === 0) return;
+    if (onDeleteProjects) {
+      await onDeleteProjects(Array.from(selectedProjects));
+      setSelectedProjects(new Set());
+      setIsSelectMode(false);
+    }
+  };
   
   // Determine how many projects to show
   const projectsPerPage = showAll ? 10 : 5;
@@ -145,22 +192,71 @@ export const ProjectList: React.FC<ProjectListProps> = ({
           {displayedProjects.length > 0 ? (
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-heading-4">Recent Projects</h2>
-            {!showAll ? (
-              <button 
-                onClick={handleViewAll}
-                className="text-caption text-muted-foreground hover:text-foreground transition-colors"
-              >
-                View all ({projects.length})
-              </button>
-            ) : (
-              <button 
-                onClick={handleViewLess}
-                className="text-caption text-muted-foreground hover:text-foreground transition-colors"
-              >
-                View less
-              </button>
-            )}
+                <div className="flex items-center gap-3">
+                  <h2 className="text-heading-4">Recent Projects</h2>
+                  {isSelectMode && selectedProjects.size > 0 && (
+                    <span className="text-caption text-muted-foreground">
+                      {selectedProjects.size} selected
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {isSelectMode ? (
+                    <>
+                      <button
+                        onClick={selectedProjects.size === displayedProjects.length ? deselectAll : selectAllDisplayed}
+                        className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {selectedProjects.size === displayedProjects.length ? 'Deselect all' : 'Select all'}
+                      </button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteSelected}
+                        disabled={selectedProjects.size === 0}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleSelectMode}
+                        className="flex items-center gap-1"
+                      >
+                        <X className="h-3 w-3" />
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {onDeleteProjects && (
+                        <button
+                          onClick={toggleSelectMode}
+                          className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Select
+                        </button>
+                      )}
+                      {!showAll ? (
+                        <button 
+                          onClick={handleViewAll}
+                          className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          View all ({projects.length})
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={handleViewLess}
+                          className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          View less
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
           </div>
           
           <div className="space-y-1">
@@ -176,14 +272,28 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                 className="group"
               >
                 <motion.button
-                  onClick={() => onProjectClick(project)}
+                  onClick={() => isSelectMode ? toggleProjectSelection(project.id) : onProjectClick(project)}
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-accent/50 transition-colors flex items-center justify-between"
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md hover:bg-accent/50 transition-colors flex items-center justify-between",
+                    isSelectMode && selectedProjects.has(project.id) && "bg-accent/30"
+                  )}
                 >
-                  <span className="text-body-small font-medium">
-                    {getProjectName(project.path)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isSelectMode && (
+                      <span className="text-muted-foreground">
+                        {selectedProjects.has(project.id) ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </span>
+                    )}
+                    <span className="text-body-small font-medium">
+                      {getProjectName(project.path)}
+                    </span>
+                  </div>
                   <span className="text-caption text-muted-foreground font-mono text-right" style={{ minWidth: '200px' }}>
                     {getDisplayPath(project.path, 35)}
                   </span>

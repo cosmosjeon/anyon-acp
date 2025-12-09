@@ -5,7 +5,9 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Chrome, Loader2, Crown, Terminal } from 'lucide-react';
+import { Chrome, Crown, Terminal } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
+import anyonLogo from '@/assets/logo-anyon.png';
 
 const API_URL = 'http://localhost:4000';
 
@@ -113,8 +115,8 @@ export const LoginPage: React.FC = () => {
     <div className="h-screen flex items-center justify-center bg-background p-4">
       <Card className="max-w-md w-full p-8 space-y-6">
         {/* 로고 */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">ANYON</h1>
+        <div className="text-center space-y-4">
+          <img src={anyonLogo} alt="ANYON" className="h-12 mx-auto logo-invert" />
           <p className="text-muted-foreground">
             AI 기반 개발 플랫폼
           </p>
@@ -137,7 +139,7 @@ export const LoginPage: React.FC = () => {
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <VideoLoader size="sm" />
                 로그인 중...
               </>
             ) : (
@@ -158,7 +160,7 @@ export const LoginPage: React.FC = () => {
               size="lg"
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <VideoLoader size="sm" />
               ) : (
                 <Terminal className="w-5 h-5 text-muted-foreground" />
               )}

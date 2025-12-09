@@ -8,10 +8,13 @@ import {
   PanelRightClose,
   PanelRightOpen,
   ArrowLeft,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
+import { useTheme } from '@/hooks/useTheme';
 import logoAnyon from '@/assets/logo-anyon.png';
 
 type NavItem = 'chat' | 'files' | 'history' | 'settings';
@@ -67,6 +70,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   showRightPanelToggle = true,
   className,
 }) => {
+  const { theme, toggleTheme } = useTheme();
+
   const handleNavClick = (item: NavItem) => {
     if (navDisabled) return;
     if (item === 'files' && onFilePanelToggle) {
@@ -87,14 +92,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         {/* Logo - Back to Projects */}
         <div className="h-14 flex items-center justify-center border-b border-border/30">
           <TooltipSimple content="Projects" side="right">
-            <motion.button
+            <button
               onClick={onLogoClick}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="p-1 rounded-lg hover:bg-muted/50 transition-colors"
+              className="p-1 rounded-lg cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
-            </motion.button>
+              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+            </button>
           </TooltipSimple>
         </div>
 
@@ -194,6 +197,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               </motion.button>
             </TooltipSimple>
           )}
+
+          {/* Theme Toggle */}
+          <TooltipSimple content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} side="right">
+            <motion.button
+              onClick={toggleTheme}
+              whileTap={{ scale: 0.95 }}
+              className="w-full h-11 flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </motion.button>
+          </TooltipSimple>
 
           {/* Settings */}
           <TooltipSimple content="Settings" side="right">

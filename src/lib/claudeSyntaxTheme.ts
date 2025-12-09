@@ -3,7 +3,7 @@ import { ThemeMode } from '@/contexts/ThemeContext';
 /**
  * Claude-themed syntax highlighting theme factory
  * Returns different syntax themes based on the current theme mode
- * 
+ *
  * @param theme - The current theme mode
  * @returns Prism syntax highlighting theme object
  */
@@ -22,19 +22,6 @@ export const getClaudeSyntaxTheme = (theme: ThemeMode): any => {
       variable: '#a78bfa', // Light Purple
       operator: '#9ca3af',
     },
-    gray: {
-      base: '#e3e8f0',
-      background: 'transparent',
-      comment: '#71717a',
-      punctuation: '#a1a1aa',
-      property: '#fbbf24', // Yellow
-      tag: '#a78bfa', // Light Purple
-      string: '#34d399', // Green
-      function: '#93bbfc', // Light Blue
-      keyword: '#d8b4fe', // Light Purple
-      variable: '#c084fc', // Purple
-      operator: '#a1a1aa',
-    },
     light: {
       base: '#1f2937',
       background: 'transparent',
@@ -48,33 +35,6 @@ export const getClaudeSyntaxTheme = (theme: ThemeMode): any => {
       variable: '#8b5cf6', // Violet
       operator: '#6b7280',
     },
-    white: {
-      base: '#000000',
-      background: 'transparent',
-      comment: '#6b7280',
-      punctuation: '#374151',
-      property: '#dc2626', // Red
-      tag: '#5b21b6', // Deep Purple
-      string: '#047857', // Dark Green
-      function: '#1e40af', // Dark Blue
-      keyword: '#6b21a8', // Dark Purple
-      variable: '#6d28d9', // Dark Violet
-      operator: '#374151',
-    },
-    custom: {
-      // Default to dark theme colors for custom
-      base: '#e3e8f0',
-      background: 'transparent',
-      comment: '#6b7280',
-      punctuation: '#9ca3af',
-      property: '#f59e0b',
-      tag: '#8b5cf6',
-      string: '#10b981',
-      function: '#818cf8',
-      keyword: '#c084fc',
-      variable: '#a78bfa',
-      operator: '#9ca3af',
-    }
   };
 
   const colors = themes[theme] || themes.dark;

@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Download,
-  Loader2,
+  
   AlertCircle,
   Eye,
   Check,
   Globe,
   FileJson,
 } from "lucide-react";
+import { VideoLoader } from "@/components/VideoLoader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -203,7 +204,7 @@ export const GitHubAgentBrowser: React.FC<GitHubAgentBrowserProps> = ({
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <VideoLoader size="lg" />
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -294,7 +295,7 @@ export const GitHubAgentBrowser: React.FC<GitHubAgentBrowserProps> = ({
               <div className="flex-1 overflow-y-auto">
                 {selectedAgent.loading ? (
                   <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <VideoLoader size="lg" />
                   </div>
                 ) : selectedAgent.error ? (
                   <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -364,7 +365,7 @@ export const GitHubAgentBrowser: React.FC<GitHubAgentBrowserProps> = ({
                   >
                     {importing ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <VideoLoader size="sm" />
                         Importing...
                       </>
                     ) : isAgentImported(selectedAgent.file.name) ? (

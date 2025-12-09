@@ -18,13 +18,13 @@ export interface PromptDisplayInfo {
  */
 export const getPromptDisplayInfo = (prompt: string): PromptDisplayInfo => {
   // Check planning workflows
-  const planningStep = WORKFLOW_SEQUENCE.find((s) => s.workflow === prompt);
+  const planningStep = WORKFLOW_SEQUENCE.find((s) => s.workflowId === prompt || prompt.includes(s.workflowId));
   if (planningStep) {
     return { text: planningStep.displayText, icon: planningStep.icon };
   }
 
   // Check development workflows
-  const devStep = DEV_WORKFLOW_SEQUENCE.find((s) => s.prompt === prompt);
+  const devStep = DEV_WORKFLOW_SEQUENCE.find((s) => s.workflowId === prompt || prompt.includes(s.workflowId));
   if (devStep) {
     return { text: devStep.displayText, icon: devStep.icon };
   }

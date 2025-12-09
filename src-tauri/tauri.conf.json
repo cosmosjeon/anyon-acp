@@ -58,9 +58,16 @@
       "schemes": [
         "anyon"
       ]
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5ODc5RkQxQkQyNjhDMTUKUldRVmpDYTkwWitIT2RpN1ZUcEhkWm44RUZzOWx0VTUwdlB1eE9SUk9rQnU0Q09WUGFsS3lMcW8K",
+      "endpoints": [
+        "https://github.com/cosmosgenius/anyon/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "active": true,
     "targets": [
       "deb",

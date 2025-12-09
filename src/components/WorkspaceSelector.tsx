@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Lightbulb, Wrench, Loader2, Download, AlertTriangle, FolderOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Download, AlertTriangle, FolderOpen, CheckCircle } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
+import maintainTabIcon from '@/assets/maintain-tab-icon.png';
+import mvpTabIcon from '@/assets/mvp-tab-icon.png';
 import { Button } from '@/components/ui/button';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -152,7 +155,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
           onLogoClick={goToProjectList}
         />
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <VideoLoader size="lg" />
         </div>
       </div>
     );
@@ -197,79 +200,84 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
         />
 
         {/* Main Content */}
-        <div className="flex-1 h-full overflow-y-auto">
-          <div className="max-w-4xl mx-auto p-6">
-            {/* Installing indicator / Status message */}
+        <div className="flex-1 h-full overflow-y-auto flex flex-col">
+          {/* Installing indicator / Status message - Bottom Center */}
+          <AnimatePresence>
             {(isInstalling || installMessage) && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`mb-4 p-3 rounded-lg flex items-center gap-3 ${
-                  installMessage?.type === 'error'
-                    ? 'bg-destructive/10 border border-destructive/20'
-                    : installMessage?.type === 'success'
-                    ? 'bg-green-500/10 border border-green-500/20'
-                    : 'bg-primary/10 border border-primary/20'
-                }`}
+                exit={{ opacity: 0, y: 20 }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
               >
-                {isInstalling ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-sm">Installing ANYON agents...</span>
-                  </>
-                ) : installMessage && (
-                  <span className={`text-sm ${
-                    installMessage.type === 'error' ? 'text-destructive' :
-                    installMessage.type === 'success' ? 'text-green-500' : ''
-                  }`}>
-                    {installMessage.text}
-                  </span>
-                )}
+                <div className={`flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm ${
+                  installMessage?.type === 'error'
+                    ? 'bg-destructive/90 border-destructive/30 text-white'
+                    : installMessage?.type === 'success'
+                    ? 'bg-green-600/90 border-green-500/30 text-white'
+                    : 'bg-background/95 border-border text-foreground'
+                }`}>
+                  {isInstalling ? (
+                    <>
+                      <VideoLoader size="sm" />
+                      <span className="text-sm font-medium">Installing ANYON agents...</span>
+                    </>
+                  ) : installMessage && (
+                    <>
+                      {installMessage.type === 'success' && <CheckCircle className="h-4 w-4" />}
+                      {installMessage.type === 'error' && <AlertTriangle className="h-4 w-4" />}
+                      <span className="text-sm font-medium">{installMessage.text}</span>
+                    </>
+                  )}
+                </div>
               </motion.div>
             )}
+          </AnimatePresence>
 
-            {/* Breadcrumb */}
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15 }}
-              className="mb-8"
-            >
-              <Breadcrumb
-                items={[
-                  {
-                    label: 'Projects',
-                    onClick: goToProjectList,
-                    icon: <FolderOpen className="w-4 h-4" />,
-                  },
-                  {
-                    label: projectName,
-                  },
-                ]}
-              />
-            </motion.div>
+          {/* Breadcrumb - Top Left */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+            className="p-6"
+          >
+            <Breadcrumb
+              items={[
+                {
+                  label: 'Projects',
+                  onClick: goToProjectList,
+                  icon: <FolderOpen className="w-4 h-4" />,
+                },
+                {
+                  label: projectName,
+                },
+              ]}
+            />
+          </motion.div>
 
+          {/* Center Content */}
+          <div className="flex-1 flex flex-col items-center justify-center px-8 pb-16">
             {/* Selection prompt */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.15, delay: 0.05 }}
-              className="text-center mb-8"
+              className="text-center mb-12"
             >
-              <h2 className="text-xl font-medium text-muted-foreground">
+              <h2 className="text-2xl font-medium text-muted-foreground">
                 What would you like to do?
               </h2>
             </motion.div>
 
             {/* Selection cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 w-full max-w-5xl">
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.15, delay: 0.1 }}
               >
                 <SelectionCard
-                  icon={Lightbulb}
+                  iconImage={mvpTabIcon}
                   title="MVP Development"
                   description="Build new features with AI-assisted planning and documentation"
                   onClick={handleSelectMvp}
@@ -282,7 +290,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
                 transition={{ duration: 0.15, delay: 0.15 }}
               >
                 <SelectionCard
-                  icon={Wrench}
+                  iconImage={maintainTabIcon}
                   title="Maintenance"
                   description="Fix bugs, refactor code, and maintain existing features"
                   onClick={handleSelectMaintenance}

@@ -39,14 +39,29 @@ interface AuthState {
 
 const API_URL = 'http://localhost:4000';
 
+// Dev user for development environment
+const DEV_USER: User = {
+  id: 'dev-user-001',
+  email: 'dev@anyon.local',
+  name: 'Dev User',
+};
+
+const DEV_SUBSCRIPTION: Subscription = {
+  planType: 'PRO',
+  status: 'ACTIVE',
+};
+
+// Check if we're in development mode
+const isDev = import.meta.env.DEV;
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // Initial state
-      user: null,
-      subscription: null,
-      accessToken: null,
-      isAuthenticated: false,
+      // Initial state - use dev user in development mode
+      user: isDev ? DEV_USER : null,
+      subscription: isDev ? DEV_SUBSCRIPTION : null,
+      accessToken: isDev ? 'dev-token' : null,
+      isAuthenticated: isDev ? true : false,
       isLoading: false,
       error: null,
 
@@ -87,13 +102,24 @@ export const useAuthStore = create<AuthState>()(
 
       // 로그아웃
       logout: () => {
-        set({
-          user: null,
-          subscription: null,
-          accessToken: null,
-          isAuthenticated: false,
-          error: null,
-        });
+        // In dev mode, reset to dev user instead of null
+        if (isDev) {
+          set({
+            user: DEV_USER,
+            subscription: DEV_SUBSCRIPTION,
+            accessToken: 'dev-token',
+            isAuthenticated: true,
+            error: null,
+          });
+        } else {
+          set({
+            user: null,
+            subscription: null,
+            accessToken: null,
+            isAuthenticated: false,
+            error: null,
+          });
+        }
       },
 
       // 인증 확인
@@ -232,10 +258,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        user: state.user,
-        subscription: state.subscription,
-        accessToken: state.accessToken,
-        isAuthenticated: state.isAuthenticated,
+        // In dev mode, always use dev user
+        user: isDev ? DEV_USER : state.user,
+        subscription: isDev ? DEV_SUBSCRIPTION : state.subscription,
+        accessToken: isDev ? 'dev-token' : state.accessToken,
+        isAuthenticated: isDev ? true : state.isAuthenticated,
       }),
     }
   )
