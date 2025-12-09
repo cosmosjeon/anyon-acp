@@ -71,27 +71,27 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
         animate={{ width: expanded ? expandedWidth : collapsedWidth }}
         transition={{ duration: 0.2 }}
         className={cn(
-          'h-full flex flex-col bg-background border-r border-border/50 flex-shrink-0 overflow-hidden',
+          'h-full flex flex-col bg-background border-r border-border/30 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_8px_-2px_rgba(0,0,0,0.3)] flex-shrink-0 overflow-hidden z-10',
           className
         )}
       >
         {/* Header - Logo */}
-        <div className="h-14 flex items-center border-b border-border/30 px-3 gap-2">
+        <div className="h-14 flex items-center justify-center px-3 border-b border-border/30">
           {expanded ? (
             <button
               onClick={onLogoClick}
-              className="flex items-center gap-1.5 rounded-lg flex-shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
-              <img src={logoText} alt="ANYON" className="h-5 object-contain" />
+              <img src={logoAnyon} alt="ANYON" className="w-9 h-9 object-contain logo-invert" />
+              <img src={logoText} alt="ANYON" className="h-6 object-contain" />
             </button>
           ) : (
             <TooltipSimple content="Home" side="right">
               <button
                 onClick={onLogoClick}
-                className="p-1 rounded-lg flex-shrink-0 cursor-pointer"
+                className="rounded-lg cursor-pointer"
               >
-                <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+                <img src={logoAnyon} alt="ANYON" className="w-9 h-9 object-contain logo-invert" />
               </button>
             </TooltipSimple>
           )}

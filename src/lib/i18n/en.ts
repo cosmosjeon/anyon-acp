@@ -1,7 +1,30 @@
 const en = {
   // Settings - Header
   'settings.title': 'Settings',
-  'settings.subtitle': 'Configure Claude Code preferences',
+  'settings.subtitle': 'Customize your app experience',
+
+  // Settings - Simple (Non-developer friendly)
+  'settings.simple.appearance': 'Appearance',
+  'settings.simple.appearanceDesc': 'Change language and visual theme',
+  'settings.simple.language': 'Language',
+  'settings.simple.languageDesc': 'Choose the language for the app',
+  'settings.simple.theme': 'Display Mode',
+  'settings.simple.themeDark': 'Dark mode reduces eye strain',
+  'settings.simple.themeLight': 'Light mode for clear visibility',
+  'settings.simple.welcomeAnimation': 'Welcome Animation',
+  'settings.simple.welcomeAnimationDesc': 'Show a welcome screen when the app starts',
+  'settings.simple.privacy': 'Privacy & Data',
+  'settings.simple.privacyDesc': 'Manage data storage and privacy settings',
+  'settings.simple.rememberTabs': 'Remember Open Tabs',
+  'settings.simple.rememberTabsDesc': 'Restore your tabs when you reopen the app',
+  'settings.simple.helpImprove': 'Help Improve the Service',
+  'settings.simple.helpImproveDesc': 'Share anonymous usage data to help us improve',
+  'settings.simple.privacyProtected': 'Your privacy is protected',
+  'settings.simple.privacyPoint1': 'No personal information or file contents collected',
+  'settings.simple.privacyPoint2': 'All data is anonymized',
+  'settings.simple.privacyPoint3': 'You can turn this off anytime',
+  'settings.simple.developerSettings': 'Developer Settings',
+  'settings.simple.developerSettingsDesc': 'Advanced options for power users (usually no need to change)',
   'settings.save': 'Save Settings',
   'settings.saving': 'Saving...',
   'settings.saved': 'Settings saved successfully!',
@@ -10,6 +33,66 @@ const en = {
   // Settings - Tabs
   'settings.tab.account': 'Account',
   'settings.tab.general': 'General',
+  'settings.tab.ai': 'AI Assistant',
+
+  // Settings - AI Assistant Tab
+  'settings.ai.version': 'AI Version',
+  'settings.ai.versionDesc': 'Choose the AI assistant version for your projects',
+  'settings.ai.versionChanged': 'Click Save to apply changes',
+  'settings.ai.permissions': 'AI Permissions',
+  'settings.ai.permissionsDesc': 'Configure what the AI can do automatically',
+  'settings.ai.allowRules': 'Allowed Actions',
+  'settings.ai.allowRulesDesc': 'Actions the AI can perform without asking for confirmation',
+  'settings.ai.denyRules': 'Blocked Actions',
+  'settings.ai.denyRulesDesc': 'Actions the AI is never allowed to perform',
+  'settings.ai.noAllowRules': 'No allow rules set. The AI will ask for confirmation on all actions.',
+  'settings.ai.noDenyRules': 'No blocked actions set.',
+  'settings.ai.addRule': 'Add Rule',
+  'settings.ai.allowPlaceholder': 'e.g., Bash(npm run build)',
+  'settings.ai.denyPlaceholder': 'e.g., Bash(rm -rf *)',
+  'settings.ai.examples': 'Examples',
+  'settings.ai.exampleNpm': 'Allow npm commands',
+  'settings.ai.exampleRead': 'Allow reading docs folder',
+  'settings.ai.exampleEdit': 'Allow editing src folder',
+  'settings.ai.infoTitle': 'What is the AI Assistant?',
+  'settings.ai.infoDesc': 'The AI assistant helps you write code, edit files, and run commands. Use permission settings to control exactly what the AI can do.',
+
+  // AI Behavior
+  'settings.ai.behavior': 'AI Behavior',
+  'settings.ai.behaviorDesc': 'Customize how the AI works',
+  'settings.ai.coauthored': 'Include "Co-authored by Claude"',
+  'settings.ai.coauthoredDesc': 'Add Claude attribution to git commits and pull requests',
+  'settings.ai.verbose': 'Verbose Output',
+  'settings.ai.verboseDesc': 'Show detailed command execution results',
+  'settings.ai.chatRetention': 'Chat History Retention',
+  'settings.ai.chatRetentionDesc': 'How many days to keep your conversations (default: 30)',
+
+  // Environment Variables
+  'settings.ai.envVars': 'Environment Variables',
+  'settings.ai.envVarsDesc': 'Set additional configuration values for the AI',
+  'settings.ai.addEnvVar': 'Add Variable',
+  'settings.ai.noEnvVars': 'No environment variables configured',
+  'settings.ai.envKeyPlaceholder': 'Variable name',
+  'settings.ai.envValuePlaceholder': 'Value',
+  'settings.ai.commonEnvVars': 'Common variables',
+  'settings.ai.envModelDesc': 'Specify a custom AI model name',
+
+  // Hooks
+  'settings.ai.hooks': 'Automation Scripts',
+  'settings.ai.hooksDesc': 'Run commands automatically before or after certain actions',
+
+  // Proxy
+  'settings.ai.proxy': 'Proxy Settings',
+  'settings.ai.proxyDesc': 'Connect to the AI through a network proxy',
+
+  // Advanced
+  'settings.ai.advanced': 'Advanced Settings',
+  'settings.ai.advancedDesc': 'Additional options for experts (usually no need to change)',
+  'settings.ai.apiKeyHelper': 'API Key Helper Script',
+  'settings.ai.apiKeyHelperDesc': 'Path to a custom script for API authentication',
+  'settings.ai.rawJson': 'Settings File Preview',
+  'settings.ai.rawJsonDesc': 'View the raw settings file content that will be saved',
+
   'settings.tab.permissions': 'Permissions',
   'settings.tab.environment': 'Environment',
   'settings.tab.advanced': 'Advanced',

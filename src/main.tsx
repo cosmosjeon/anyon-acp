@@ -24,14 +24,24 @@ analytics.initialize();
 // Start resource monitoring (check every 2 minutes)
 resourceMonitor.startMonitoring(120000);
 
-// Add a macOS-specific class to the <html> element to enable platform-specific styling
+// Add platform-specific classes to the <html> element to enable platform-specific styling
 // Browser-safe detection using navigator properties (works in Tauri and web preview)
 (() => {
-  const isMacLike = typeof navigator !== "undefined" &&
-    (navigator.platform?.toLowerCase().includes("mac") ||
-      navigator.userAgent?.toLowerCase().includes("mac os x"));
-  if (isMacLike) {
+  if (typeof navigator === "undefined") return;
+  
+  const ua = navigator.userAgent?.toLowerCase() || '';
+  const pl = navigator.platform?.toLowerCase() || '';
+  
+  const isMac = pl.includes("mac") || ua.includes("mac os x");
+  const isWindows = pl.includes("win") || ua.includes("windows");
+  const isLinux = (pl.includes("linux") || ua.includes("linux")) && !ua.includes("android");
+  
+  if (isMac) {
     document.documentElement.classList.add("is-macos");
+  } else if (isWindows) {
+    document.documentElement.classList.add("is-windows");
+  } else if (isLinux) {
+    document.documentElement.classList.add("is-linux");
   }
 })();
 

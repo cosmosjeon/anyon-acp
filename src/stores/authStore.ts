@@ -102,24 +102,13 @@ export const useAuthStore = create<AuthState>()(
 
       // 로그아웃
       logout: () => {
-        // In dev mode, reset to dev user instead of null
-        if (isDev) {
-          set({
-            user: DEV_USER,
-            subscription: DEV_SUBSCRIPTION,
-            accessToken: 'dev-token',
-            isAuthenticated: true,
-            error: null,
-          });
-        } else {
-          set({
-            user: null,
-            subscription: null,
-            accessToken: null,
-            isAuthenticated: false,
-            error: null,
-          });
-        }
+        set({
+          user: null,
+          subscription: null,
+          accessToken: null,
+          isAuthenticated: false,
+          error: null,
+        });
       },
 
       // 인증 확인

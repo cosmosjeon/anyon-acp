@@ -1,7 +1,30 @@
 const ko = {
   // Settings - Header
   'settings.title': '설정',
-  'settings.subtitle': 'Claude Code 환경설정',
+  'settings.subtitle': '앱 환경을 나에게 맞게 설정하세요',
+
+  // Settings - Simple (Non-developer friendly)
+  'settings.simple.appearance': '화면 설정',
+  'settings.simple.appearanceDesc': '언어와 테마를 변경할 수 있어요',
+  'settings.simple.language': '언어',
+  'settings.simple.languageDesc': '앱에서 사용할 언어를 선택하세요',
+  'settings.simple.theme': '화면 모드',
+  'settings.simple.themeDark': '어두운 화면으로 눈의 피로를 줄여요',
+  'settings.simple.themeLight': '밝은 화면으로 선명하게 볼 수 있어요',
+  'settings.simple.welcomeAnimation': '시작 애니메이션',
+  'settings.simple.welcomeAnimationDesc': '앱 시작 시 환영 화면을 보여줘요',
+  'settings.simple.privacy': '개인정보 및 데이터',
+  'settings.simple.privacyDesc': '데이터 저장과 개인정보 설정',
+  'settings.simple.rememberTabs': '열린 탭 기억하기',
+  'settings.simple.rememberTabsDesc': '다음에 앱을 열 때 탭을 복원해요',
+  'settings.simple.helpImprove': '서비스 개선 참여',
+  'settings.simple.helpImproveDesc': '익명 사용 데이터로 서비스 개선에 도움을 줘요',
+  'settings.simple.privacyProtected': '개인정보가 안전하게 보호됩니다',
+  'settings.simple.privacyPoint1': '개인 정보나 파일 내용은 수집하지 않아요',
+  'settings.simple.privacyPoint2': '모든 데이터는 익명으로 처리돼요',
+  'settings.simple.privacyPoint3': '언제든 이 설정을 끌 수 있어요',
+  'settings.simple.developerSettings': '개발자 설정',
+  'settings.simple.developerSettingsDesc': '고급 사용자를 위한 추가 설정 (일반적으로 변경할 필요 없어요)',
   'settings.save': '설정 저장',
   'settings.saving': '저장 중...',
   'settings.saved': '설정이 저장되었습니다!',
@@ -10,6 +33,66 @@ const ko = {
   // Settings - Tabs
   'settings.tab.account': '계정',
   'settings.tab.general': '일반',
+  'settings.tab.ai': 'AI 어시스턴트',
+
+  // Settings - AI Assistant Tab
+  'settings.ai.version': 'AI 버전',
+  'settings.ai.versionDesc': '프로젝트에서 사용할 AI 어시스턴트 버전을 선택하세요',
+  'settings.ai.versionChanged': '저장 버튼을 누르면 변경사항이 적용됩니다',
+  'settings.ai.permissions': 'AI 권한 설정',
+  'settings.ai.permissionsDesc': 'AI가 자동으로 할 수 있는 작업을 설정해요',
+  'settings.ai.allowRules': '허용할 작업',
+  'settings.ai.allowRulesDesc': 'AI가 확인 없이 바로 실행할 수 있는 작업들이에요',
+  'settings.ai.denyRules': '차단할 작업',
+  'settings.ai.denyRulesDesc': 'AI가 절대 실행하지 못하게 막을 작업들이에요',
+  'settings.ai.noAllowRules': '허용 규칙이 없어요. AI가 모든 작업에 대해 확인을 요청해요.',
+  'settings.ai.noDenyRules': '차단 규칙이 없어요.',
+  'settings.ai.addRule': '규칙 추가',
+  'settings.ai.allowPlaceholder': '예: Bash(npm run build)',
+  'settings.ai.denyPlaceholder': '예: Bash(rm -rf *)',
+  'settings.ai.examples': '사용 예시',
+  'settings.ai.exampleNpm': 'npm 명령어 허용',
+  'settings.ai.exampleRead': 'docs 폴더 읽기 허용',
+  'settings.ai.exampleEdit': 'src 폴더 수정 허용',
+  'settings.ai.infoTitle': 'AI 어시스턴트란?',
+  'settings.ai.infoDesc': 'AI 어시스턴트는 코드 작성, 파일 수정, 명령어 실행 등을 도와주는 도구예요. 권한 설정으로 AI가 할 수 있는 작업을 세밀하게 조절할 수 있어요.',
+
+  // AI Behavior
+  'settings.ai.behavior': 'AI 동작 설정',
+  'settings.ai.behaviorDesc': 'AI가 작업하는 방식을 조절해요',
+  'settings.ai.coauthored': '"Claude와 공동 작성" 표시',
+  'settings.ai.coauthoredDesc': 'git 커밋과 PR에 Claude가 도와줬다는 표시를 추가해요',
+  'settings.ai.verbose': '상세 출력 모드',
+  'settings.ai.verboseDesc': '명령어 실행 결과를 자세히 보여줘요',
+  'settings.ai.chatRetention': '대화 기록 보관 기간',
+  'settings.ai.chatRetentionDesc': '대화 내용을 며칠간 저장할지 설정해요 (기본: 30일)',
+
+  // Environment Variables
+  'settings.ai.envVars': '환경 변수',
+  'settings.ai.envVarsDesc': 'AI가 사용할 추가 설정값을 지정해요',
+  'settings.ai.addEnvVar': '변수 추가',
+  'settings.ai.noEnvVars': '설정된 환경 변수가 없어요',
+  'settings.ai.envKeyPlaceholder': '변수 이름',
+  'settings.ai.envValuePlaceholder': '값',
+  'settings.ai.commonEnvVars': '자주 사용하는 변수',
+  'settings.ai.envModelDesc': 'AI 모델 이름을 직접 지정할 수 있어요',
+
+  // Hooks
+  'settings.ai.hooks': '자동 실행 스크립트',
+  'settings.ai.hooksDesc': '특정 작업 전후에 자동으로 실행할 명령어를 설정해요',
+
+  // Proxy
+  'settings.ai.proxy': '프록시 설정',
+  'settings.ai.proxyDesc': '네트워크 프록시를 통해 AI에 연결할 수 있어요',
+
+  // Advanced
+  'settings.ai.advanced': '고급 설정',
+  'settings.ai.advancedDesc': '전문가를 위한 추가 옵션 (보통은 변경할 필요 없어요)',
+  'settings.ai.apiKeyHelper': 'API 키 도우미 스크립트',
+  'settings.ai.apiKeyHelperDesc': 'API 인증을 위한 커스텀 스크립트 경로',
+  'settings.ai.rawJson': '설정 파일 미리보기',
+  'settings.ai.rawJsonDesc': '저장될 설정 파일의 내용을 확인할 수 있어요',
+
   'settings.tab.permissions': '권한',
   'settings.tab.environment': '환경변수',
   'settings.tab.advanced': '고급',

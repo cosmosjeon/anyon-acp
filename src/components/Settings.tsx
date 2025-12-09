@@ -1,25 +1,43 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus,
-  Trash2,
   Save,
   AlertCircle,
-  
   Shield,
   User,
   Mail,
   Crown,
   LogOut,
-  Globe,
+  Sparkles,
+  Moon,
+  Sun,
+  Languages,
+  Palette,
+  FolderOpen,
+  Bot,
+  Plus,
+  Trash2,
+  ChevronDown,
+  CheckCircle2,
+  XCircle,
+  Terminal,
+  FileText,
+  Edit3,
+  HelpCircle,
+  Settings2,
+  Wifi,
+  Database,
+  Zap,
+  Clock,
+  MessageSquare,
+  GitBranch,
 } from "lucide-react";
 import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import {
   api,
   type ClaudeSettings,
@@ -28,9 +46,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { ClaudeVersionSelector } from "./ClaudeVersionSelector";
-import { StorageTab } from "./StorageTab";
 import { HooksEditor } from "./HooksEditor";
-import { SlashCommandsManager } from "./SlashCommandsManager";
 import { ProxySettings } from "./ProxySettings";
 import { useTheme, useTrackEvent, useTranslation } from "@/hooks";
 import { analytics } from "@/lib/analytics";
@@ -38,13 +54,6 @@ import { TabPersistenceService } from "@/services/tabPersistence";
 import { useAuthStore } from "@/stores/authStore";
 
 interface SettingsProps {
-  /**
-   * Callback to go back to the main view
-   */
-  onBack: () => void;
-  /**
-   * Optional className for styling
-   */
   className?: string;
 }
 
@@ -59,33 +68,54 @@ interface EnvironmentVariable {
   value: string;
 }
 
-/**
- * Comprehensive Settings UI for managing Claude Code settings
- * Provides a no-code interface for editing the settings.json file
- */
+type SettingsSection =
+  | "appearance"
+  | "privacy"
+  | "ai-version"
+  | "ai-behavior"
+  | "ai-permissions"
+  | "ai-env"
+  | "ai-hooks"
+  | "ai-proxy"
+  | "ai-advanced"
+  | "account"
+  | "subscription";
+
+interface NavItem {
+  id: SettingsSection;
+  label: string;
+  icon: React.ElementType;
+  category: "general" | "ai" | "account";
+}
+
 export const Settings: React.FC<SettingsProps> = ({
   className,
 }) => {
   const [settings, setSettings] = useState<ClaudeSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Claude binary path
   const [currentBinaryPath, setCurrentBinaryPath] = useState<string | null>(null);
   const [selectedInstallation, setSelectedInstallation] = useState<ClaudeInstallation | null>(null);
   const [binaryPathChanged, setBinaryPathChanged] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Permission rules state
+  // Permission rules
   const [allowRules, setAllowRules] = useState<PermissionRule[]>([]);
   const [denyRules, setDenyRules] = useState<PermissionRule[]>([]);
 
-  // Environment variables state
+  // Environment variables
   const [envVars, setEnvVars] = useState<EnvironmentVariable[]>([]);
 
   // Hooks state
   const [userHooksChanged, setUserHooksChanged] = useState(false);
   const getUserHooks = React.useRef<(() => any) | null>(null);
+
+  // Proxy state
+  const [proxySettingsChanged, setProxySettingsChanged] = useState(false);
+  const saveProxySettings = React.useRef<(() => Promise<void>) | null>(null);
 
   // Theme hook
   const { theme, toggleTheme } = useTheme();
@@ -93,71 +123,68 @@ export const Settings: React.FC<SettingsProps> = ({
   // Translation hook
   const { t, language, setLanguage } = useTranslation();
 
-  // Proxy state
-  const [proxySettingsChanged, setProxySettingsChanged] = useState(false);
-  const saveProxySettings = React.useRef<(() => Promise<void>) | null>(null);
-
   // Analytics state
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const trackEvent = useTrackEvent();
 
   // Tab persistence state
   const [tabPersistenceEnabled, setTabPersistenceEnabled] = useState(true);
+
   // Startup intro preference
   const [startupIntroEnabled, setStartupIntroEnabled] = useState(true);
 
   // Auth store
   const { user, logout, getUserSettings, saveUserSettings, updateUserSetting } = useAuthStore();
 
+  // Navigation items
+  const navItems: NavItem[] = [
+    { id: "appearance", label: t('settings.simple.appearance'), icon: Palette, category: "general" },
+    { id: "privacy", label: t('settings.simple.privacy'), icon: Shield, category: "general" },
+    { id: "ai-version", label: t('settings.ai.version'), icon: Bot, category: "ai" },
+    { id: "ai-behavior", label: t('settings.ai.behavior'), icon: MessageSquare, category: "ai" },
+    { id: "ai-permissions", label: t('settings.ai.permissions'), icon: Shield, category: "ai" },
+    { id: "ai-env", label: t('settings.ai.envVars'), icon: Settings2, category: "ai" },
+    { id: "ai-hooks", label: t('settings.ai.hooks'), icon: Zap, category: "ai" },
+    { id: "ai-proxy", label: t('settings.ai.proxy'), icon: Wifi, category: "ai" },
+    { id: "ai-advanced", label: t('settings.ai.advanced'), icon: Database, category: "ai" },
+    { id: "account", label: t('settings.account.title'), icon: User, category: "account" },
+    { id: "subscription", label: t('settings.account.subscription'), icon: Crown, category: "account" },
+  ];
+
   // Load settings on mount
   useEffect(() => {
     loadSettings();
-    loadClaudeBinaryPath();
-    loadAnalyticsSettings();
-    // Load tab persistence setting
-    setTabPersistenceEnabled(TabPersistenceService.isEnabled());
-    // Load startup intro setting (default to true if not set)
-    (async () => {
-      const pref = await api.getSetting('startup_intro_enabled');
-      setStartupIntroEnabled(pref === null ? true : pref === 'true');
-    })();
   }, []);
 
-  /**
-   * Loads analytics settings
-   */
-  const loadAnalyticsSettings = async () => {
-    const settings = analytics.getSettings();
-    if (settings) {
-      setAnalyticsEnabled(settings.enabled);
-    }
-  };
-
-  /**
-   * Loads the current Claude binary path
-   */
-  const loadClaudeBinaryPath = async () => {
-    try {
-      const path = await api.getClaudeBinaryPath();
-      setCurrentBinaryPath(path);
-    } catch (err) {
-      console.error("Failed to load Claude binary path:", err);
-    }
-  };
-
-  /**
-   * Loads the current Claude settings
-   */
   const loadSettings = async () => {
     try {
       setLoading(true);
-      setError(null);
 
-      // Try to load from server first (user settings)
+      // Load Claude binary path
+      try {
+        const path = await api.getClaudeBinaryPath();
+        setCurrentBinaryPath(path);
+      } catch (err) {
+        console.error("Failed to load Claude binary path:", err);
+      }
+
+      // Load analytics settings
+      const analyticsSettings = analytics.getSettings();
+      if (analyticsSettings) {
+        setAnalyticsEnabled(analyticsSettings.enabled);
+      }
+
+      // Load tab persistence setting
+      setTabPersistenceEnabled(TabPersistenceService.isEnabled());
+
+      // Load startup intro setting
+      const startupPref = await api.getSetting('startup_intro_enabled');
+      setStartupIntroEnabled(startupPref === null ? true : startupPref === 'true');
+
+      // Try to load from server
       try {
         const userSettings = await getUserSettings();
         if (userSettings && typeof userSettings === 'object') {
-          console.log('Loaded settings from server:', userSettings);
           setSettings(userSettings);
 
           // Parse permissions
@@ -191,7 +218,6 @@ export const Settings: React.FC<SettingsProps> = ({
             );
           }
 
-          // Load UI preferences from server
           if (userSettings.startup_intro_enabled !== undefined) {
             setStartupIntroEnabled(userSettings.startup_intro_enabled === true);
           }
@@ -202,75 +228,56 @@ export const Settings: React.FC<SettingsProps> = ({
             setTabPersistenceEnabled(userSettings.tab_persistence_enabled === true);
             TabPersistenceService.setEnabled(userSettings.tab_persistence_enabled === true);
           }
-
-          setLoading(false);
-          return;
         }
       } catch (serverError) {
-        console.warn('Failed to load from server, falling back to local:', serverError);
-      }
+        console.warn('Failed to load from server, trying local:', serverError);
 
-      // Fallback to local settings
-      const loadedSettings = await api.getClaudeSettings();
+        // Fallback to local settings
+        const loadedSettings = await api.getClaudeSettings();
+        if (loadedSettings && typeof loadedSettings === 'object') {
+          setSettings(loadedSettings);
 
-      // Ensure loadedSettings is an object
-      if (!loadedSettings || typeof loadedSettings !== 'object') {
-        console.warn("Loaded settings is not an object:", loadedSettings);
-        setSettings({});
-        return;
-      }
+          if (loadedSettings.permissions && typeof loadedSettings.permissions === 'object') {
+            if (Array.isArray(loadedSettings.permissions.allow)) {
+              setAllowRules(
+                loadedSettings.permissions.allow.map((rule: string, index: number) => ({
+                  id: `allow-${index}`,
+                  value: rule,
+                }))
+              );
+            }
+            if (Array.isArray(loadedSettings.permissions.deny)) {
+              setDenyRules(
+                loadedSettings.permissions.deny.map((rule: string, index: number) => ({
+                  id: `deny-${index}`,
+                  value: rule,
+                }))
+              );
+            }
+          }
 
-      setSettings(loadedSettings);
-
-      // Parse permissions
-      if (loadedSettings.permissions && typeof loadedSettings.permissions === 'object') {
-        if (Array.isArray(loadedSettings.permissions.allow)) {
-          setAllowRules(
-            loadedSettings.permissions.allow.map((rule: string, index: number) => ({
-              id: `allow-${index}`,
-              value: rule,
-            }))
-          );
+          if (loadedSettings.env && typeof loadedSettings.env === 'object' && !Array.isArray(loadedSettings.env)) {
+            setEnvVars(
+              Object.entries(loadedSettings.env).map(([key, value], index) => ({
+                id: `env-${index}`,
+                key,
+                value: value as string,
+              }))
+            );
+          }
         }
-        if (Array.isArray(loadedSettings.permissions.deny)) {
-          setDenyRules(
-            loadedSettings.permissions.deny.map((rule: string, index: number) => ({
-              id: `deny-${index}`,
-              value: rule,
-            }))
-          );
-        }
-      }
-
-      // Parse environment variables
-      if (loadedSettings.env && typeof loadedSettings.env === 'object' && !Array.isArray(loadedSettings.env)) {
-        setEnvVars(
-          Object.entries(loadedSettings.env).map(([key, value], index) => ({
-            id: `env-${index}`,
-            key,
-            value: value as string,
-          }))
-        );
       }
     } catch (err) {
       console.error("Failed to load settings:", err);
-      setError(t('settings.error.loadFailed'));
-      setSettings({});
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Saves the current settings
-   */
   const saveSettings = async () => {
     try {
       setSaving(true);
-      setError(null);
-      setToast(null);
 
-      // Build the settings object (include ALL settings)
       const updatedSettings: ClaudeSettings = {
         ...settings,
         permissions: {
@@ -283,25 +290,19 @@ export const Settings: React.FC<SettingsProps> = ({
           }
           return acc;
         }, {} as Record<string, string>),
-        // Include UI preferences
         analytics_enabled: analyticsEnabled,
         tab_persistence_enabled: tabPersistenceEnabled,
         startup_intro_enabled: startupIntroEnabled,
       };
 
-      // Save to server (user settings)
       try {
         await saveUserSettings(updatedSettings);
-        console.log('Settings saved to server');
       } catch (serverError) {
-        console.warn('Failed to save to server, falling back to local:', serverError);
-        // Fallback to local save
         await api.saveClaudeSettings(updatedSettings);
       }
 
       setSettings(updatedSettings);
 
-      // Save Claude binary path if changed
       if (binaryPathChanged && selectedInstallation) {
         await api.setClaudeBinaryPath(selectedInstallation.path);
         setCurrentBinaryPath(selectedInstallation.path);
@@ -324,29 +325,21 @@ export const Settings: React.FC<SettingsProps> = ({
       setToast({ message: t('settings.saved'), type: "success" });
     } catch (err) {
       console.error("Failed to save settings:", err);
-      setError(t('settings.error.saveFailed'));
       setToast({ message: t('settings.saveFailed'), type: "error" });
     } finally {
       setSaving(false);
     }
   };
 
-  /**
-   * Updates a simple setting value
-   */
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  /**
-   * Adds a new permission rule
-   */
   const addPermissionRule = (type: "allow" | "deny") => {
     const newRule: PermissionRule = {
       id: `${type}-${Date.now()}`,
       value: "",
     };
-
     if (type === "allow") {
       setAllowRules(prev => [...prev, newRule]);
     } else {
@@ -354,24 +347,14 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  /**
-   * Updates a permission rule
-   */
   const updatePermissionRule = (type: "allow" | "deny", id: string, value: string) => {
     if (type === "allow") {
-      setAllowRules(prev => prev.map(rule =>
-        rule.id === id ? { ...rule, value } : rule
-      ));
+      setAllowRules(prev => prev.map(rule => rule.id === id ? { ...rule, value } : rule));
     } else {
-      setDenyRules(prev => prev.map(rule =>
-        rule.id === id ? { ...rule, value } : rule
-      ));
+      setDenyRules(prev => prev.map(rule => rule.id === id ? { ...rule, value } : rule));
     }
   };
 
-  /**
-   * Removes a permission rule
-   */
   const removePermissionRule = (type: "allow" | "deny", id: string) => {
     if (type === "allow") {
       setAllowRules(prev => prev.filter(rule => rule.id !== id));
@@ -380,9 +363,6 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  /**
-   * Adds a new environment variable
-   */
   const addEnvVar = () => {
     const newVar: EnvironmentVariable = {
       id: `env-${Date.now()}`,
@@ -392,708 +372,874 @@ export const Settings: React.FC<SettingsProps> = ({
     setEnvVars(prev => [...prev, newVar]);
   };
 
-  /**
-   * Updates an environment variable
-   */
   const updateEnvVar = (id: string, field: "key" | "value", value: string) => {
     setEnvVars(prev => prev.map(envVar =>
       envVar.id === id ? { ...envVar, [field]: value } : envVar
     ));
   };
 
-  /**
-   * Removes an environment variable
-   */
   const removeEnvVar = (id: string) => {
     setEnvVars(prev => prev.filter(envVar => envVar.id !== id));
   };
 
-  /**
-   * Handle Claude installation selection
-   */
   const handleClaudeInstallationSelect = (installation: ClaudeInstallation) => {
     setSelectedInstallation(installation);
     setBinaryPathChanged(installation.path !== currentBinaryPath);
   };
 
+  // Render section content
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case "appearance":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                <Palette className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.simple.appearance')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.simple.appearanceDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Language Selector */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Languages className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.simple.language')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.simple.languageDesc')}
+                    </p>
+                  </div>
+                </div>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as 'en' | 'ko')}
+                  className="h-10 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  <option value="en">{t('language.en')}</option>
+                  <option value="ko">{t('language.ko')}</option>
+                </select>
+              </div>
+
+              {/* Theme Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  {theme === 'dark' ? (
+                    <Moon className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <Sun className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.simple.theme')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {theme === 'dark' ? t('settings.simple.themeDark') : t('settings.simple.themeLight')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={theme === 'dark'}
+                  onCheckedChange={toggleTheme}
+                />
+              </div>
+
+              {/* Startup Animation */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.simple.welcomeAnimation')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.simple.welcomeAnimationDesc')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={startupIntroEnabled}
+                  onCheckedChange={async (checked) => {
+                    setStartupIntroEnabled(checked);
+                    try {
+                      await updateUserSetting('startup_intro_enabled', checked);
+                      await api.saveSetting('startup_intro_enabled', checked ? 'true' : 'false');
+                      trackEvent.settingsChanged('startup_intro_enabled', checked);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Tab Persistence */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <FolderOpen className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.simple.rememberTabs')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.simple.rememberTabsDesc')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={tabPersistenceEnabled}
+                  onCheckedChange={async (checked) => {
+                    TabPersistenceService.setEnabled(checked);
+                    setTabPersistenceEnabled(checked);
+                    try {
+                      await updateUserSetting('tab_persistence_enabled', checked);
+                      trackEvent.settingsChanged('tab_persistence_enabled', checked);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case "privacy":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-green-500/10">
+                <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.simple.privacy')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.simple.privacyDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Analytics Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.simple.helpImprove')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.simple.helpImproveDesc')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={analyticsEnabled}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      if (checked) {
+                        await analytics.enable();
+                        setAnalyticsEnabled(true);
+                        await updateUserSetting('analytics_enabled', true);
+                        trackEvent.settingsChanged('analytics_enabled', true);
+                      } else {
+                        await analytics.disable();
+                        setAnalyticsEnabled(false);
+                        await updateUserSetting('analytics_enabled', false);
+                        trackEvent.settingsChanged('analytics_enabled', false);
+                      }
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Privacy Note */}
+              <AnimatePresence>
+                {analyticsEnabled && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="rounded-xl border border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-950/20 p-4"
+                  >
+                    <div className="flex gap-3">
+                      <Shield className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-green-900 dark:text-green-100">{t('settings.simple.privacyProtected')}</p>
+                        <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                          <li>✓ {t('settings.simple.privacyPoint1')}</li>
+                          <li>✓ {t('settings.simple.privacyPoint2')}</li>
+                          <li>✓ {t('settings.simple.privacyPoint3')}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Chat History Retention */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.ai.chatRetention')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.ai.chatRetentionDesc')}
+                    </p>
+                  </div>
+                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="30"
+                  value={settings?.cleanupPeriodDays || ""}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : undefined;
+                    updateSetting("cleanupPeriodDays", value);
+                  }}
+                  className="w-20 text-center"
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case "ai-version":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-violet-500/10">
+                <Bot className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.version')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.versionDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <ClaudeVersionSelector
+                selectedPath={currentBinaryPath}
+                onSelect={handleClaudeInstallationSelect}
+                simplified={true}
+              />
+              {binaryPathChanged && (
+                <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  {t('settings.ai.versionChanged')}
+                </p>
+              )}
+            </div>
+
+            {/* Info Card */}
+            <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/20">
+              <div className="flex gap-3">
+                <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">{t('settings.ai.infoTitle')}</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    {t('settings.ai.infoDesc')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "ai-behavior":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-blue-500/10">
+                <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.behavior')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.behaviorDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Include Co-authored By */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <GitBranch className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.ai.coauthored')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.ai.coauthoredDesc')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings?.includeCoAuthoredBy !== false}
+                  onCheckedChange={(checked) => updateSetting("includeCoAuthoredBy", checked)}
+                />
+              </div>
+
+              {/* Verbose Output */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Terminal className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="text-base font-medium">{t('settings.ai.verbose')}</Label>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {t('settings.ai.verboseDesc')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings?.verbose === true}
+                  onCheckedChange={(checked) => updateSetting("verbose", checked)}
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case "ai-permissions":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10">
+                <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.permissions')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.permissionsDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* Allow Rules */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <Label className="text-base font-medium text-green-600 dark:text-green-400">
+                      {t('settings.ai.allowRules')}
+                    </Label>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addPermissionRule("allow")}
+                    className="gap-2"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t('settings.ai.addRule')}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.ai.allowRulesDesc')}
+                </p>
+                <div className="space-y-2">
+                  {allowRules.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-muted/40 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {t('settings.ai.noAllowRules')}
+                      </p>
+                    </div>
+                  ) : (
+                    allowRules.map((rule) => (
+                      <div key={rule.id} className="flex items-center gap-2">
+                        <Input
+                          placeholder={t('settings.ai.allowPlaceholder')}
+                          value={rule.value}
+                          onChange={(e) => updatePermissionRule("allow", rule.id, e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removePermissionRule("allow", rule.id)}
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Deny Rules */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <Label className="text-base font-medium text-red-600 dark:text-red-400">
+                      {t('settings.ai.denyRules')}
+                    </Label>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addPermissionRule("deny")}
+                    className="gap-2"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t('settings.ai.addRule')}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.ai.denyRulesDesc')}
+                </p>
+                <div className="space-y-2">
+                  {denyRules.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-muted/40 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {t('settings.ai.noDenyRules')}
+                      </p>
+                    </div>
+                  ) : (
+                    denyRules.map((rule) => (
+                      <div key={rule.id} className="flex items-center gap-2">
+                        <Input
+                          placeholder={t('settings.ai.denyPlaceholder')}
+                          value={rule.value}
+                          onChange={(e) => updatePermissionRule("deny", rule.id, e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removePermissionRule("deny", rule.id)}
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Examples */}
+              <div className="p-4 rounded-xl bg-muted/40 space-y-3">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">{t('settings.ai.examples')}</p>
+                </div>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Terminal className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <code className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs">Bash(npm run *)</code>
+                      <span className="text-muted-foreground ml-2">{t('settings.ai.exampleNpm')}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <code className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs">Read(docs/*)</code>
+                      <span className="text-muted-foreground ml-2">{t('settings.ai.exampleRead')}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Edit3 className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <code className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs">Edit(src/*)</code>
+                      <span className="text-muted-foreground ml-2">{t('settings.ai.exampleEdit')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "ai-env":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-orange-500/10">
+                <Settings2 className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.envVars')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.envVarsDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addEnvVar}
+                  className="gap-2"
+                >
+                  <Plus className="h-3 w-3" />
+                  {t('settings.ai.addEnvVar')}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {envVars.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-muted/40 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.ai.noEnvVars')}
+                    </p>
+                  </div>
+                ) : (
+                  envVars.map((envVar) => (
+                    <div key={envVar.id} className="flex items-center gap-2">
+                      <Input
+                        placeholder={t('settings.ai.envKeyPlaceholder')}
+                        value={envVar.key}
+                        onChange={(e) => updateEnvVar(envVar.id, "key", e.target.value)}
+                        className="flex-1 font-mono text-sm"
+                      />
+                      <span className="text-muted-foreground">=</span>
+                      <Input
+                        placeholder={t('settings.ai.envValuePlaceholder')}
+                        value={envVar.value}
+                        onChange={(e) => updateEnvVar(envVar.id, "value", e.target.value)}
+                        className="flex-1 font-mono text-sm"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeEnvVar(envVar.id)}
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Common Variables Examples */}
+              <div className="p-4 rounded-xl bg-muted/40 space-y-2">
+                <p className="text-sm font-medium">{t('settings.ai.commonEnvVars')}</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li><code className="px-1 py-0.5 rounded bg-primary/10 text-primary text-xs">ANTHROPIC_MODEL</code> - {t('settings.ai.envModelDesc')}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "ai-hooks":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-yellow-500/10">
+                <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.hooks')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.hooksDesc')}</p>
+              </div>
+            </div>
+
+            <HooksEditor
+              scope="user"
+              className="border-0"
+              hideActions={true}
+              onChange={(hasChanges, getHooks) => {
+                setUserHooksChanged(hasChanges);
+                getUserHooks.current = getHooks;
+              }}
+            />
+          </div>
+        );
+
+      case "ai-proxy":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-cyan-500/10">
+                <Wifi className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.proxy')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.proxyDesc')}</p>
+              </div>
+            </div>
+
+            <ProxySettings
+              setToast={setToast}
+              onChange={(hasChanges, _getSettings, save) => {
+                setProxySettingsChanged(hasChanges);
+                saveProxySettings.current = save;
+              }}
+            />
+          </div>
+        );
+
+      case "ai-advanced":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-slate-500/10">
+                <Database className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.ai.advanced')}</h3>
+                <p className="text-sm text-muted-foreground">{t('settings.ai.advancedDesc')}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* API Key Helper */}
+              <div className="space-y-2">
+                <Label>{t('settings.ai.apiKeyHelper')}</Label>
+                <Input
+                  placeholder="/path/to/script.sh"
+                  value={settings?.apiKeyHelper || ""}
+                  onChange={(e) => updateSetting("apiKeyHelper", e.target.value || undefined)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.ai.apiKeyHelperDesc')}
+                </p>
+              </div>
+
+              {/* Raw JSON Preview */}
+              <div className="space-y-2">
+                <Label>{t('settings.ai.rawJson')}</Label>
+                <div className="p-3 rounded-lg bg-muted font-mono text-xs overflow-x-auto max-h-48 overflow-y-auto">
+                  <pre>{JSON.stringify(settings, null, 2)}</pre>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.ai.rawJsonDesc')}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "account":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.account.title')}</h3>
+              </div>
+            </div>
+
+            {user && (
+              <div className="flex items-start gap-4 p-4 bg-muted/40 rounded-xl">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center border border-border">
+                  <User size={28} className="text-primary" />
+                </div>
+
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <User size={16} className="text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('settings.account.name')}</p>
+                      <p className="text-sm font-medium">{user.name}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Mail size={16} className="text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('settings.account.email')}</p>
+                      <p className="text-sm font-medium">{user.email}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Logout */}
+            <div className="pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-red-500/10">
+                    <LogOut className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold">{t('settings.account.logout')}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.account.logoutDescription')}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={logout}
+                  variant="destructive"
+                  size="default"
+                  className="flex items-center gap-2"
+                >
+                  <LogOut size={16} />
+                  {t('settings.account.logout')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "subscription":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-yellow-500/10">
+                <Crown className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{t('settings.account.subscription')}</h3>
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/40 rounded-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Crown size={18} className="text-yellow-500" />
+                  <span className="font-medium">{t('settings.account.currentPlan')}</span>
+                </div>
+                <div className="px-3 py-1 rounded-full bg-muted border border-border">
+                  <span className="text-sm font-medium">{t('settings.account.comingSoon')}</span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-border">
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.account.proDescription')}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className={cn("h-full overflow-y-auto", className)}>
-      <div className="max-w-6xl mx-auto flex flex-col h-full">
-        {/* Header */}
-        <div className="p-6">
-          <div className="flex items-center justify-between">
+      {/* Centered Container */}
+      <div className="max-w-5xl mx-auto h-full flex">
+        {/* Left Navigation */}
+        <div className="w-56 flex-shrink-0 border-r bg-muted/20 flex flex-col">
+          {/* Header */}
+          <div className="p-5 border-b">
+            <h1 className="text-lg font-bold">{t('settings.title')}</h1>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('settings.subtitle')}
+            </p>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto p-3 space-y-5">
+            {/* General Section */}
             <div>
-              <h1 className="text-heading-1">{t('settings.title')}</h1>
-              <p className="mt-1 text-body-small text-muted-foreground">
-                {t('settings.subtitle')}
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                {t('settings.tab.general')}
               </p>
+              <div className="space-y-0.5">
+                {navItems.filter(item => item.category === "general").map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors",
+                      activeSection === item.id
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <motion.div
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.15 }}
+
+            {/* AI Section */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                {t('settings.tab.ai')}
+              </p>
+              <div className="space-y-0.5">
+                {navItems.filter(item => item.category === "ai").map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors",
+                      activeSection === item.id
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Account Section */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                {t('settings.tab.account')}
+              </p>
+              <div className="space-y-0.5">
+                {navItems.filter(item => item.category === "account").map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors",
+                      activeSection === item.id
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </nav>
+
+          {/* Save Button */}
+          <div className="p-3 border-t">
+            <Button
+              onClick={saveSettings}
+              disabled={saving || loading}
+              className="w-full"
+              size="sm"
             >
-              <Button
-                onClick={saveSettings}
-                disabled={saving || loading}
-                size="default"
-              >
-                {saving ? (
-                  <>
-                    <VideoLoader size="sm" />
-                    {t('settings.saving')}
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    {t('settings.save')}
-                  </>
-                )}
-              </Button>
-            </motion.div>
+              {saving ? (
+                <>
+                  <VideoLoader size="sm" />
+                  {t('settings.saving')}
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {t('settings.save')}
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
-        {/* Error message */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}
-              className="mx-4 mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/50 flex items-center gap-2 text-body-small text-destructive"
-            >
-              <AlertCircle className="h-4 w-4" />
-              {error}
-            </motion.div>
+        {/* Right Content */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="h-full flex items-center justify-center">
+              <VideoLoader size="lg" />
+            </div>
+          ) : (
+            <div className="p-6">
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                {renderSectionContent()}
+              </motion.div>
+            </div>
           )}
-        </AnimatePresence>
-
-        {/* Content */}
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <VideoLoader size="lg" />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto p-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid grid-cols-9 w-full mb-6 h-auto p-1">
-                <TabsTrigger value="account" className="py-2.5 px-3">{t('settings.tab.account')}</TabsTrigger>
-                <TabsTrigger value="general" className="py-2.5 px-3">{t('settings.tab.general')}</TabsTrigger>
-                <TabsTrigger value="permissions" className="py-2.5 px-3">{t('settings.tab.permissions')}</TabsTrigger>
-                <TabsTrigger value="environment" className="py-2.5 px-3">{t('settings.tab.environment')}</TabsTrigger>
-                <TabsTrigger value="advanced" className="py-2.5 px-3">{t('settings.tab.advanced')}</TabsTrigger>
-                <TabsTrigger value="hooks" className="py-2.5 px-3">{t('settings.tab.hooks')}</TabsTrigger>
-                <TabsTrigger value="commands" className="py-2.5 px-3">{t('settings.tab.commands')}</TabsTrigger>
-                <TabsTrigger value="storage" className="py-2.5 px-3">{t('settings.tab.storage')}</TabsTrigger>
-                <TabsTrigger value="proxy" className="py-2.5 px-3">{t('settings.tab.proxy')}</TabsTrigger>
-              </TabsList>
-
-              {/* Account Settings */}
-              <TabsContent value="account" className="space-y-6 mt-6">
-                <Card className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-heading-4 mb-4">{t('settings.account.title')}</h3>
-
-                    <div className="space-y-6">
-                      {/* User Profile */}
-                      {user && (
-                        <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
-                          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border border-border">
-                            <User size={32} className="text-primary" />
-                          </div>
-
-                          <div className="flex-1 space-y-3">
-                            <div className="flex items-center gap-2">
-                              <User size={16} className="text-muted-foreground" />
-                              <div>
-                                <p className="text-caption text-muted-foreground">{t('settings.account.name')}</p>
-                                <p className="text-body font-medium">{user.name}</p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <Mail size={16} className="text-muted-foreground" />
-                              <div>
-                                <p className="text-caption text-muted-foreground">{t('settings.account.email')}</p>
-                                <p className="text-body font-medium">{user.email}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Subscription Info */}
-                <Card className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-heading-4 mb-4">{t('settings.account.subscription')}</h3>
-
-                    <div className="p-4 bg-muted/30 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Crown size={20} className="text-yellow-500" />
-                          <span className="text-body font-medium">{t('settings.account.currentPlan')}</span>
-                        </div>
-                        <div className="px-3 py-1 rounded-full bg-muted border border-border">
-                          <span className="text-sm font-medium">{t('settings.account.comingSoon')}</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-border">
-                        <p className="text-body-small text-muted-foreground">
-                          {t('settings.account.proDescription')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Logout Section */}
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-heading-4">{t('settings.account.logout')}</h3>
-                      <p className="text-body-small text-muted-foreground mt-1">
-                        {t('settings.account.logoutDescription')}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={logout}
-                      variant="destructive"
-                      className="flex items-center gap-2"
-                    >
-                      <LogOut size={16} />
-                      {t('settings.account.logout')}
-                    </Button>
-                  </div>
-                </Card>
-              </TabsContent>
-
-              {/* General Settings */}
-              <TabsContent value="general" className="space-y-6 mt-6">
-                <Card className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-heading-4 mb-4">{t('settings.general.title')}</h3>
-
-                    <div className="space-y-4">
-                      {/* Language Selector */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5 flex-1">
-                          <Label>{t('settings.general.language')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.languageDesc')}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value as 'en' | 'ko')}
-                            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          >
-                            <option value="en">{t('language.en')}</option>
-                            <option value="ko">{t('language.ko')}</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Theme Toggle */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5 flex-1">
-                          <Label>{t('settings.general.darkMode')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.darkModeDesc')}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={theme === 'dark'}
-                          onCheckedChange={toggleTheme}
-                        />
-                      </div>
-
-                      {/* Include Co-authored By */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5 flex-1">
-                          <Label htmlFor="coauthored">{t('settings.general.coauthored')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.coauthoredDesc')}
-                          </p>
-                        </div>
-                        <Switch
-                          id="coauthored"
-                          checked={settings?.includeCoAuthoredBy !== false}
-                          onCheckedChange={(checked) => updateSetting("includeCoAuthoredBy", checked)}
-                        />
-                      </div>
-
-                      {/* Verbose Output */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5 flex-1">
-                          <Label htmlFor="verbose">{t('settings.general.verbose')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.verboseDesc')}
-                          </p>
-                        </div>
-                        <Switch
-                          id="verbose"
-                          checked={settings?.verbose === true}
-                          onCheckedChange={(checked) => updateSetting("verbose", checked)}
-                        />
-                      </div>
-
-                      {/* Cleanup Period */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <Label htmlFor="cleanup">{t('settings.general.retention')}</Label>
-                            <p className="text-caption text-muted-foreground mt-1">
-                              {t('settings.general.retentionDesc')}
-                            </p>
-                          </div>
-                          <Input
-                            id="cleanup"
-                            type="number"
-                            min="1"
-                            placeholder="30"
-                            value={settings?.cleanupPeriodDays || ""}
-                            onChange={(e) => {
-                              const value = e.target.value ? parseInt(e.target.value) : undefined;
-                              updateSetting("cleanupPeriodDays", value);
-                            }}
-                            className="w-24"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Claude Binary Path Selector */}
-                      <div className="space-y-3">
-                        <ClaudeVersionSelector
-                          selectedPath={currentBinaryPath}
-                          onSelect={handleClaudeInstallationSelect}
-                          simplified={true}
-                        />
-                        {binaryPathChanged && (
-                          <p className="text-caption text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            {t('settings.general.binaryPathChanged')}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Separator */}
-                      <div className="border-t border-border pt-4 mt-6" />
-
-                      {/* Analytics Toggle */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <Label htmlFor="analytics-enabled">{t('settings.general.analytics')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.analyticsDesc')}
-                          </p>
-                        </div>
-                        <Switch
-                          id="analytics-enabled"
-                          checked={analyticsEnabled}
-                          onCheckedChange={async (checked) => {
-                            try {
-                              if (checked) {
-                                await analytics.enable();
-                                setAnalyticsEnabled(true);
-                                // Save to server
-                                await updateUserSetting('analytics_enabled', true);
-                                trackEvent.settingsChanged('analytics_enabled', true);
-                                setToast({ message: t('settings.general.analyticsEnabled'), type: "success" });
-                              } else {
-                                await analytics.disable();
-                                setAnalyticsEnabled(false);
-                                // Save to server
-                                await updateUserSetting('analytics_enabled', false);
-                                trackEvent.settingsChanged('analytics_enabled', false);
-                                setToast({ message: t('settings.general.analyticsDisabled'), type: "success" });
-                              }
-                            } catch (e) {
-                              setToast({ message: t('settings.general.updateFailed'), type: 'error' });
-                            }
-                          }}
-                        />
-                      </div>
-
-                      {/* Privacy Info */}
-                      {analyticsEnabled && (
-                        <div className="rounded-lg border border-border bg-muted/50 p-3">
-                          <div className="flex gap-2">
-                            <Shield className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-foreground">{t('settings.general.privacyTitle')}</p>
-                              <ul className="text-xs text-muted-foreground space-y-0.5">
-                                <li>• {t('settings.general.privacyItem1')}</li>
-                                <li>• {t('settings.general.privacyItem2')}</li>
-                                <li>• {t('settings.general.privacyItem3')}</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab Persistence Toggle */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <Label htmlFor="tab-persistence">{t('settings.general.tabPersistence')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.tabPersistenceDesc')}
-                          </p>
-                        </div>
-                        <Switch
-                          id="tab-persistence"
-                          checked={tabPersistenceEnabled}
-                          onCheckedChange={async (checked) => {
-                            TabPersistenceService.setEnabled(checked);
-                            setTabPersistenceEnabled(checked);
-                            try {
-                              // Save to server
-                              await updateUserSetting('tab_persistence_enabled', checked);
-                              trackEvent.settingsChanged('tab_persistence_enabled', checked);
-                              setToast({
-                                message: checked
-                                  ? t('settings.general.tabPersistenceEnabled')
-                                  : t('settings.general.tabPersistenceDisabled'),
-                                type: "success"
-                              });
-                            } catch (e) {
-                              setToast({ message: t('settings.general.updateFailed'), type: 'error' });
-                            }
-                          }}
-                        />
-                      </div>
-
-                      {/* Startup Intro Toggle */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <Label htmlFor="startup-intro">{t('settings.general.startupIntro')}</Label>
-                          <p className="text-caption text-muted-foreground">
-                            {t('settings.general.startupIntroDesc')}
-                          </p>
-                        </div>
-                        <Switch
-                          id="startup-intro"
-                          checked={startupIntroEnabled}
-                          onCheckedChange={async (checked) => {
-                            setStartupIntroEnabled(checked);
-                            try {
-                              // Save to server
-                              await updateUserSetting('startup_intro_enabled', checked);
-                              // Also save to local for immediate use
-                              await api.saveSetting('startup_intro_enabled', checked ? 'true' : 'false');
-                              trackEvent.settingsChanged('startup_intro_enabled', checked);
-                              setToast({
-                                message: checked
-                                  ? t('settings.general.startupIntroEnabled')
-                                  : t('settings.general.startupIntroDisabled'),
-                                type: 'success'
-                              });
-                            } catch (e) {
-                              setToast({ message: t('settings.general.updateFailed'), type: 'error' });
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </TabsContent>
-
-              {/* Permissions Settings */}
-              <TabsContent value="permissions" className="space-y-6">
-                <Card className="p-6">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-heading-4 mb-2">{t('settings.permissions.title')}</h3>
-                      <p className="text-body-small text-muted-foreground mb-4">
-                        {t('settings.permissions.description')}
-                      </p>
-                    </div>
-
-                    {/* Allow Rules */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-label text-green-500">{t('settings.permissions.allowRules')}</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addPermissionRule("allow")}
-                          className="gap-2 hover:border-green-500/50 hover:text-green-500"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {t('settings.permissions.addRule')}
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {allowRules.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2">
-                            {t('settings.permissions.noAllowRules')}
-                          </p>
-                        ) : (
-                          allowRules.map((rule) => (
-                            <motion.div
-                              key={rule.id}
-                              initial={{ opacity: 0, x: -8 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.15 }}
-                              className="flex items-center gap-2"
-                            >
-                              <Input
-                                placeholder={t('settings.permissions.allowPlaceholder')}
-                                value={rule.value}
-                                onChange={(e) => updatePermissionRule("allow", rule.id, e.target.value)}
-                                className="flex-1"
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removePermissionRule("allow", rule.id)}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Deny Rules */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-label text-red-500">{t('settings.permissions.denyRules')}</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addPermissionRule("deny")}
-                          className="gap-2 hover:border-red-500/50 hover:text-red-500"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {t('settings.permissions.addRule')}
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {denyRules.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2">
-                            {t('settings.permissions.noDenyRules')}
-                          </p>
-                        ) : (
-                          denyRules.map((rule) => (
-                            <motion.div
-                              key={rule.id}
-                              initial={{ opacity: 0, x: -8 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.15 }}
-                              className="flex items-center gap-2"
-                            >
-                              <Input
-                                placeholder={t('settings.permissions.denyPlaceholder')}
-                                value={rule.value}
-                                onChange={(e) => updatePermissionRule("deny", rule.id, e.target.value)}
-                                className="flex-1"
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removePermissionRule("deny", rule.id)}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        <strong>{t('settings.permissions.examples')}</strong>
-                      </p>
-                      <ul className="text-caption text-muted-foreground space-y-1 ml-4">
-                        <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash</code> - {t('settings.permissions.exampleBash')}</li>
-                        <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash(npm run build)</code> - {t('settings.permissions.exampleBashExact')}</li>
-                        <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash(npm run test:*)</code> - {t('settings.permissions.exampleBashPrefix')}</li>
-                        <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Read(~/.zshrc)</code> - {t('settings.permissions.exampleRead')}</li>
-                        <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Edit(docs/**)</code> - {t('settings.permissions.exampleEdit')}</li>
-                      </ul>
-                    </div>
-                  </div>
-                </Card>
-              </TabsContent>
-
-              {/* Environment Variables */}
-              <TabsContent value="environment" className="space-y-6">
-                <Card className="p-6">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-heading-4">{t('settings.environment.title')}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {t('settings.environment.description')}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={addEnvVar}
-                        className="gap-2"
-                      >
-                        <Plus className="h-3 w-3" />
-                        {t('settings.environment.addVariable')}
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {envVars.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2">
-                          {t('settings.environment.noVariables')}
-                        </p>
-                      ) : (
-                        envVars.map((envVar) => (
-                          <motion.div
-                            key={envVar.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center gap-2"
-                          >
-                            <Input
-                              placeholder={t('settings.environment.keyPlaceholder')}
-                              value={envVar.key}
-                              onChange={(e) => updateEnvVar(envVar.id, "key", e.target.value)}
-                              className="flex-1 font-mono text-sm"
-                            />
-                            <span className="text-muted-foreground">=</span>
-                            <Input
-                              placeholder={t('settings.environment.valuePlaceholder')}
-                              value={envVar.value}
-                              onChange={(e) => updateEnvVar(envVar.id, "value", e.target.value)}
-                              className="flex-1 font-mono text-sm"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeEnvVar(envVar.id)}
-                              className="h-8 w-8 hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </motion.div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="pt-2 space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        <strong>{t('settings.environment.commonVariables')}</strong>
-                      </p>
-                      <ul className="text-caption text-muted-foreground space-y-1 ml-4">
-                        <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">CLAUDE_CODE_ENABLE_TELEMETRY</code> - {t('settings.environment.telemetryDesc')}</li>
-                        <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">ANTHROPIC_MODEL</code> - {t('settings.environment.modelDesc')}</li>
-                        <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">DISABLE_COST_WARNINGS</code> - {t('settings.environment.costWarningsDesc')}</li>
-                      </ul>
-                    </div>
-                  </div>
-                </Card>
-              </TabsContent>
-              {/* Advanced Settings */}
-              <TabsContent value="advanced" className="space-y-6">
-                <Card className="p-6">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-base font-semibold mb-4">{t('settings.advanced.title')}</h3>
-                      <p className="text-sm text-muted-foreground mb-6">
-                        {t('settings.advanced.description')}
-                      </p>
-                    </div>
-
-                    {/* API Key Helper */}
-                    <div className="space-y-2">
-                      <Label htmlFor="apiKeyHelper">{t('settings.advanced.apiKeyHelper')}</Label>
-                      <Input
-                        id="apiKeyHelper"
-                        placeholder="/path/to/generate_api_key.sh"
-                        value={settings?.apiKeyHelper || ""}
-                        onChange={(e) => updateSetting("apiKeyHelper", e.target.value || undefined)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t('settings.advanced.apiKeyHelperDesc')}
-                      </p>
-                    </div>
-
-                    {/* Raw JSON Editor */}
-                    <div className="space-y-2">
-                      <Label>{t('settings.advanced.rawJson')}</Label>
-                      <div className="p-3 rounded-md bg-muted font-mono text-xs overflow-x-auto whitespace-pre-wrap">
-                        <pre>{JSON.stringify(settings, null, 2)}</pre>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {t('settings.advanced.rawJsonDesc')}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              </TabsContent>
-
-              {/* Hooks Settings */}
-              <TabsContent value="hooks" className="space-y-6">
-                <Card className="p-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-base font-semibold mb-2">{t('settings.hooks.title')}</h3>
-                      <p className="text-body-small text-muted-foreground mb-4">
-                        {t('settings.hooks.description')} <code className="mx-1 px-2 py-1 bg-muted rounded text-xs">~/.claude/settings.json</code>
-                      </p>
-                    </div>
-
-                    <HooksEditor
-                      key={activeTab}
-                      scope="user"
-                      className="border-0"
-                      hideActions={true}
-                      onChange={(hasChanges, getHooks) => {
-                        setUserHooksChanged(hasChanges);
-                        getUserHooks.current = getHooks;
-                      }}
-                    />
-                  </div>
-                </Card>
-              </TabsContent>
-
-              {/* Commands Tab */}
-              <TabsContent value="commands">
-                <Card className="p-6">
-                  <SlashCommandsManager className="p-0" />
-                </Card>
-              </TabsContent>
-
-              {/* Storage Tab */}
-              <TabsContent value="storage">
-                <StorageTab />
-              </TabsContent>
-
-              {/* Proxy Settings */}
-              <TabsContent value="proxy">
-                <Card className="p-6">
-                  <ProxySettings
-                    setToast={setToast}
-                    onChange={(hasChanges, _getSettings, save) => {
-                      setProxySettingsChanged(hasChanges);
-                      saveProxySettings.current = save;
-                    }}
-                  />
-                </Card>
-              </TabsContent>
-
-            </Tabs>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Toast Notification */}
@@ -1106,8 +1252,6 @@ export const Settings: React.FC<SettingsProps> = ({
           />
         )}
       </ToastContainer>
-
-
     </div>
   );
-}; 
+};

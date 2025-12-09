@@ -164,7 +164,9 @@ function App() {
     return (
       <HashRouter>
         <ThemeProvider>
-          <LoginPage />
+          <div className="h-screen overflow-hidden">
+            <LoginPage />
+          </div>
         </ThemeProvider>
       </HashRouter>
     );

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import logoSpiral from "../assets/logo-anyon.png";
-import logoText from "../../ANYON.png";
+import logoText from "@/assets/ANYON.png";
 import type { CSSProperties } from "react";
 
 

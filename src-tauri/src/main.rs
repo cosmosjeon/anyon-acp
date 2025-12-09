@@ -56,6 +56,9 @@ use tauri::{Manager, Emitter};
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
+#[cfg(target_os = "windows")]
+use window_vibrancy::apply_mica;
+
 fn main() {
     // Initialize logger
     env_logger::init();
@@ -293,6 +296,16 @@ fn main() {
                         None,
                     )
                     .expect("Failed to apply any window vibrancy");
+                }
+            }
+
+            // Apply Mica effect on Windows 11 (fails silently on older versions)
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    // Apply Mica effect - this only works on Windows 11
+                    // On Windows 10 or older, this will fail silently
+                    let _ = apply_mica(&window, None);
                 }
             }
 

@@ -15,3 +15,59 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 } 
+
+
+/**
+ * Platform detection utilities for cross-platform UI rendering.
+ * Uses navigator.platform and navigator.userAgent for browser-safe detection
+ * that works in both Tauri and web preview environments.
+ */
+export const platform = {
+  /**
+   * Check if the current platform is macOS
+   */
+  isMac: (): boolean => {
+    if (typeof navigator === 'undefined') return false;
+    return (
+      navigator.platform?.toLowerCase().includes('mac') ||
+      navigator.userAgent?.toLowerCase().includes('mac os x') ||
+      false
+    );
+  },
+
+  /**
+   * Check if the current platform is Windows
+   */
+  isWindows: (): boolean => {
+    if (typeof navigator === 'undefined') return false;
+    return (
+      navigator.platform?.toLowerCase().includes('win') ||
+      navigator.userAgent?.toLowerCase().includes('windows') ||
+      false
+    );
+  },
+
+  /**
+   * Check if the current platform is Linux
+   */
+  isLinux: (): boolean => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent?.toLowerCase() || '';
+    const pl = navigator.platform?.toLowerCase() || '';
+    // Exclude Android from Linux detection
+    return (
+      (pl.includes('linux') || ua.includes('linux')) &&
+      !ua.includes('android')
+    );
+  },
+
+  /**
+   * Get the current platform name
+   */
+  getName: (): 'mac' | 'windows' | 'linux' | 'unknown' => {
+    if (platform.isMac()) return 'mac';
+    if (platform.isWindows()) return 'windows';
+    if (platform.isLinux()) return 'linux';
+    return 'unknown';
+  },
+};

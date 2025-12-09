@@ -3,15 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Wrench,
-  
   Code,
   Monitor,
   X,
-  FolderOpen,
+  Lightbulb,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
 import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { FileExplorer } from '@/components/FileExplorer';
 import { EnhancedPreviewPanel } from '@/components/preview';
@@ -45,16 +45,16 @@ interface MaintenanceWorkspaceProps {
  * └────────┴─────────────────┴──────────────────────┘
  */
 export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ projectId }) => {
-  const { goToProject, goToProjectList } = useProjectsNavigation();
+  const { goToProject, goToProjectList, goToMvp } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<MaintenanceTabType>('code');
+  const [activeTab, setActiveTab] = useState<MaintenanceTabType>('preview');
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Sidebar state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Sidebar state - collapsed by default
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [filePanelOpen, setFilePanelOpen] = useState(false);
   const filePanelWidth = 280;
 
@@ -127,26 +127,43 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Resize handling
+  // Resize handling with requestAnimationFrame for smooth performance
   useEffect(() => {
     if (!isDragging) return;
 
+    let animationFrameId: number;
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const sidebarWidth = sidebarCollapsed ? 56 : 256; // Dynamic sidebar width
-      const filePanelW = filePanelOpen ? filePanelWidth : 0;
-      const availableWidth = rect.width - sidebarWidth - filePanelW;
-      const mouseX = e.clientX - rect.left - sidebarWidth - filePanelW;
-      const newRightWidth = ((availableWidth - mouseX) / availableWidth) * 100;
-      setRightPanelWidth(Math.max(25, Math.min(70, newRightWidth)));
+      // Cancel any pending animation frame
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const sidebarWidth = sidebarCollapsed ? 56 : 220; // Correct sidebar widths
+        const filePanelW = filePanelOpen ? filePanelWidth : 0;
+        const availableWidth = rect.width - sidebarWidth - filePanelW;
+        const mouseX = e.clientX - rect.left - sidebarWidth - filePanelW;
+        const newRightWidth = ((availableWidth - mouseX) / availableWidth) * 100;
+        setRightPanelWidth(Math.max(25, Math.min(70, newRightWidth)));
+      });
     };
 
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      setIsDragging(false);
+    };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -211,10 +228,6 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
           currentSessionId={currentSession?.id}
           onNewSession={handleNewSession}
           onSessionSelect={handleSessionSelect}
-          filePanelOpen={filePanelOpen}
-          onFilePanelToggle={() => setFilePanelOpen(prev => !prev)}
-          rightPanelVisible={rightPanelVisible}
-          onRightPanelToggle={() => setRightPanelVisible(prev => !prev)}
           onLogoClick={() => setShowSettings(false)}
           onSettingsClick={() => setShowSettings(false)}
           collapsed={sidebarCollapsed}
@@ -236,10 +249,6 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
         currentSessionId={currentSession?.id}
         onNewSession={handleNewSession}
         onSessionSelect={handleSessionSelect}
-        filePanelOpen={filePanelOpen}
-        onFilePanelToggle={() => setFilePanelOpen(prev => !prev)}
-        rightPanelVisible={rightPanelVisible}
-        onRightPanelToggle={() => setRightPanelVisible(prev => !prev)}
         onLogoClick={goToProjectList}
         onSettingsClick={() => setShowSettings(true)}
         collapsed={sidebarCollapsed}
@@ -282,24 +291,59 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
         style={{ width: rightPanelVisible ? `${100 - rightPanelWidth}%` : '100%' }}
       >
         {/* Header with Breadcrumb */}
-        <div className="flex-shrink-0 h-12 border-b border-border flex items-center px-4 gap-3">
+        <div className="flex-shrink-0 h-12 flex items-center justify-between px-4">
           <Breadcrumb
             items={[
               {
-                label: 'Projects',
-                onClick: goToProjectList,
-                icon: <FolderOpen className="w-4 h-4" />,
-              },
-              {
                 label: projectName,
-                onClick: () => goToProject(projectId),
+                isProjectSelector: true,
+                currentProjectPath: project?.path,
+                onProjectSelect: (selectedProject) => {
+                  const targetProject = projects.find(p => p.path === selectedProject.path);
+                  if (targetProject) {
+                    goToProject(targetProject.id);
+                  }
+                },
               },
               {
-                label: 'Maintenance',
-                icon: <Wrench className="w-4 h-4 text-orange-500" />,
+                label: '유지보수',
+                icon: <Wrench className="w-4 h-4" />,
+                dropdownOptions: [
+                  {
+                    label: 'MVP 개발',
+                    value: 'mvp',
+                    icon: <Lightbulb className="w-4 h-4" />,
+                    description: '새로운 기능 개발',
+                  },
+                  {
+                    label: '유지보수',
+                    value: 'maintenance',
+                    icon: <Wrench className="w-4 h-4" />,
+                    description: '버그 수정 및 개선',
+                  },
+                ],
+                dropdownValue: 'maintenance',
+                onDropdownSelect: (value) => {
+                  if (value === 'mvp' && projectId) {
+                    goToMvp(projectId);
+                  }
+                },
               },
             ]}
           />
+          {/* Panel Toggle Button */}
+          <button
+            onClick={() => setRightPanelVisible(prev => !prev)}
+            className={cn(
+              'p-2 rounded-md transition-colors',
+              rightPanelVisible
+                ? 'text-primary hover:bg-primary/10'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            )}
+            title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
+          >
+            {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+          </button>
         </div>
 
         {/* Chat Content */}
@@ -337,22 +381,34 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               animate={{ width: `${rightPanelWidth}%`, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="h-full bg-background border-l border-border overflow-hidden flex flex-col"
+              className="h-full bg-background border-l border-border overflow-hidden flex flex-col shadow-[-2px_0_8px_rgba(0,0,0,0.08)]"
             >
-              {/* Tabs Header */}
-              <div className="flex-shrink-0 border-b border-border px-3 py-2">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MaintenanceTabType)}>
-                  <TabsList className="bg-muted/50">
-                    <TabsTrigger value="code" className="gap-1.5 text-xs">
-                      <Code className="w-3.5 h-3.5" />
-                      코드
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="gap-1.5 text-xs">
-                      <Monitor className="w-3.5 h-3.5" />
-                      프리뷰
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+              {/* Header - Preview focused with code toggle */}
+              <div className="flex-shrink-0 border-b border-border bg-card/50">
+                <div className="flex items-center justify-between px-3 py-2">
+                  {/* Left: Title */}
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">
+                      {activeTab === 'preview' ? '프리뷰' : '코드'}
+                    </span>
+                  </div>
+
+                  {/* Right: Code toggle button */}
+                  <button
+                    onClick={() => setActiveTab(activeTab === 'preview' ? 'code' : 'preview')}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                      activeTab === 'code'
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                    title={activeTab === 'preview' ? '코드 보기' : '프리뷰 보기'}
+                  >
+                    <Code className="w-3.5 h-3.5" />
+                    <span>{activeTab === 'preview' ? '코드' : '프리뷰'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Tab Content */}
