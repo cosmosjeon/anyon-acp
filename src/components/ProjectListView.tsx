@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderOpen, Search, Loader2, Plus, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { FolderOpen, Search, Loader2, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ProjectCard } from '@/components/ProjectCard';
 import { MinimalSidebar } from '@/components/MinimalSidebar';
 import { Settings } from '@/components/Settings';
@@ -36,6 +42,7 @@ export const ProjectListView: React.FC = () => {
   const [isInstallingAnyon, setIsInstallingAnyon] = useState(false);
   const [installStatus, setInstallStatus] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [sortBy, setSortBy] = useState<'recent' | 'name' | 'created'>('recent');
 
   // Load projects from API
   const refreshProjects = useCallback(async (): Promise<Project[]> => {
@@ -59,12 +66,34 @@ export const ProjectListView: React.FC = () => {
     refreshProjects();
   }, [refreshProjects]);
 
-  // Filter projects by search query
-  const filteredProjects = projects.filter((project) => {
-    const projectName = getProjectName(project.path);
-    return projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           project.path.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  // Filter and sort projects
+  const filteredProjects = useMemo(() => {
+    // First filter by search query
+    const filtered = projects.filter((project) => {
+      const projectName = getProjectName(project.path);
+      return projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             project.path.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
+    // Then sort based on sortBy
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          // Sort by most recent session, fallback to created_at
+          const aTime = a.most_recent_session || a.created_at;
+          const bTime = b.most_recent_session || b.created_at;
+          return bTime - aTime; // Descending (newest first)
+        case 'name':
+          const aName = getProjectName(a.path).toLowerCase();
+          const bName = getProjectName(b.path).toLowerCase();
+          return aName.localeCompare(bName); // Ascending (A-Z)
+        case 'created':
+          return b.created_at - a.created_at; // Descending (newest first)
+        default:
+          return 0;
+      }
+    });
+  }, [projects, searchQuery, sortBy]);
 
   const handleProjectClick = (project: Project) => {
     // Navigate to workspace selector for this project
@@ -226,21 +255,21 @@ export const ProjectListView: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 h-full overflow-y-auto">
-        {/* Installation Status Toast */}
+        {/* Installation Status - Bottom Center Inline */}
         <AnimatePresence>
           {installStatus && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="fixed top-4 right-4 z-50"
+              exit={{ opacity: 0, y: 20 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
             >
-              <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+              <div className={`flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm ${
                 installStatus.type === 'error'
-                  ? 'bg-destructive/10 border-destructive/20 text-destructive'
+                  ? 'bg-destructive/90 border-destructive/30 text-white'
                   : installStatus.type === 'success'
-                  ? 'bg-green-500/10 border-green-500/20 text-green-600'
-                  : 'bg-primary/10 border-primary/20 text-primary'
+                  ? 'bg-green-600/90 border-green-500/30 text-white'
+                  : 'bg-background/95 border-border text-foreground'
               }`}>
                 {installStatus.type === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
                 {installStatus.type === 'success' && <CheckCircle className="h-4 w-4" />}
@@ -288,16 +317,45 @@ export const ProjectListView: React.FC = () => {
             </div>
           </div>
 
-          {/* Search */}
+          {/* Search and Sort */}
           {projects.length > 0 && (
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="default" className="gap-2 min-w-[140px]">
+                    <ArrowUpDown className="h-4 w-4" />
+                    {sortBy === 'recent' && '최근 사용순'}
+                    {sortBy === 'name' && '이름순'}
+                    {sortBy === 'created' && '생성일순'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSortBy('recent')} className="gap-2">
+                    <Clock className="h-4 w-4" />
+                    최근 사용순
+                    {sortBy === 'recent' && <CheckCircle className="h-4 w-4 ml-auto text-primary" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy('name')} className="gap-2">
+                    <SortAsc className="h-4 w-4" />
+                    이름순
+                    {sortBy === 'name' && <CheckCircle className="h-4 w-4 ml-auto text-primary" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy('created')} className="gap-2">
+                    <Calendar className="h-4 w-4" />
+                    생성일순
+                    {sortBy === 'created' && <CheckCircle className="h-4 w-4 ml-auto text-primary" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
 

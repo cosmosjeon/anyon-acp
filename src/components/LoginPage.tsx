@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Chrome, Loader2, Crown, Terminal } from 'lucide-react';
+import anyonLogo from '@/assets/logo-anyon.png';
 
 const API_URL = 'http://localhost:4000';
 
@@ -113,8 +114,8 @@ export const LoginPage: React.FC = () => {
     <div className="h-screen flex items-center justify-center bg-background p-4">
       <Card className="max-w-md w-full p-8 space-y-6">
         {/* 로고 */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">ANYON</h1>
+        <div className="text-center space-y-4">
+          <img src={anyonLogo} alt="ANYON" className="h-12 mx-auto" />
           <p className="text-muted-foreground">
             AI 기반 개발 플랫폼
           </p>

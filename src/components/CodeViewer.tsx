@@ -78,7 +78,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
   className,
 }) => {
   const { theme } = useTheme();
-  const isDark = theme === 'dark' || theme === 'gray';
+  const isDark = theme === 'dark';
   const detectedLanguage = language || (filePath ? getLanguageFromPath(filePath) : 'text');
 
   // Empty state - no file selected

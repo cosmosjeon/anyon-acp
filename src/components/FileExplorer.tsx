@@ -74,7 +74,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   className,
 }) => {
   const { theme } = useTheme();
-  const isDark = theme === 'dark' || theme === 'gray';
+  const isDark = theme === 'dark';
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);

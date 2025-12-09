@@ -321,3 +321,22 @@ export function getWorkflowPromptConfig(workflowId: string): WorkflowPromptConfi
   return ALL_WORKFLOW_PROMPTS[workflowId];
 }
 
+/**
+ * 슬래시 커맨드에서 워크플로우 ID 추출
+ * @example "/anyon:anyon-method:workflows:startup-prd" -> "startup-prd"
+ */
+export function slashCommandToWorkflowId(slashCommand: string): string | null {
+  // /anyon:anyon-method:workflows:startup-prd 형식에서 워크플로우 ID 추출
+  const match = slashCommand.match(/workflows:([a-z0-9-]+)/i);
+  if (match && ALL_WORKFLOW_PROMPTS[match[1]]) {
+    return match[1];
+  }
+
+  // 직접 워크플로우 ID인 경우
+  if (ALL_WORKFLOW_PROMPTS[slashCommand]) {
+    return slashCommand;
+  }
+
+  return null;
+}
+

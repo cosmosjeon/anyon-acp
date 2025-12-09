@@ -16,7 +16,7 @@ import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
 import { DevDocsPanel } from '@/components/development';
-import { PreviewPanel } from '@/components/PreviewPanel';
+import { EnhancedPreviewPanel } from '@/components/preview';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
@@ -423,7 +423,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                     isSessionLoading={isSessionLoading}
                   />
                 )}
-                {activeTab === 'preview' && <PreviewPanel />}
+                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
               </div>
             </motion.div>
           </>

@@ -54,3 +54,19 @@ export const DEV_WORKFLOW_SEQUENCE: DevWorkflowStep[] = [
 export const getWorkflowStepById = (id: string): DevWorkflowStep | undefined => {
   return DEV_WORKFLOW_SEQUENCE.find((step) => step.id === id);
 };
+
+/**
+ * Get current step from prompt string
+ * Matches prompt content to workflow steps
+ */
+export const getCurrentStepFromPrompt = (prompt: string): DevWorkflowStep | null => {
+  const lowerPrompt = prompt.toLowerCase();
+
+  for (const step of DEV_WORKFLOW_SEQUENCE) {
+    if (lowerPrompt.includes(step.workflowId) || lowerPrompt.includes(step.id)) {
+      return step;
+    }
+  }
+
+  return null;
+};

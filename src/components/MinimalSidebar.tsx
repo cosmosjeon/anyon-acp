@@ -12,6 +12,7 @@ import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
 import { api, type Project } from '@/lib/api';
 import logoAnyon from '@/assets/logo-anyon.png';
+import logoText from '@/assets/anyon-logo-text.png';
 
 interface MinimalSidebarProps {
   /** Whether settings is active */
@@ -73,39 +74,23 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
         {/* Header - Logo */}
         <div className="h-14 flex items-center border-b border-border/30 px-3 gap-2">
           {expanded ? (
-            <motion.button
+            <button
               onClick={onLogoClick}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="p-1 rounded-lg hover:bg-muted/50 transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 rounded-lg flex-shrink-0 cursor-pointer"
             >
               <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
-            </motion.button>
+              <img src={logoText} alt="ANYON" className="h-5 object-contain" />
+            </button>
           ) : (
             <TooltipSimple content="Home" side="right">
-              <motion.button
+              <button
                 onClick={onLogoClick}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-1 rounded-lg hover:bg-muted/50 transition-colors flex-shrink-0"
+                className="p-1 rounded-lg flex-shrink-0 cursor-pointer"
               >
                 <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
-              </motion.button>
+              </button>
             </TooltipSimple>
           )}
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-sm font-semibold whitespace-nowrap"
-              >
-                ANYON
-              </motion.span>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Expand/Collapse Toggle */}

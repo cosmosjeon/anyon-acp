@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { FileExplorer } from '@/components/FileExplorer';
-import { PreviewPanel } from '@/components/PreviewPanel';
+import { EnhancedPreviewPanel } from '@/components/preview';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
@@ -359,7 +359,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                 {activeTab === 'code' && (
                   <FileExplorer rootPath={project?.path} />
                 )}
-                {activeTab === 'preview' && <PreviewPanel />}
+                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
               </div>
             </motion.div>
           </>
