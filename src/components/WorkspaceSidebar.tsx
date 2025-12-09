@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import {
   Plus,
-  Folder,
   Settings,
-  PanelRightClose,
-  PanelRightOpen,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   MessageSquare,
-  
+  Search,
+  X,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -18,7 +17,7 @@ import { VideoLoader } from '@/components/VideoLoader';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
-import { api, type Session, type Project } from '@/lib/api';
+import { api, type Session } from '@/lib/api';
 import { useTheme } from '@/hooks/useTheme';
 import logoAnyon from '@/assets/logo-anyon.png';
 import logoText from '@/assets/anyon-logo-text.png';
@@ -34,14 +33,6 @@ interface WorkspaceSidebarProps {
   onNewSession?: () => void;
   /** Callback when session is selected */
   onSessionSelect?: (session: Session | null) => void;
-  /** Whether file panel is open */
-  filePanelOpen?: boolean;
-  /** Callback to toggle file panel */
-  onFilePanelToggle?: () => void;
-  /** Whether right panel is visible */
-  rightPanelVisible?: boolean;
-  /** Callback to toggle right panel */
-  onRightPanelToggle?: () => void;
   /** Callback when logo is clicked (go to projects) */
   onLogoClick?: () => void;
   /** Callback when settings is clicked */
@@ -56,7 +47,7 @@ interface WorkspaceSidebarProps {
 
 /**
  * WorkspaceSidebar - Full-featured sidebar for workspace screens
- * Shows: Logo, New Session, Session List, Project Switcher, Files, Panel Toggle, Settings, User
+ * Shows: Logo, New Session, Session List, Panel Toggle, Settings, User
  */
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   projectPath,
@@ -64,10 +55,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   currentSessionId,
   onNewSession,
   onSessionSelect,
-  filePanelOpen = false,
-  onFilePanelToggle,
-  rightPanelVisible = true,
-  onRightPanelToggle,
   onLogoClick,
   onSettingsClick,
   collapsed = false,
@@ -76,9 +63,72 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const { theme, toggleTheme } = useTheme();
+
+  const INITIAL_SESSION_COUNT = 5;
+
+  // Helper function to format session display text
+  const getSessionDisplayText = (session: Session, maxLength: number = 35): string => {
+    if (session.first_message) {
+      // Clean up the message - remove newlines and extra spaces
+      const cleaned = session.first_message.replace(/\s+/g, ' ').trim();
+      return cleaned.substring(0, maxLength);
+    }
+    // Fallback to date/time if no message
+    const date = new Date(session.created_at * 1000);
+    return date.toLocaleString('ko-KR', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Helper function to group sessions by date
+  const groupSessionsByDate = (sessions: Session[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const groups: { label: string; sessions: Session[] }[] = [
+      { label: '오늘', sessions: [] },
+      { label: '어제', sessions: [] },
+      { label: '지난 7일', sessions: [] },
+      { label: '이전', sessions: [] },
+    ];
+
+    sessions.forEach((session) => {
+      const sessionDate = new Date(session.created_at * 1000);
+      if (sessionDate >= today) {
+        groups[0].sessions.push(session);
+      } else if (sessionDate >= yesterday) {
+        groups[1].sessions.push(session);
+      } else if (sessionDate >= lastWeek) {
+        groups[2].sessions.push(session);
+      } else {
+        groups[3].sessions.push(session);
+      }
+    });
+
+    return groups.filter((group) => group.sessions.length > 0);
+  };
+
+  // Filter and group sessions
+  const filteredAndGroupedSessions = useMemo(() => {
+    let filtered = sessions;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = sessions.filter(
+        (session) =>
+          session.first_message?.toLowerCase().includes(query) ||
+          session.id.toLowerCase().includes(query)
+      );
+    }
+    return groupSessionsByDate(filtered);
+  }, [sessions, searchQuery]);
 
   // Load sessions for current project
   useEffect(() => {
@@ -102,25 +152,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     loadSessions();
   }, [projectPath]);
 
-  // Load projects for switcher
-  useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        const projectList = await api.listRegisteredProjects();
-        setProjects(projectList);
-      } catch (err) {
-        console.error('Failed to load projects:', err);
-      }
-    };
-    loadProjects();
-  }, []);
-
   const handleSessionClick = (session: Session) => {
     onSessionSelect?.(session);
   };
 
   const collapsedWidth = 56;
-  const expandedWidth = 256;
+  const expandedWidth = 220;
 
   return (
     <TooltipProvider>
@@ -128,20 +165,20 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         animate={{ width: collapsed ? collapsedWidth : expandedWidth }}
         transition={{ duration: 0.2 }}
         className={cn(
-          'h-full flex flex-col bg-background border-r border-border/50 flex-shrink-0 overflow-hidden',
+          'h-full flex flex-col bg-background border-r border-border/30 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_8px_-2px_rgba(0,0,0,0.3)] flex-shrink-0 overflow-hidden z-10',
           className
         )}
       >
         {/* Header - Logo */}
-        <div className="h-14 flex items-center gap-2 px-3 border-b border-border/30">
+        <div className="h-14 flex items-center justify-center px-3 border-b border-border/30">
           <TooltipSimple content="Back to Projects" side="right">
             <button
               onClick={onLogoClick}
-              className="flex items-center gap-1.5 rounded-lg flex-shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+              <img src={logoAnyon} alt="ANYON" className="w-9 h-9 object-contain logo-invert" />
               {!collapsed && (
-                <img src={logoText} alt="ANYON" className="h-5 object-contain" />
+                <img src={logoText} alt="ANYON" className="h-6 object-contain" />
               )}
             </button>
           </TooltipSimple>
@@ -178,7 +215,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         </div>
 
         {/* New Session Button */}
-        <div className="px-2 pb-2 border-b border-border/30">
+        <div className="px-2 pb-2">
           {collapsed ? (
             <TooltipSimple content="새 대화" side="right">
               <motion.button
@@ -202,14 +239,37 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           )}
         </div>
 
+        {/* Search Bar - Only when expanded */}
+        {!collapsed && (
+          <div className="px-2 pb-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="대화 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={cn(
+                  'w-full h-8 pl-8 pr-8 text-xs rounded-md border transition-colors',
+                  'bg-muted/30 border-border/50 placeholder:text-muted-foreground/60',
+                  'focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50'
+                )}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/50"
+                >
+                  <X className="w-3 h-3 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Session List */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-2">
-            {!collapsed && (
-              <div className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">
-                최근 대화
-              </div>
-            )}
             {loadingSessions ? (
               <div className="flex items-center justify-center py-4">
                 <VideoLoader size="sm" />
@@ -220,169 +280,154 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   아직 대화가 없습니다
                 </div>
               )
-            ) : (
+            ) : collapsed ? (
+              // Collapsed mode - just show icons
               <div className="space-y-0.5">
-                {sessions.map((session) => (
-                  collapsed ? (
-                    <TooltipSimple
-                      key={session.id}
-                      content={session.first_message?.substring(0, 50) || `Session ${session.id.slice(0, 8)}`}
-                      side="right"
-                    >
-                      <motion.button
-                        onClick={() => handleSessionClick(session)}
-                        whileTap={{ scale: 0.98 }}
-                        className={cn(
-                          'w-full h-9 flex items-center justify-center rounded-md transition-colors',
-                          currentSessionId === session.id
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                        )}
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </motion.button>
-                    </TooltipSimple>
-                  ) : (
+                {sessions.slice(0, 10).map((session) => (
+                  <TooltipSimple
+                    key={session.id}
+                    content={getSessionDisplayText(session, 50)}
+                    side="right"
+                  >
                     <motion.button
-                      key={session.id}
                       onClick={() => handleSessionClick(session)}
                       whileTap={{ scale: 0.98 }}
                       className={cn(
-                        'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors',
+                        'w-full h-9 flex items-center justify-center rounded-md transition-colors',
                         currentSessionId === session.id
                           ? 'bg-primary/10 text-primary'
                           : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                       )}
                     >
-                      <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="text-xs truncate">
-                        {session.first_message?.substring(0, 30) || `Session ${session.id.slice(0, 8)}`}
-                      </span>
+                      <MessageSquare className="w-4 h-4" />
                     </motion.button>
-                  )
+                  </TooltipSimple>
                 ))}
+              </div>
+            ) : filteredAndGroupedSessions.length === 0 ? (
+              // No search results
+              <div className="text-xs text-muted-foreground px-2 py-4 text-center">
+                '{searchQuery}' 검색 결과 없음
+              </div>
+            ) : (
+              // Expanded mode - show sessions with "show more" button
+              <div className="space-y-0.5">
+                {(() => {
+                  // Flatten all sessions for display
+                  const allFilteredSessions = filteredAndGroupedSessions.flatMap(g => g.sessions);
+                  const displaySessions = showAllSessions
+                    ? allFilteredSessions
+                    : allFilteredSessions.slice(0, INITIAL_SESSION_COUNT);
+                  const hasMore = allFilteredSessions.length > INITIAL_SESSION_COUNT;
+                  const remainingCount = allFilteredSessions.length - INITIAL_SESSION_COUNT;
+
+                  return (
+                    <>
+                      {displaySessions.map((session) => (
+                        <motion.button
+                          key={session.id}
+                          onClick={() => handleSessionClick(session)}
+                          whileTap={{ scale: 0.98 }}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors group',
+                            currentSessionId === session.id
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                          )}
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs truncate block">
+                              {getSessionDisplayText(session)}
+                            </span>
+                          </div>
+                        </motion.button>
+                      ))}
+
+                      {/* Show More / Show Less Button */}
+                      {hasMore && (
+                        <motion.button
+                          onClick={() => setShowAllSessions(!showAllSessions)}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full flex items-center justify-center gap-1 px-2 py-1.5 mt-1 rounded-md text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                        >
+                          {showAllSessions ? (
+                            <>
+                              <ChevronUp className="w-3 h-3" />
+                              <span>접기</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              <span>더보기 ({remainingCount})</span>
+                            </>
+                          )}
+                        </motion.button>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
         </div>
 
-        {/* Project Switcher */}
-        {!collapsed && (
-          <div className="border-t border-border/30">
-            <div className="relative">
-              <button
-                onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-              >
-                <Folder className="w-4 h-4" />
-                <span className="flex-1 text-left truncate text-xs">프로젝트 전환</span>
-                <ChevronDown className={cn('w-4 h-4 transition-transform', showProjectDropdown && 'rotate-180')} />
-              </button>
-
-              <AnimatePresence>
-                {showProjectDropdown && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50"
-                  >
-                    <div className="max-h-48 overflow-y-auto">
-                      {projects.map((project) => {
-                        const name = project.path.split('/').pop() || project.path;
-                        const isActive = project.path === projectPath;
-                        return (
-                          <button
-                            key={project.id}
-                            onClick={() => {
-                              setShowProjectDropdown(false);
-                              // Navigate to project - this would need to be handled by parent
-                              if (!isActive && onLogoClick) {
-                                // For now, go to projects list. Could be enhanced to switch directly
-                                onLogoClick();
-                              }
-                            }}
-                            className={cn(
-                              'w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
-                              isActive
-                                ? 'bg-primary/10 text-primary'
-                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                            )}
-                          >
-                            <Folder className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span className="truncate">{name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
         {/* Bottom Actions */}
         <div className={cn(
-          'flex border-t border-border/30 py-2',
-          collapsed ? 'flex-col items-center gap-1 px-2' : 'items-center justify-between px-2'
+          'border-t border-border/30 py-2',
+          collapsed ? 'flex flex-col items-center gap-1 px-2' : 'px-2 space-y-1'
         )}>
-          {/* Files Toggle */}
-          <TooltipSimple content="Files (Cmd+B)" side={collapsed ? 'right' : 'top'}>
-            <motion.button
-              onClick={onFilePanelToggle}
-              whileTap={{ scale: 0.95 }}
-              className={cn(
-                'p-2 rounded-md transition-colors',
-                filePanelOpen
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-              )}
-            >
-              <Folder className="w-4 h-4" />
-            </motion.button>
-          </TooltipSimple>
+          {collapsed ? (
+            // Collapsed mode - icon only with tooltips
+            <>
+              <TooltipSimple content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} side="right">
+                <motion.button
+                  onClick={toggleTheme}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                >
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </motion.button>
+              </TooltipSimple>
 
-          {/* Panel Toggle */}
-          <TooltipSimple content={rightPanelVisible ? 'Hide Panel' : 'Show Panel'} side={collapsed ? 'right' : 'top'}>
-            <motion.button
-              onClick={onRightPanelToggle}
-              whileTap={{ scale: 0.95 }}
-              className={cn(
-                'p-2 rounded-md transition-colors',
-                rightPanelVisible
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-              )}
-            >
-              {rightPanelVisible ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-            </motion.button>
-          </TooltipSimple>
+              <TooltipSimple content="Settings" side="right">
+                <motion.button
+                  onClick={onSettingsClick}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                </motion.button>
+              </TooltipSimple>
 
-          {/* Theme Toggle */}
-          <TooltipSimple content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} side={collapsed ? 'right' : 'top'}>
-            <motion.button
-              onClick={toggleTheme}
-              whileTap={{ scale: 0.95 }}
-              className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </motion.button>
-          </TooltipSimple>
+              <UserProfileDropdown />
+            </>
+          ) : (
+            // Expanded mode - icon + text labels
+            <>
+              <motion.button
+                onClick={toggleTheme}
+                whileTap={{ scale: 0.95 }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors text-xs"
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4 flex-shrink-0" /> : <Moon className="w-4 h-4 flex-shrink-0" />}
+                <span>{theme === 'dark' ? '라이트 모드' : '다크 모드'}</span>
+              </motion.button>
 
-          {/* Settings */}
-          <TooltipSimple content="Settings" side={collapsed ? 'right' : 'top'}>
-            <motion.button
-              onClick={onSettingsClick}
-              whileTap={{ scale: 0.95 }}
-              className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-            </motion.button>
-          </TooltipSimple>
+              <motion.button
+                onClick={onSettingsClick}
+                whileTap={{ scale: 0.95 }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors text-xs"
+              >
+                <Settings className="w-4 h-4 flex-shrink-0" />
+                <span>설정</span>
+              </motion.button>
 
-          {/* User Profile */}
-          <UserProfileDropdown />
+              <div className="pt-1 border-t border-border/30 mt-1">
+                <UserProfileDropdown showName={true} />
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
     </TooltipProvider>

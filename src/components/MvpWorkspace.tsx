@@ -6,8 +6,10 @@ import {
   Code,
   Monitor,
   X,
-  FolderOpen,
   ArrowLeft,
+  Wrench,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
 import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
@@ -101,7 +103,7 @@ interface MvpWorkspaceProps {
  * └────────┴─────────────────┴──────────────────────┘
  */
 export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
-  const { goToProject, goToProjectList } = useProjectsNavigation();
+  const { goToProject, goToProjectList, goToMaintenance } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<MvpTabType>('planning');
@@ -110,8 +112,8 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const [sessionKey, setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Sidebar state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Sidebar state - collapsed by default
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [filePanelOpen, setFilePanelOpen] = useState(false);
   const filePanelWidth = 280;
 
@@ -191,26 +193,43 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Resize handling
+  // Resize handling with requestAnimationFrame for smooth performance
   useEffect(() => {
     if (!isDragging) return;
 
+    let animationFrameId: number;
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const sidebarWidth = sidebarCollapsed ? 56 : 256; // Dynamic sidebar width
-      const filePanelW = filePanelOpen ? filePanelWidth : 0;
-      const availableWidth = rect.width - sidebarWidth - filePanelW;
-      const mouseX = e.clientX - rect.left - sidebarWidth - filePanelW;
-      const newRightWidth = ((availableWidth - mouseX) / availableWidth) * 100;
-      setRightPanelWidth(Math.max(25, Math.min(70, newRightWidth)));
+      // Cancel any pending animation frame
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const sidebarWidth = sidebarCollapsed ? 56 : 220; // Correct sidebar widths
+        const filePanelW = filePanelOpen ? filePanelWidth : 0;
+        const availableWidth = rect.width - sidebarWidth - filePanelW;
+        const mouseX = e.clientX - rect.left - sidebarWidth - filePanelW;
+        const newRightWidth = ((availableWidth - mouseX) / availableWidth) * 100;
+        setRightPanelWidth(Math.max(25, Math.min(70, newRightWidth)));
+      });
     };
 
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      setIsDragging(false);
+    };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -301,10 +320,6 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
           currentSessionId={currentSession?.id}
           onNewSession={handleNewSession}
           onSessionSelect={handleSessionSelect}
-          filePanelOpen={filePanelOpen}
-          onFilePanelToggle={() => setFilePanelOpen(prev => !prev)}
-          rightPanelVisible={rightPanelVisible}
-          onRightPanelToggle={() => setRightPanelVisible(prev => !prev)}
           onLogoClick={() => setShowSettings(false)}
           onSettingsClick={() => setShowSettings(false)}
           collapsed={sidebarCollapsed}
@@ -326,10 +341,6 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
         currentSessionId={currentSession?.id}
         onNewSession={handleNewSession}
         onSessionSelect={handleSessionSelect}
-        filePanelOpen={filePanelOpen}
-        onFilePanelToggle={() => setFilePanelOpen(prev => !prev)}
-        rightPanelVisible={rightPanelVisible}
-        onRightPanelToggle={() => setRightPanelVisible(prev => !prev)}
         onLogoClick={goToProjectList}
         onSettingsClick={() => setShowSettings(true)}
         collapsed={sidebarCollapsed}
@@ -372,24 +383,59 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
         style={{ width: rightPanelVisible ? `${100 - rightPanelWidth}%` : '100%' }}
       >
         {/* Header with Breadcrumb */}
-        <div className="flex-shrink-0 h-12 border-b border-border flex items-center px-4 gap-3">
+        <div className="flex-shrink-0 h-12 flex items-center justify-between px-4">
           <Breadcrumb
             items={[
               {
-                label: 'Projects',
-                onClick: goToProjectList,
-                icon: <FolderOpen className="w-4 h-4" />,
-              },
-              {
                 label: projectName,
-                onClick: () => goToProject(projectId),
+                isProjectSelector: true,
+                currentProjectPath: project?.path,
+                onProjectSelect: (selectedProject) => {
+                  const targetProject = projects.find(p => p.path === selectedProject.path);
+                  if (targetProject) {
+                    goToProject(targetProject.id);
+                  }
+                },
               },
               {
-                label: 'MVP',
-                icon: <Lightbulb className="w-4 h-4 text-primary" />,
+                label: 'MVP 개발',
+                icon: <Lightbulb className="w-4 h-4" />,
+                dropdownOptions: [
+                  {
+                    label: 'MVP 개발',
+                    value: 'mvp',
+                    icon: <Lightbulb className="w-4 h-4" />,
+                    description: '새로운 기능 개발',
+                  },
+                  {
+                    label: '유지보수',
+                    value: 'maintenance',
+                    icon: <Wrench className="w-4 h-4" />,
+                    description: '버그 수정 및 개선',
+                  },
+                ],
+                dropdownValue: 'mvp',
+                onDropdownSelect: (value) => {
+                  if (value === 'maintenance' && projectId) {
+                    goToMaintenance(projectId);
+                  }
+                },
               },
             ]}
           />
+          {/* Panel Toggle Button */}
+          <button
+            onClick={() => setRightPanelVisible(prev => !prev)}
+            className={cn(
+              'p-2 rounded-md transition-colors',
+              rightPanelVisible
+                ? 'text-primary hover:bg-primary/10'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            )}
+            title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
+          >
+            {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+          </button>
         </div>
 
         {/* Chat Content */}
@@ -429,10 +475,10 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               animate={{ width: `${rightPanelWidth}%`, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="h-full bg-background border-l border-border overflow-hidden flex flex-col"
+              className="h-full bg-background border-l border-border overflow-hidden flex flex-col shadow-[-2px_0_8px_rgba(0,0,0,0.08)]"
             >
               {/* Tabs Header with Status Badges */}
-              <div className="flex-shrink-0 border-b border-border">
+              <div className="flex-shrink-0 border-b border-border bg-card/50">
                 <div className="flex">
                   {/* 기획문서 탭 */}
                   <button

@@ -85,18 +85,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     <TooltipProvider>
       <div
         className={cn(
-          'h-full w-14 flex flex-col bg-background border-r border-border/50 flex-shrink-0',
+          'h-full w-14 flex flex-col bg-background border-r border-border/30 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_8px_-2px_rgba(0,0,0,0.3)] flex-shrink-0 overflow-hidden z-10',
           className
         )}
       >
         {/* Logo - Back to Projects */}
-        <div className="h-14 flex items-center justify-center border-b border-border/30">
+        <div className="h-14 flex items-center justify-center px-3 border-b border-border/30">
           <TooltipSimple content="Projects" side="right">
             <button
               onClick={onLogoClick}
-              className="p-1 rounded-lg cursor-pointer"
+              className="rounded-lg cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
+              <img src={logoAnyon} alt="ANYON" className="w-9 h-9 object-contain logo-invert" />
             </button>
           </TooltipSimple>
         </div>

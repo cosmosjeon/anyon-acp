@@ -14,14 +14,18 @@
     "windows": [
       {
         "title": "ANYON",
-        "width": 800,
-        "height": 600,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "decorations": false,
         "transparent": true,
         "shadow": true,
         "center": true,
         "resizable": true,
-        "alwaysOnTop": false
+        "alwaysOnTop": false,
+        "visible": true,
+        "focus": true
       }
     ],
     "security": {

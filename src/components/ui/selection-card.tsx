@@ -52,7 +52,7 @@ export const SelectionCard: React.FC<SelectionCardProps> = ({
           iconImage ? "w-56 h-56" : "w-24 h-24 bg-primary/10 group-hover:bg-primary/20"
         )}>
           {iconImage ? (
-            <img src={iconImage} alt={title} className="w-52 h-52 object-contain" />
+            <img src={iconImage} alt={title} className="w-52 h-52 object-contain logo-invert" />
           ) : Icon ? (
             <Icon className="w-12 h-12 text-primary" />
           ) : null}

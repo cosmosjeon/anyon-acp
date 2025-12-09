@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FileCode, FolderOpen } from 'lucide-react';
+import { FileCode, FolderOpen, Code } from 'lucide-react';
+import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { VideoLoader } from '@/components/VideoLoader';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -119,54 +120,73 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     );
   }
 
+  const fileName = selectedFile ? selectedFile.split('/').pop() : null;
+  const projectName = rootPath.split('/').pop() || 'Explorer';
+
   return (
-    <div className={cn('h-full p-3', className)}>
-      <div className="h-full rounded-lg border border-border shadow-sm overflow-hidden">
-        <SplitPane
-          initialSplit={30}
-          minLeftWidth={150}
-          minRightWidth={200}
-          left={
-            <div className={cn(
-              "h-full border-r border-border",
-              isDark ? "bg-[#1e1e1e]" : "bg-muted/30"
-            )}>
-              {/* File Tree Header */}
+    <div className={cn('h-full flex flex-col', className)}>
+      {/* 통일 헤더 */}
+      <PanelHeader
+        icon={<Code className="w-4 h-4" />}
+        title="코드"
+        subtitle={projectName}
+        badge={
+          selectedFile ? (
+            <StatusBadge variant="info">{fileName}</StatusBadge>
+          ) : (
+            <StatusBadge variant="muted">파일 선택</StatusBadge>
+          )
+        }
+      />
+
+      {/* 콘텐츠 영역 */}
+      <div className="flex-1 min-h-0 p-3">
+        <div className="h-full rounded-lg border border-border shadow-sm overflow-hidden">
+          <SplitPane
+            initialSplit={30}
+            minLeftWidth={150}
+            minRightWidth={200}
+            left={
               <div className={cn(
-                "flex items-center gap-2 px-3 py-2 border-b",
-                isDark ? "bg-[#252526] border-[#3c3c3c]" : "bg-muted/50 border-border"
+                "h-full border-r border-border",
+                isDark ? "bg-[#1e1e1e]" : "bg-muted/30"
               )}>
-                <FolderOpen className="w-4 h-4 text-yellow-500" />
-                <span className="text-xs text-muted-foreground font-medium truncate">
-                  {rootPath.split('/').pop() || 'Explorer'}
-                </span>
-              </div>
-              {/* File Tree */}
-              <FileTree
-                rootPath={rootPath}
-                selectedFile={selectedFile || undefined}
-                onFileSelect={handleFileSelect}
-                className="text-[13px]"
-              />
-            </div>
-          }
-          right={
-            <div className={cn(
-              "h-full flex flex-col",
-              isDark ? "bg-[#282c34]" : "bg-background"
-            )}>
-              {/* Code Viewer Header */}
-              {selectedFile && (
+                {/* File Tree Header */}
                 <div className={cn(
-                  "flex-shrink-0 flex items-center gap-2 px-3 py-2 border-b",
-                  isDark ? "bg-[#21252b] border-[#181a1f]" : "bg-muted/50 border-border"
+                  "flex items-center gap-2 px-3 py-2 border-b",
+                  isDark ? "bg-[#252526] border-[#3c3c3c]" : "bg-muted/50 border-border"
                 )}>
-                  <FileCode className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground truncate" title={selectedFile}>
-                    {selectedFile}
+                  <FolderOpen className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs text-muted-foreground font-medium truncate">
+                    {projectName}
                   </span>
                 </div>
-              )}
+                {/* File Tree */}
+                <FileTree
+                  rootPath={rootPath}
+                  selectedFile={selectedFile || undefined}
+                  onFileSelect={handleFileSelect}
+                  className="text-[13px]"
+                />
+              </div>
+            }
+            right={
+              <div className={cn(
+                "h-full flex flex-col",
+                isDark ? "bg-[#282c34]" : "bg-background"
+              )}>
+                {/* Code Viewer Header */}
+                {selectedFile && (
+                  <div className={cn(
+                    "flex-shrink-0 flex items-center gap-2 px-3 py-2 border-b",
+                    isDark ? "bg-[#21252b] border-[#181a1f]" : "bg-muted/50 border-border"
+                  )}>
+                    <FileCode className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground truncate" title={selectedFile}>
+                      {selectedFile}
+                    </span>
+                  </div>
+                )}
 
               {/* Code Content */}
               <div className="flex-1 overflow-auto">
@@ -215,7 +235,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
               </div>
             </div>
           }
-        />
+          />
+        </div>
       </div>
     </div>
   );

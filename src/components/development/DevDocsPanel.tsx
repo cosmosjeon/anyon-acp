@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlayCircle, Square, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PlayCircle, Square, AlertCircle, CheckCircle2, Code, Trash2 } from 'lucide-react';
+import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -159,18 +160,30 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      {/* 헤더 */}
-      <div className="flex-shrink-0 px-4 py-3 border-b bg-muted/30">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium">개발 워크플로우</h3>
-          {isRunningWorkflow && (
-            <Button onClick={handleStop} variant="outline" size="sm" className="gap-2 h-7">
-              <Square className="h-3.5 w-3.5" />
+      {/* 통일 헤더 */}
+      <PanelHeader
+        icon={<Code className="w-4 h-4" />}
+        title="개발 워크플로우"
+        badge={
+          isDevComplete ? (
+            <StatusBadge variant="success">완료</StatusBadge>
+          ) : isRunningWorkflow ? (
+            <StatusBadge variant="info" pulse>실행중</StatusBadge>
+          ) : isStopped ? (
+            <StatusBadge variant="warning">중지됨</StatusBadge>
+          ) : (
+            <StatusBadge variant="muted">대기</StatusBadge>
+          )
+        }
+        actions={
+          isRunningWorkflow ? (
+            <Button onClick={handleStop} variant="outline" size="sm" className="gap-1.5 h-7">
+              <Square className="h-3 w-3" />
               중지
             </Button>
-          )}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       {/* 워크플로우 시각화 */}
       <div className="flex-shrink-0 p-4 border-b">
@@ -285,13 +298,16 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
       {/* 실행 로그 영역 */}
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20">
-          <span className="text-xs font-medium text-muted-foreground">실행 로그</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            실행 로그 {executionLog.length > 0 && `(${executionLog.length})`}
+          </span>
           {executionLog.length > 0 && (
             <button
               onClick={handleClearLog}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="로그 지우기"
             >
-              지우기
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

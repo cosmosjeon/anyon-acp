@@ -1,5 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { CheckCircle2, ArrowRight, FileText, PlayCircle } from 'lucide-react';
+import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import prdIcon from '@/assets/prd-icon.png';
+import uiuxIcon from '@/assets/uiux-icon.png';
+import trdIcon from '@/assets/trd-icon.png';
+import architectureIcon from '@/assets/architecture-icon.png';
+import erdIcon from '@/assets/erd-icon.png';
+import designIcon from '@/assets/design-icon.png';
+import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -106,47 +113,48 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      {/* 상단 진행률 헤더 */}
-      <div className="flex-shrink-0 border-b px-4 py-3 bg-muted/30">
-        {/* 현재 문서 제목 + 진행률 */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+      {/* 상단 통일 헤더 */}
+      <PanelHeader
+        icon={<FileText className="w-4 h-4" />}
+        title={activeStep?.title || 'PRD'}
+        subtitle={`${activeStepIndex + 1}/${WORKFLOW_SEQUENCE.length}`}
+        badge={
+          activeDoc?.exists ? (
+            <StatusBadge variant="success">완료</StatusBadge>
+          ) : progress.isAllComplete ? (
+            <StatusBadge variant="success">{progress.completed}/{progress.total}</StatusBadge>
+          ) : (
+            <StatusBadge variant="muted">{progress.completed}/{progress.total}</StatusBadge>
+          )
+        }
+        actions={
+          <div className="flex items-center gap-1">
             <button
               onClick={() => handleNavigate('prev')}
               disabled={!canGoPrev}
               className={cn(
-                "p-1 rounded hover:bg-muted transition-colors",
+                "p-1.5 rounded-md hover:bg-muted transition-colors",
                 !canGoPrev && "opacity-30 cursor-not-allowed"
               )}
             >
-              <ArrowRight className="w-4 h-4 rotate-180" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="font-medium">
-              {activeStep?.title || 'PRD'}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              ({activeStepIndex + 1}/{WORKFLOW_SEQUENCE.length})
-            </span>
             <button
               onClick={() => handleNavigate('next')}
               disabled={!canGoNext}
               className={cn(
-                "p-1 rounded hover:bg-muted transition-colors",
+                "p-1.5 rounded-md hover:bg-muted transition-colors",
                 !canGoNext && "opacity-30 cursor-not-allowed"
               )}
             >
-              <ArrowRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+        }
+      />
 
-          {/* 완료 상태 */}
-          {activeDoc?.exists && (
-            <div className="flex items-center gap-1 text-xs text-primary">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>완료</span>
-            </div>
-          )}
-        </div>
+      {/* 프로그레스 바 영역 */}
+      <div className="flex-shrink-0 border-b px-4 py-3 bg-background">
 
         {/* 프로그레스 바 */}
         <div className="relative">
@@ -205,8 +213,26 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
           // 작성 시작 프롬프트
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center max-w-md">
-              <div className="w-16 h-16 rounded-xl bg-muted/50 flex items-center justify-center mb-4 mx-auto">
-                <FileText className="w-8 h-8 text-muted-foreground" />
+              <div className="w-64 h-64 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                <img
+                  src={
+                    activeDocId === 'ux-design' ? uiuxIcon :
+                    activeDocId === 'design-guide' ? designIcon :
+                    activeDocId === 'trd' ? trdIcon :
+                    activeDocId === 'architecture' ? architectureIcon :
+                    activeDocId === 'erd' ? erdIcon :
+                    prdIcon
+                  }
+                  alt={
+                    activeDocId === 'ux-design' ? 'UX Design' :
+                    activeDocId === 'design-guide' ? 'Design Guide' :
+                    activeDocId === 'trd' ? 'TRD' :
+                    activeDocId === 'architecture' ? 'Architecture' :
+                    activeDocId === 'erd' ? 'ERD' :
+                    'PRD'
+                  }
+                  className="w-64 h-64 object-contain logo-invert"
+                />
               </div>
 
               {activeStep && (
