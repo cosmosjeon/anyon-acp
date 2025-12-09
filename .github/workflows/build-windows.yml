@@ -67,7 +67,7 @@ jobs:
           Copy-Item -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi -Destination dist/windows-x86_64/ -ErrorAction SilentlyContinue
           Copy-Item -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig -Destination dist/windows-x86_64/ -ErrorAction SilentlyContinue
           Copy-Item -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe -Destination dist/windows-x86_64/ -ErrorAction SilentlyContinue
-          Copy-Item -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.sig -Destination dist/windows-x86_64/ -ErrorAction SilentlyContinue
+          Copy-Item -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig -Destination dist/windows-x86_64/ -ErrorAction SilentlyContinue
 
           # Generate checksums
           cd dist/windows-x86_64

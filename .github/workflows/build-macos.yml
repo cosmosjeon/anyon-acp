@@ -90,6 +90,7 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz.sig
+          if-no-files-found: warn
           retention-days: 1
 
   universal:
