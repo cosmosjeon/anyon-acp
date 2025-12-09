@@ -114,7 +114,8 @@ interface ClaudeCodeSessionProps {
  */
 export interface ClaudeCodeSessionRef {
   sendPrompt: (prompt: string, model?: "sonnet" | "opus") => void;
-  startNewSession: (initialPrompt: string) => void;
+  startNewSession: (initialPrompt: string, systemPrompt?: string) => void;
+  continueSession: (prompt: string, systemPrompt?: string) => void;
   isLoading: boolean;
 }
 
@@ -530,21 +531,25 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     sendPrompt: (prompt: string, model: "sonnet" | "opus" = "sonnet") => {
       handleSendPrompt(prompt, model);
     },
-    startNewSession: (initialPrompt: string) => {
+    startNewSession: (initialPrompt: string, systemPrompt?: string) => {
       // Clear current session and start a new one
       setMessages([]);
       setRawJsonlOutput([]);
       setError(null);
       setIsFirstPrompt(true);
       setTotalTokens(0);
-      // Send the initial prompt
-      handleSendPrompt(initialPrompt, "sonnet");
+      // Send the initial prompt with optional system prompt
+      handleSendPrompt(initialPrompt, "sonnet", systemPrompt);
+    },
+    continueSession: (prompt: string, systemPrompt?: string) => {
+      // Continue existing session with optional system prompt
+      handleSendPrompt(prompt, "sonnet", systemPrompt);
     },
     isLoading,
   }), [isLoading]);
 
-  const handleSendPrompt = async (prompt: string, model: "sonnet" | "opus") => {
-    console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, projectPath, claudeSessionId, effectiveSession });
+  const handleSendPrompt = async (prompt: string, model: "sonnet" | "opus", systemPrompt?: string) => {
+    console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, systemPrompt: !!systemPrompt, projectPath, claudeSessionId, effectiveSession });
 
     if (!projectPath) {
       setError("Please select a project directory first");
@@ -954,13 +959,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           console.log('[ClaudeCodeSession] Resuming session:', effectiveSession.id);
           trackEvent.sessionResumed(effectiveSession.id);
           trackEvent.modelSelected(model);
-          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model);
+          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model, systemPrompt);
         } else {
           console.log('[ClaudeCodeSession] Starting new session');
           setIsFirstPrompt(false);
           trackEvent.sessionCreated(model, 'prompt_input');
           trackEvent.modelSelected(model);
-          await api.executeClaudeCode(projectPath, prompt, model);
+          await api.executeClaudeCode(projectPath, prompt, model, systemPrompt);
         }
       }
     } catch (err) {
