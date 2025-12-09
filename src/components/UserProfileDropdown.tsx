@@ -5,9 +5,11 @@ import { useAuthStore } from '@/stores/authStore';
 
 interface UserProfileDropdownProps {
   onSettingsClick?: () => void;
+  /** Show user name next to avatar */
+  showName?: boolean;
 }
 
-export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ onSettingsClick }) => {
+export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ onSettingsClick, showName = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
@@ -44,18 +46,25 @@ export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ onSett
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
         whileTap={{ scale: 0.97 }}
-        className="flex items-center gap-2 p-1.5 pr-2.5 rounded-md hover:bg-accent transition-colors"
+        className={`flex items-center gap-2 p-1.5 rounded-md hover:bg-accent transition-colors ${showName ? 'pr-2.5' : ''}`}
       >
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-border">
+        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-border flex-shrink-0">
           <User className="w-4 h-4 text-primary" />
         </div>
 
-        {/* Chevron */}
-        <ChevronDown
-          size={12}
-          className={`text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
-        />
+        {/* User Name - Only when showName is true */}
+        {showName && user?.name && (
+          <span className="text-sm truncate max-w-[120px]">{user.name}</span>
+        )}
+
+        {/* Chevron - Only when showName is true */}
+        {showName && (
+          <ChevronDown
+            size={12}
+            className={`text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        )}
       </motion.button>
 
       {/* Dropdown Menu */}

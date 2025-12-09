@@ -1,24 +1,36 @@
 import React, { useEffect, useState, Suspense, lazy, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Lightbulb, Loader2, FileText, Code, Monitor } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Lightbulb,
+  Loader2,
+  FileText,
+  Code,
+  Monitor,
+  X,
+  FolderOpen,
+  ArrowLeft,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SplitPane } from '@/components/ui/split-pane';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
 import { DevDocsPanel } from '@/components/development';
 import { PreviewPanel } from '@/components/PreviewPanel';
-import { SessionDropdown } from '@/components/SessionDropdown';
+import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
+import { Settings } from '@/components/Settings';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
 import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
+import { cn } from '@/lib/utils';
 
-// Lazy load ClaudeCodeSession for better performance
+// Lazy load components
 const ClaudeCodeSession = lazy(() =>
   import('@/components/ClaudeCodeSession').then(m => ({ default: m.ClaudeCodeSession }))
 );
+const FileTree = lazy(() => import('@/components/FileTree'));
 
 type MvpTabType = 'planning' | 'development' | 'preview';
 
@@ -27,12 +39,13 @@ interface MvpWorkspaceProps {
 }
 
 /**
- * MvpWorkspace - MVP Development workspace
+ * MvpWorkspace - MVP Development workspace with Lovable/Bolt style layout
  *
- * Features:
- * - Left panel: ClaudeCodeSession (AI chat)
- * - Right panel: Planning docs, Development docs, Preview tabs
- * - Planning docs panel with workflow automation
+ * Layout:
+ * ┌────────┬─────────────────┬──────────────────────┐
+ * │Sidebar │     Chat        │   Planning/Dev/      │
+ * │ (56px) │  (flexible)     │   Preview Tabs       │
+ * └────────┴─────────────────┴──────────────────────┘
  */
 export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const { goToProject, goToProjectList } = useProjectsNavigation();
@@ -41,9 +54,21 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const [activeTab, setActiveTab] = useState<MvpTabType>('planning');
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [sessionKey, setSessionKey] = useState(0); // Key to force re-mount ClaudeCodeSession
+  const [sessionKey, setSessionKey] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
 
-  // Ref for ClaudeCodeSession to send prompts programmatically
+  // Sidebar state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [filePanelOpen, setFilePanelOpen] = useState(false);
+  const filePanelWidth = 280;
+
+  // Right panel state
+  const [rightPanelVisible, setRightPanelVisible] = useState(true);
+  const [rightPanelWidth, setRightPanelWidth] = useState(45); // percentage
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Ref for ClaudeCodeSession
   const claudeSessionRef = useRef<ClaudeCodeSessionRef>(null);
 
   // Check planning docs completion
@@ -57,7 +82,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   }, [projectId, projects, getProjectById]);
 
-  // Load last session for this tab when project is set
+  // Load last session
   useEffect(() => {
     if (project?.path) {
       const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
@@ -68,21 +93,16 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   }, [project?.path]);
 
-  // Check and initialize git repo if needed
+  // Git repo check
   useEffect(() => {
     const checkGitRepo = async () => {
       if (project?.path) {
         try {
           const isGitRepo = await api.checkIsGitRepo(project.path);
-
           if (!isGitRepo) {
-            console.log('Initializing git repository for project:', project.path);
             const gitResult = await api.initGitRepo(project.path);
-
             if (gitResult.success) {
               console.log('Git repository initialized successfully');
-            } else {
-              console.warn('Git init failed:', gitResult.stderr);
             }
           }
         } catch (gitErr) {
@@ -93,6 +113,56 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     checkGitRepo();
   }, [project?.path]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modKey) {
+        switch (e.key) {
+          case 'b':
+          case 'B':
+            e.preventDefault();
+            setFilePanelOpen(prev => !prev);
+            break;
+          case '\\':
+            e.preventDefault();
+            setRightPanelVisible(prev => !prev);
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Resize handling
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const sidebarWidth = sidebarCollapsed ? 56 : 256; // Dynamic sidebar width
+      const filePanelW = filePanelOpen ? filePanelWidth : 0;
+      const availableWidth = rect.width - sidebarWidth - filePanelW;
+      const mouseX = e.clientX - rect.left - sidebarWidth - filePanelW;
+      const newRightWidth = ((availableWidth - mouseX) / availableWidth) * 100;
+      setRightPanelWidth(Math.max(25, Math.min(70, newRightWidth)));
+    };
+
+    const handleMouseUp = () => setIsDragging(false);
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, filePanelOpen, filePanelWidth, sidebarCollapsed]);
+
   const handleBack = () => {
     if (projectId) {
       goToProject(projectId);
@@ -101,44 +171,40 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   };
 
-  // Handle streaming state changes from ClaudeCodeSession
   const handleStreamingChange = useCallback((isStreaming: boolean) => {
     setIsSessionLoading(isStreaming);
   }, []);
 
-  // Start a new workflow (new conversation) from PlanningDocsPanel
   const handleStartNewWorkflow = useCallback((workflowPrompt: string) => {
     if (claudeSessionRef.current) {
-      // Start a new session with the workflow prompt
       claudeSessionRef.current.startNewSession(workflowPrompt);
     }
   }, []);
 
-  // Send prompt to existing session (for development workflow)
   const handleSendPlanningPrompt = useCallback((prompt: string) => {
     if (claudeSessionRef.current) {
-      // Send prompt to current session
       claudeSessionRef.current.sendPrompt(prompt);
     }
   }, []);
 
-  // Handle session selection from dropdown
   const handleSessionSelect = useCallback((session: Session | null) => {
     setCurrentSession(session);
-    setSessionKey(prev => prev + 1); // Force re-mount
-
-    // Save as last session if selecting an existing session
+    setSessionKey(prev => prev + 1);
     if (session && project?.path) {
       SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', session.id);
     }
   }, [project?.path]);
 
-  // Handle new session created
   const handleSessionCreated = useCallback((sessionId: string) => {
     if (project?.path) {
       SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId);
     }
   }, [project?.path]);
+
+  const handleNewSession = useCallback(() => {
+    setCurrentSession(null);
+    setSessionKey(prev => prev + 1);
+  }, []);
 
   const projectName = project?.path.split('/').pop() || 'Project';
 
@@ -162,126 +228,193 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     );
   }
 
-  return (
-    <div className="h-full flex flex-col">
-      {/* Workspace Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15 }}
-        className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-      >
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleBack}
-            className="h-8 w-8"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center">
-              <Lightbulb className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-sm font-semibold">{projectName}</h1>
-              <p className="text-xs text-muted-foreground">MVP Development</p>
-            </div>
-          </div>
-
-          {/* Session Dropdown */}
-          {project?.path && (
-            <SessionDropdown
-              projectPath={project.path}
-              tabType="mvp"
-              currentSessionId={currentSession?.id || null}
-              onSessionSelect={handleSessionSelect}
-              className="ml-auto"
-            />
-          )}
-        </div>
-      </motion.div>
-
-      {/* Main Content - SplitPane with Chat and Tabs */}
-      <div className="flex-1 overflow-hidden">
-        <SplitPane
-          initialSplit={50}
-          minLeftWidth={350}
-          minRightWidth={400}
-          left={
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              }
-            >
-              <ClaudeCodeSession
-                key={sessionKey}
-                ref={claudeSessionRef}
-                session={currentSession || undefined}
-                initialProjectPath={project?.path}
-                onBack={handleBack}
-                onProjectPathChange={() => { }}
-                onStreamingChange={handleStreamingChange}
-                embedded={true}
-                tabType="mvp"
-                onSessionCreated={handleSessionCreated}
-              />
-            </Suspense>
-          }
-          right={
-            <div className="h-full p-3">
-              <div className="h-full flex flex-col rounded-lg border border-border bg-muted/30 shadow-sm overflow-hidden">
-                {/* Tab Header */}
-                <div className="flex-shrink-0 border-b border-border bg-muted/50 px-3 py-2">
-                  <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MvpTabType)}>
-                    <TabsList className="bg-background/50">
-                      <TabsTrigger value="planning" className="gap-1.5">
-                        <FileText className="w-3.5 h-3.5" />
-                        기획문서
-                      </TabsTrigger>
-                      <TabsTrigger value="development" className="gap-1.5">
-                        <Code className="w-3.5 h-3.5" />
-                        개발문서
-                      </TabsTrigger>
-                      <TabsTrigger value="preview" className="gap-1.5">
-                        <Monitor className="w-3.5 h-3.5" />
-                        프리뷰
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-
-                {/* Tab Content */}
-                <div className="flex-1 overflow-hidden">
-                  {activeTab === 'planning' && (
-                    <PlanningDocsPanel
-                      projectPath={project?.path}
-                      onStartNewWorkflow={handleStartNewWorkflow}
-                      isSessionLoading={isSessionLoading}
-                    />
-                  )}
-                  {activeTab === 'development' && (
-                    <DevDocsPanel
-                      projectPath={project?.path}
-                      isPlanningComplete={isPlanningComplete}
-                      onSendPrompt={handleSendPlanningPrompt}
-                      onStartNewSession={handleStartNewWorkflow}
-                      isSessionLoading={isSessionLoading}
-                    />
-                  )}
-                  {activeTab === 'preview' && (
-                    <PreviewPanel />
-                  )}
-                </div>
-              </div>
-            </div>
-          }
+  // Show settings view
+  if (showSettings) {
+    return (
+      <div className="h-full flex overflow-hidden bg-background">
+        <WorkspaceSidebar
+          projectPath={project?.path || ''}
+          tabType="mvp"
+          currentSessionId={currentSession?.id}
+          onNewSession={handleNewSession}
+          onSessionSelect={handleSessionSelect}
+          filePanelOpen={filePanelOpen}
+          onFilePanelToggle={() => setFilePanelOpen(prev => !prev)}
+          rightPanelVisible={rightPanelVisible}
+          onRightPanelToggle={() => setRightPanelVisible(prev => !prev)}
+          onLogoClick={() => setShowSettings(false)}
+          onSettingsClick={() => setShowSettings(false)}
+          collapsed={sidebarCollapsed}
+          onCollapseToggle={() => setSidebarCollapsed(prev => !prev)}
         />
+        <div className="flex-1 h-full overflow-y-auto">
+          <Settings onBack={() => setShowSettings(false)} />
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="h-full flex overflow-hidden bg-background">
+      {/* Sidebar with Sessions */}
+      <WorkspaceSidebar
+        projectPath={project?.path || ''}
+        tabType="mvp"
+        currentSessionId={currentSession?.id}
+        onNewSession={handleNewSession}
+        onSessionSelect={handleSessionSelect}
+        filePanelOpen={filePanelOpen}
+        onFilePanelToggle={() => setFilePanelOpen(prev => !prev)}
+        rightPanelVisible={rightPanelVisible}
+        onRightPanelToggle={() => setRightPanelVisible(prev => !prev)}
+        onLogoClick={goToProjectList}
+        onSettingsClick={() => setShowSettings(true)}
+        collapsed={sidebarCollapsed}
+        onCollapseToggle={() => setSidebarCollapsed(prev => !prev)}
+      />
+
+      {/* File Panel */}
+      <AnimatePresence>
+        {filePanelOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: filePanelWidth, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="h-full border-r border-border bg-background flex flex-col overflow-hidden flex-shrink-0"
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <span className="text-sm font-medium">Files</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setFilePanelOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <Suspense fallback={<div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div>}>
+                {project?.path && (
+                  <FileTree
+                    rootPath={project.path}
+                    onFileSelect={(file) => console.log('File selected:', file)}
+                  />
+                )}
+              </Suspense>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Chat Area */}
+      <div
+        className="flex-1 h-full overflow-hidden flex flex-col"
+        style={{ width: rightPanelVisible ? `${100 - rightPanelWidth}%` : '100%' }}
+      >
+        {/* Header with Breadcrumb */}
+        <div className="flex-shrink-0 h-12 border-b border-border flex items-center px-4 gap-3">
+          <Breadcrumb
+            items={[
+              {
+                label: 'Projects',
+                onClick: goToProjectList,
+                icon: <FolderOpen className="w-4 h-4" />,
+              },
+              {
+                label: projectName,
+                onClick: () => goToProject(projectId),
+              },
+              {
+                label: 'MVP',
+                icon: <Lightbulb className="w-4 h-4 text-primary" />,
+              },
+            ]}
+          />
+        </div>
+
+        {/* Chat Content */}
+        <div className="flex-1 overflow-hidden">
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>}>
+            <ClaudeCodeSession
+              key={sessionKey}
+              ref={claudeSessionRef}
+              session={currentSession || undefined}
+              initialProjectPath={project?.path}
+              onBack={handleBack}
+              onProjectPathChange={() => {}}
+              onStreamingChange={handleStreamingChange}
+              embedded={true}
+              tabType="mvp"
+              onSessionCreated={handleSessionCreated}
+            />
+          </Suspense>
+        </div>
+      </div>
+
+      {/* Right Panel (Planning/Dev/Preview) */}
+      <AnimatePresence>
+        {rightPanelVisible && (
+          <>
+            {/* Resize Handle */}
+            <div
+              className={cn(
+                'w-1 h-full cursor-col-resize flex-shrink-0 hover:bg-primary/50 transition-colors',
+                isDragging && 'bg-primary'
+              )}
+              onMouseDown={(e) => { e.preventDefault(); setIsDragging(true); }}
+            />
+
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: `${rightPanelWidth}%`, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="h-full bg-background border-l border-border overflow-hidden flex flex-col"
+            >
+              {/* Tabs Header */}
+              <div className="flex-shrink-0 border-b border-border px-3 py-2">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MvpTabType)}>
+                  <TabsList className="bg-muted/50">
+                    <TabsTrigger value="planning" className="gap-1.5 text-xs">
+                      <FileText className="w-3.5 h-3.5" />
+                      기획문서
+                    </TabsTrigger>
+                    <TabsTrigger value="development" className="gap-1.5 text-xs">
+                      <Code className="w-3.5 h-3.5" />
+                      개발문서
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="gap-1.5 text-xs">
+                      <Monitor className="w-3.5 h-3.5" />
+                      프리뷰
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {/* Tab Content */}
+              <div className="flex-1 overflow-hidden">
+                {activeTab === 'planning' && (
+                  <PlanningDocsPanel
+                    projectPath={project?.path}
+                    onStartNewWorkflow={handleStartNewWorkflow}
+                    isSessionLoading={isSessionLoading}
+                  />
+                )}
+                {activeTab === 'development' && (
+                  <DevDocsPanel
+                    projectPath={project?.path}
+                    isPlanningComplete={isPlanningComplete}
+                    onSendPrompt={handleSendPlanningPrompt}
+                    onStartNewSession={handleStartNewWorkflow}
+                    isSessionLoading={isSessionLoading}
+                  />
+                )}
+                {activeTab === 'preview' && <PreviewPanel />}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Drag overlay */}
+      {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
     </div>
   );
 };

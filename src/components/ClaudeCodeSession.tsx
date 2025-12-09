@@ -136,7 +136,15 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   tabType,
   onSessionCreated,
 }, ref) => {
-  const [projectPath] = useState(initialProjectPath || session?.project_path || "");
+  const [projectPath, setProjectPath] = useState(initialProjectPath || session?.project_path || "");
+
+  // Update projectPath when initialProjectPath changes (e.g., when switching projects)
+  useEffect(() => {
+    const newPath = initialProjectPath || session?.project_path || "";
+    if (newPath && newPath !== projectPath) {
+      setProjectPath(newPath);
+    }
+  }, [initialProjectPath, session?.project_path]);
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
