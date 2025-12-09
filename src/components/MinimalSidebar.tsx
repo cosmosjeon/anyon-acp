@@ -6,10 +6,13 @@ import {
   ChevronRight,
   Folder,
   ChevronDown,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
+import { useTheme } from '@/hooks/useTheme';
 import { api, type Project } from '@/lib/api';
 import logoAnyon from '@/assets/logo-anyon.png';
 import logoText from '@/assets/anyon-logo-text.png';
@@ -42,6 +45,7 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
   const [expanded, setExpanded] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // Load recent projects when expanded
   useEffect(() => {
@@ -189,6 +193,38 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
           'flex flex-col py-2 border-t border-border/30',
           expanded ? 'px-2' : ''
         )}>
+          {/* Theme Toggle */}
+          {expanded ? (
+            <motion.button
+              onClick={toggleTheme}
+              whileTap={{ scale: 0.95 }}
+              className="h-10 flex items-center gap-2 transition-colors rounded-md px-2 w-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 flex-shrink-0" />
+              ) : (
+                <Moon className="w-5 h-5 flex-shrink-0" />
+              )}
+              <span className="text-sm whitespace-nowrap">
+                {theme === 'dark' ? '라이트 모드' : '다크 모드'}
+              </span>
+            </motion.button>
+          ) : (
+            <TooltipSimple content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} side="right">
+              <motion.button
+                onClick={toggleTheme}
+                whileTap={{ scale: 0.95 }}
+                className="h-10 flex items-center gap-2 transition-colors rounded-md w-full justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5 flex-shrink-0" />
+                ) : (
+                  <Moon className="w-5 h-5 flex-shrink-0" />
+                )}
+              </motion.button>
+            </TooltipSimple>
+          )}
+
           {/* Settings */}
           {expanded ? (
             <motion.button

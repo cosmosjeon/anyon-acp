@@ -12,8 +12,8 @@ import {
   Lightbulb,
   Cpu,
   Rocket,
-  
 } from "lucide-react";
+import { VideoLoader } from "@/components/VideoLoader";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover } from "@/components/ui/popover";
@@ -1049,7 +1049,7 @@ const FloatingPromptInputInner = (
                       className="min-w-[60px]"
                     >
                       {isLoading ? (
-                        <div className="rotating-symbol text-primary-foreground" />
+                        <VideoLoader size="sm" />
                       ) : (
                         <Send className="h-4 w-4" />
                       )}

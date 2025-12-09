@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  ArrowLeft, 
-  Play, 
-  StopCircle, 
+import {
+  ArrowLeft,
+  Play,
+  StopCircle,
   Terminal,
   AlertCircle,
-  Loader2,
   Copy,
   ChevronDown,
   Maximize2,
   X,
   Settings2
 } from "lucide-react";
+import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -755,7 +755,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {isRunning && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <VideoLoader size="md" />
                     <span className="text-sm text-muted-foreground">Initializing agent...</span>
                   </div>
                 </div>
@@ -896,7 +896,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {isRunning && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <VideoLoader size="md" />
                     <span className="text-sm text-muted-foreground">Initializing agent...</span>
                   </div>
                 </div>

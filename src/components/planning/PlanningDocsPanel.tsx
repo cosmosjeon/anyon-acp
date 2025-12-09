@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { CheckCircle2, Circle, ArrowRight, FileText, Loader2, PlayCircle } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRight, FileText, PlayCircle } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
@@ -91,7 +92,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   if (isLoading && documents.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <VideoLoader size="md" />
       </div>
     );
   }
@@ -217,7 +218,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
                       >
                         {activeWorkflows.has(activeStep.id) ? (
                           <>
-                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <VideoLoader size="sm" />
                             작성 중...
                           </>
                         ) : (
@@ -246,7 +247,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
                       >
                         {activeWorkflows.has(activeStep.id) ? (
                           <>
-                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <VideoLoader size="sm" />
                             작성 중...
                           </>
                         ) : (
@@ -283,7 +284,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
               >
                 {activeWorkflows.has(progress.nextStep.id) ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <VideoLoader size="sm" />
                     작성 중...
                   </>
                 ) : (

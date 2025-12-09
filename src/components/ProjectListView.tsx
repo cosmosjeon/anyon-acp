@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderOpen, Search, Loader2, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar } from 'lucide-react';
+import { FolderOpen, Search, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar, Trash2, X } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,54 @@ export const ProjectListView: React.FC = () => {
   const [installStatus, setInstallStatus] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'created'>('recent');
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+
+  const toggleSelectMode = () => {
+    if (isSelectMode) {
+      setSelectedProjects(new Set());
+    }
+    setIsSelectMode(!isSelectMode);
+  };
+
+  const toggleProjectSelection = (projectId: string) => {
+    const newSelected = new Set(selectedProjects);
+    if (newSelected.has(projectId)) {
+      newSelected.delete(projectId);
+    } else {
+      newSelected.add(projectId);
+    }
+    setSelectedProjects(newSelected);
+  };
+
+  const selectAllDisplayed = () => {
+    const newSelected = new Set<string>();
+    filteredProjects.forEach(p => newSelected.add(p.id));
+    setSelectedProjects(newSelected);
+  };
+
+  const deselectAll = () => {
+    setSelectedProjects(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedProjects.size === 0) return;
+    
+    const count = selectedProjects.size;
+    if (window.confirm(`Remove ${count} project${count > 1 ? 's' : ''} from the list?`)) {
+      try {
+        const projectsToDelete = projects.filter(p => selectedProjects.has(p.id));
+        for (const project of projectsToDelete) {
+          await api.unregisterProject(project.path);
+        }
+        await refreshProjects();
+        setSelectedProjects(new Set());
+        setIsSelectMode(false);
+      } catch (err) {
+        console.error('Failed to remove projects:', err);
+      }
+    }
+  };
 
   // Load projects from API
   const refreshProjects = useCallback(async (): Promise<Project[]> => {
@@ -239,7 +288,7 @@ export const ProjectListView: React.FC = () => {
           onProjectSelect={handleSidebarProjectSelect}
         />
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <VideoLoader size="lg" />
         </div>
       </div>
     );
@@ -271,7 +320,7 @@ export const ProjectListView: React.FC = () => {
                   ? 'bg-green-600/90 border-green-500/30 text-white'
                   : 'bg-background/95 border-border text-foreground'
               }`}>
-                {installStatus.type === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
+                {installStatus.type === 'info' && <VideoLoader size="sm" />}
                 {installStatus.type === 'success' && <CheckCircle className="h-4 w-4" />}
                 {installStatus.type === 'error' && <AlertCircle className="h-4 w-4" />}
                 <span className="text-sm font-medium">{installStatus.text}</span>
@@ -300,7 +349,7 @@ export const ProjectListView: React.FC = () => {
                   className="flex items-center gap-2"
                 >
                   {isOpeningFolder ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <VideoLoader size="sm" />
                   ) : isInstallingAnyon ? (
                     <>
                       <Download className="h-4 w-4 animate-pulse" />
@@ -319,7 +368,7 @@ export const ProjectListView: React.FC = () => {
 
           {/* Search and Sort */}
           {projects.length > 0 && (
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -359,6 +408,67 @@ export const ProjectListView: React.FC = () => {
             </div>
           )}
 
+          {/* Selection Mode Bar */}
+          {projects.length > 0 && (
+            <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-muted/50 border">
+              {isSelectMode ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">
+                      {selectedProjects.size > 0 
+                        ? `${selectedProjects.size}개 선택됨`
+                        : '삭제할 프로젝트를 선택하세요'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectedProjects.size === filteredProjects.length ? deselectAll : selectAllDisplayed}
+                      className="text-xs"
+                    >
+                      {selectedProjects.size === filteredProjects.length ? '전체 해제' : '전체 선택'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteSelected}
+                      disabled={selectedProjects.size === 0}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      삭제 ({selectedProjects.size})
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSelectMode}
+                      className="flex items-center gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                      취소
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredProjects.length}개의 프로젝트
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleSelectMode}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    프로젝트 삭제
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Error state */}
           {error && (
             <motion.div
@@ -379,6 +489,9 @@ export const ProjectListView: React.FC = () => {
                   project={project}
                   onClick={() => handleProjectClick(project)}
                   onDelete={handleDeleteProject}
+                  isSelectMode={isSelectMode}
+                  isSelected={selectedProjects.has(project.id)}
+                  onToggleSelect={() => toggleProjectSelection(project.id)}
                 />
               ))}
             </div>
@@ -414,7 +527,7 @@ export const ProjectListView: React.FC = () => {
                     className="flex items-center gap-2"
                   >
                     {isOpeningFolder ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <VideoLoader size="sm" />
                     ) : isInstallingAnyon ? (
                       <>
                         <Download className="h-4 w-4 animate-pulse" />

@@ -4,14 +4,14 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { api, type UsageStats, type ProjectUsage } from "@/lib/api";
-import { 
-  Calendar, 
+import {
+  Calendar,
   Filter,
-  Loader2,
   Briefcase,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { VideoLoader } from "@/components/VideoLoader";
 
 interface UsageDashboardProps {
   /**
@@ -347,7 +347,7 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ }) => {
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <VideoLoader size="lg" />
             </div>
           ) : error ? (
             <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/50 text-body-small text-destructive">

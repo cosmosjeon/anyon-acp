@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Loader2, Play, Clock, CheckCircle, XCircle, Trash2, Import, ChevronDown, ChevronRight, FileJson, Globe, Download, Plus, History, Edit } from 'lucide-react';
+import { Bot, Play, Clock, CheckCircle, XCircle, Trash2, Import, ChevronDown, ChevronRight, FileJson, Globe, Download, Plus, History, Edit } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,7 +163,7 @@ export const Agents: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'running':
-        return <Loader2 className="w-4 h-4 animate-spin" />;
+        return <VideoLoader size="sm" />;
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'failed':
@@ -326,7 +327,7 @@ export const Agents: React.FC = () => {
           <TabsContent value="agents" className="flex-1 overflow-hidden">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  <VideoLoader size="lg" />
                 </div>
               ) : agents.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 text-center">

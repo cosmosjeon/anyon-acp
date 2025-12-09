@@ -14,8 +14,9 @@ import {
   Check,
   X,
   Table,
-  Loader2,
+  
 } from "lucide-react";
+import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -555,7 +556,7 @@ export const StorageTab: React.FC = () => {
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <VideoLoader size="lg" />
         </div>
       )}
 
@@ -637,7 +638,7 @@ export const StorageTab: React.FC = () => {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <VideoLoader size="sm" />
               ) : (
                 "Update"
               )}
@@ -711,7 +712,7 @@ export const StorageTab: React.FC = () => {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <VideoLoader size="sm" />
               ) : (
                 "Insert"
               )}
@@ -758,7 +759,7 @@ export const StorageTab: React.FC = () => {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <VideoLoader size="sm" />
               ) : (
                 "Delete"
               )}
@@ -798,7 +799,7 @@ export const StorageTab: React.FC = () => {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <VideoLoader size="sm" />
               ) : (
                 "Reset Database"
               )}
@@ -932,7 +933,7 @@ export const StorageTab: React.FC = () => {
               disabled={loading || !sqlQuery.trim()}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <VideoLoader size="sm" />
               ) : (
                 "Execute"
               )}

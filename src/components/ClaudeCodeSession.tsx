@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   Copy,
   ChevronDown,
   GitBranch,
@@ -18,6 +18,7 @@ import {
   Rocket,
   CheckCircle
 } from "lucide-react";
+import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1355,7 +1356,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           transition={{ duration: 0.15 }}
           className="flex items-center justify-center py-4 mb-20"
         >
-          <div className="rotating-symbol text-primary" />
+          <VideoLoader size="md" />
         </motion.div>
       )}
 
@@ -1441,8 +1442,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               
               {isLoading && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
-                  <div className="flex items-center gap-3">
-                    <div className="rotating-symbol text-primary" />
+                  <div className="flex flex-col items-center gap-3">
+                    <VideoLoader size="lg" />
                     <span className="text-sm text-muted-foreground">
                       {session ? "Loading session history..." : "Initializing Claude Code..."}
                     </span>

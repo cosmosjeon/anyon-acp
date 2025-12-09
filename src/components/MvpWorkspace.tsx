@@ -2,7 +2,7 @@ import React, { useEffect, useState, Suspense, lazy, useRef, useCallback } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Lightbulb,
-  Loader2,
+  
   FileText,
   Code,
   Monitor,
@@ -10,6 +10,7 @@ import {
   FolderOpen,
   ArrowLeft,
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Breadcrumb } from '@/components/Breadcrumb';
@@ -228,7 +229,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <VideoLoader size="lg" />
       </div>
     );
   }
@@ -307,7 +308,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div>}>
+              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -348,7 +349,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               ref={claudeSessionRef}

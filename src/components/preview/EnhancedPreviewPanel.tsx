@@ -20,8 +20,9 @@ import {
   FolderOpen,
   Play,
   Square,
-  Loader2,
+  
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -477,7 +478,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
             )}
             {isLoading && (
               <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+                <VideoLoader size="sm" />
                 <span className="text-sm">{packageManager || '패키지 매니저 감지 중...'}</span>
               </div>
             )}
@@ -587,7 +588,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
                   title="개발 서버 중지"
                 >
                   {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    <VideoLoader size="sm" />
                   ) : (
                     <Square className="w-4 h-4 mr-1" />
                   )}
@@ -603,7 +604,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
                   className="bg-green-600 hover:bg-green-700"
                 >
                   {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    <VideoLoader size="sm" />
                   ) : (
                     <Play className="w-4 h-4 mr-1" />
                   )}

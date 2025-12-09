@@ -1,18 +1,12 @@
 import React, { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProjectRoutes } from '@/components/ProjectRoutes';
 import { useTabContext } from '@/contexts/TabContext';
+import { VideoLoader } from '@/components/VideoLoader';
 
 interface AppLayoutProps {
   className?: string;
 }
-
-const LoadingSpinner: React.FC = () => (
-  <div className="flex items-center justify-center h-full">
-    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-  </div>
-);
 
 /**
  * AppLayout - Main application layout
@@ -28,7 +22,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className }) => {
 
   return (
     <div className={cn('h-full w-full overflow-hidden bg-background', className)}>
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<VideoLoader size="lg" />}>
         <ProjectRoutes tabId={activeTabId || 'default'} />
       </Suspense>
     </div>

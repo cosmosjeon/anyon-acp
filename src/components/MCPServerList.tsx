@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Network, 
-  Globe, 
-  Terminal, 
-  Trash2, 
-  Play, 
+import { VideoLoader } from "@/components/VideoLoader";
+import {
+  Network,
+  Globe,
+  Terminal,
+  Trash2,
+  Play,
   CheckCircle,
-  Loader2,
+  
   RefreshCw,
   FolderOpen,
   User,
@@ -266,7 +267,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
                 className="hover:bg-green-500/10 hover:text-green-600"
               >
                 {testingServer === server.name ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <VideoLoader size="sm" />
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
@@ -279,7 +280,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
                 className="hover:bg-destructive/10 hover:text-destructive"
               >
                 {removingServer === server.name ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <VideoLoader size="sm" />
                 ) : (
                   <Trash2 className="h-4 w-4" />
                 )}
@@ -374,7 +375,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <VideoLoader size="lg" />
       </div>
     );
   }

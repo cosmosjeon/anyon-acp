@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Download, X, RefreshCw, Loader2 } from 'lucide-react';
+import { Download, X, RefreshCw } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { useUpdater } from '@/hooks';
 
 // 개발 환경에서 UI 테스트용 mock 모드
@@ -105,7 +106,7 @@ export function UpdateNotification() {
           >
             {downloading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <VideoLoader size="sm" />
                 Installing...
               </>
             ) : (

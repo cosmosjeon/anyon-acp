@@ -10,10 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
-  Loader2,
+  
   Sun,
   Moon,
 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
@@ -114,8 +115,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     loadProjects();
   }, []);
 
-  const currentProjectName = projectPath.split('/').pop() || 'Project';
-
   const handleSessionClick = (session: Session) => {
     onSessionSelect?.(session);
   };
@@ -213,7 +212,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             )}
             {loadingSessions ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <VideoLoader size="sm" />
               </div>
             ) : sessions.length === 0 ? (
               !collapsed && (

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlayCircle, Square, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { PlayCircle, Square, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DEV_WORKFLOW_SEQUENCE } from '@/constants/development';
@@ -165,7 +166,7 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
                 )}
               >
                 {isRunning ? (
-                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  <VideoLoader size="md" />
                 ) : (
                   <PlayCircle className="h-6 w-6 text-muted-foreground/60" />
                 )}
