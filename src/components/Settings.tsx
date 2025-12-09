@@ -17,7 +17,6 @@ import {
   Bot,
   Plus,
   Trash2,
-  ChevronDown,
   CheckCircle2,
   XCircle,
   Terminal,
@@ -36,7 +35,6 @@ import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   api,
@@ -55,6 +53,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 interface SettingsProps {
   className?: string;
+  onBack?: () => void;
 }
 
 interface PermissionRule {

@@ -8,7 +8,6 @@ import { Terminal } from 'lucide-react';
 import { VideoLoader } from '@/components/VideoLoader';
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
-import loginLogo from '@/assets/loginlogo.png';
 import anyonTextLogo from '@/assets/ANYON.png';
 
 const API_URL = 'http://localhost:4000';
