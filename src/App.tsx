@@ -153,7 +153,7 @@ function App() {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <img src={logoAnyon} alt="Anyon Logo" className="w-16 h-16" />
+          <img src={logoAnyon} alt="Anyon Logo" className="w-16 h-16 logo-invert" />
         </div>
       </div>
     );

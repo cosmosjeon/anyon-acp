@@ -20,7 +20,7 @@ import {
   FolderOpen,
   Play,
   Square,
-  
+  MoreVertical,
 } from 'lucide-react';
 import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { usePreviewStore } from '@/stores/previewStore';
@@ -134,6 +133,28 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   // 요소 선택 상태
   const [_selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
 
+  // 툴바 확장 상태
+  const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
+
+  // 소스 모드 변경 핸들러
+  const handleSourceModeChange = (mode: 'port' | 'file') => {
+    if (mode === sourceMode) return;
+    setSourceMode(mode);
+    // 모드 변경 시 적절한 URL 설정
+    if (mode === 'port') {
+      // 서버 모드: 서버 URL 사용
+      if (devServerProxyUrl) {
+        setCurrentUrl(devServerProxyUrl + urlPath);
+      }
+    } else {
+      // 파일 모드: 현재 파일이 있으면 유지, 없으면 초기화
+      setSelectedPort(null);
+      if (!currentFilePath) {
+        setCurrentUrl('');
+      }
+    }
+  };
+
   // iframe ref 등록
   useEffect(() => {
     if (iframeRef.current) {
@@ -155,7 +176,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     console.log('[Preview] loadHtmlFile called:', { filePath, isTauri, projectPath });
 
     if (!isTauri) {
-      // 브라우저 환경에서는 Tauri 명령어 사용 불가
       console.warn('[Preview] Not in Tauri environment, cannot load HTML file directly');
       addAppOutput({
         type: 'info',
@@ -201,7 +221,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
   }, [devServerProxyUrl, sourceMode, urlPath]);
 
-  // 프로젝트 열면 자동으로 프리뷰 시작 (HTML 파일 또는 dev server)
+  // 프로젝트 열면 자동으로 프리뷰 시작
   useEffect(() => {
     console.log('[Preview] Auto-detect useEffect triggered:', {
       projectPath,
@@ -226,13 +246,11 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
     const autoDetectAndStart = async () => {
       try {
-        // 1. 먼저 package.json 확인 → dev server 시작
         const hasPackageJson = await invoke<boolean>('check_file_exists', {
           filePath: `${projectPath}/package.json`
         });
 
         if (hasPackageJson) {
-          // npm/yarn/pnpm/bun 프로젝트 - dev server 시작
           if (!devServerRunning) {
             setSourceMode('port');
             startDevServer();
@@ -240,7 +258,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
           return;
         }
 
-        // 2. package.json 없으면 HTML 파일 찾기
         const htmlFiles = ['index.html', 'main.html', 'home.html'];
         for (const htmlFile of htmlFiles) {
           const htmlPath = `${projectPath}/${htmlFile}`;
@@ -254,7 +271,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
           }
         }
 
-        // 3. 루트에 없으면 src/ 폴더에서 찾기
         for (const htmlFile of htmlFiles) {
           const htmlPath = `${projectPath}/src/${htmlFile}`;
           const exists = await invoke<boolean>('check_file_exists', { filePath: htmlPath });
@@ -273,13 +289,12 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
       }
     };
 
-    // htmlFilePath가 외부에서 설정되지 않았을 때만 자동 감지
     if (!htmlFilePath && !currentUrl) {
       autoDetectAndStart();
     }
   }, [projectPath, htmlFilePath, devServerRunning, startDevServer, currentUrl]);
 
-  // 포트 스캔 (dev server가 없을 때만)
+  // 포트 스캔
   useEffect(() => {
     if (sourceMode === 'port' && !devServerProxyUrl) {
       scanPorts();
@@ -305,7 +320,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
   };
 
-  // 포트 변경
   const handlePortChange = (port: number) => {
     setSelectedPort(port);
     const portInfo = ports.find((p) => p.port === port);
@@ -314,7 +328,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
   };
 
-  // 네비게이션
   const handleNavigate = () => {
     if (selectedPort) {
       setCurrentUrl(`http://localhost:${selectedPort}${urlPath}`);
@@ -329,7 +342,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     iframeRef.current?.contentWindow?.postMessage({ type: 'navigate', payload: { direction: 'forward' } }, '*');
   };
 
-  // 새로고침
   const handleRefresh = () => {
     if (sourceMode === 'file' && currentFilePath) {
       loadHtmlFile(currentFilePath);
@@ -344,12 +356,10 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     });
   };
 
-  // 풀스크린
   const handleFullscreen = () => {
     iframeRef.current?.requestFullscreen();
   };
 
-  // 외부 열기
   const handleOpenExternal = async () => {
     if (sourceMode === 'file' && currentFilePath) {
       await open(currentFilePath);
@@ -358,7 +368,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
   };
 
-  // 요소 선택기 토글
   const handleToggleSelector = () => {
     console.log('[Preview] Toggle selector clicked:', {
       isSelectorActive,
@@ -367,7 +376,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
       currentUrl
     });
 
-    // isComponentSelectorInitialized가 false여도 iframe이 있으면 시도
     if (iframeRef.current?.contentWindow) {
       if (isSelectorActive) {
         iframeRef.current.contentWindow.postMessage(
@@ -389,7 +397,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
   };
 
-  // 디바이스 관련
   const toggleOrientation = () => setIsLandscape(!isLandscape);
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 2));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.25));
@@ -401,7 +408,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     return { width, height };
   };
 
-  // AI 수정 핸들러
   const handleAIFix = useCallback((prompt: string) => {
     onAIFix?.(prompt);
     clearPreviewError();
@@ -410,6 +416,21 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const { width, height } = getDeviceDimensions();
   const hasContent = currentUrl || (sourceMode === 'port' && ports.some((p) => p.alive));
   const problemCount = problemReport?.problems?.length || 0;
+
+  // 서버 상태 텍스트
+  const getServerStatusText = () => {
+    if (isLoading) return '시작 중...';
+    if (devServerRunning && devServerPort) return `localhost:${devServerPort}`;
+    if (sourceMode === 'file' && currentFilePath) return currentFilePath.split(/[/\\]/).pop() || '';
+    return '연결 안됨';
+  };
+
+  const getServerStatusColor = () => {
+    if (isLoading) return 'text-amber-500';
+    if (devServerRunning) return 'text-green-500';
+    if (previewError) return 'text-red-500';
+    return 'text-gray-400';
+  };
 
   // 현재 활성 컨텐츠 렌더링
   const renderContent = () => {
@@ -424,7 +445,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
       case 'console':
         return <Console />;
       case 'code':
-        // TODO: CodeView 컴포넌트 구현
         return (
           <div className="flex items-center justify-center h-full text-gray-500">
             Code view coming soon...
@@ -441,7 +461,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     if (!currentUrl) {
       return (
         <div className="relative flex items-center justify-center h-full text-gray-500">
-          {/* 에러 배너 - currentUrl 없어도 표시 */}
           <ErrorBanner
             error={previewError}
             onDismiss={clearPreviewError}
@@ -500,7 +519,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
           >
             <div className="absolute -top-8 left-0 right-0 text-center text-sm text-gray-500">
               {selectedDevice.name} {isLandscape ? '(Landscape)' : '(Portrait)'}
-              <span className="ml-2 text-xs">{width}×{height}</span>
+              <span className="ml-2 text-xs">{width}x{height}</span>
             </div>
             <div
               className="relative shadow-2xl"
@@ -525,7 +544,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
     return (
       <div className="relative h-full">
-        {/* 에러 배너 */}
         <ErrorBanner
           error={previewError}
           onDismiss={clearPreviewError}
@@ -544,248 +562,278 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-      {/* 액션 헤더 (탭 전환) */}
-      <ActionHeader
-        problemCount={problemCount}
-        onCleanRestart={() => console.log('Clean restart')}
-        onClearCache={() => console.log('Clear cache')}
-      />
-
-      {/* 툴바 - 프리뷰 모드일 때만 표시 */}
-      {previewMode === 'preview' && (
-        <div className="flex items-center gap-2 p-2 border-b border-gray-200 dark:border-gray-700 flex-wrap">
-          {/* 소스 모드 토글 */}
-          <div className="flex items-center border rounded-md">
-            <Button
-              variant={sourceMode === 'port' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-r-none"
-              onClick={() => setSourceMode('port')}
-            >
-              <Server className="w-4 h-4 mr-1" />
-              서버
-            </Button>
-            <Button
-              variant={sourceMode === 'file' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-l-none"
-              onClick={() => setSourceMode('file')}
-            >
-              <FileCode className="w-4 h-4 mr-1" />
-              파일
-            </Button>
+      {/* 상단 서버 상태 바 */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <div className="flex items-center gap-3">
+          {/* 서버 상태 인디케이터 */}
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              isLoading && "bg-amber-500 animate-pulse",
+              devServerRunning && !isLoading && "bg-green-500",
+              !devServerRunning && !isLoading && previewError && "bg-red-500",
+              !devServerRunning && !isLoading && !previewError && "bg-gray-400"
+            )} />
+            <span className={cn("text-sm font-medium", getServerStatusColor())}>
+              {getServerStatusText()}
+            </span>
           </div>
 
-          {sourceMode === 'port' ? (
-            <>
-              {/* 개발 서버 시작/중지 버튼 */}
-              {devServerRunning ? (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={stopDevServer}
-                  disabled={isLoading}
-                  title="개발 서버 중지"
-                >
-                  {isLoading ? (
-                    <VideoLoader size="sm" />
-                  ) : (
-                    <Square className="w-4 h-4 mr-1" />
-                  )}
-                  중지
-                </Button>
-              ) : (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={startDevServer}
-                  disabled={isLoading || !projectPath}
-                  title="개발 서버 시작"
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isLoading ? (
-                    <VideoLoader size="sm" />
-                  ) : (
-                    <Play className="w-4 h-4 mr-1" />
-                  )}
-                  시작
-                </Button>
-              )}
-
-              {/* 패키지 매니저 및 포트 정보 */}
-              {devServerRunning && (
-                <div className="flex items-center gap-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-md text-sm">
-                  <span className="text-green-600 dark:text-green-400">
-                    {packageManager || 'npm'} • localhost:{devServerPort || '...'}
-                  </span>
-                </div>
-              )}
-
-              {/* 포트 선택 (dev server가 없을 때만) */}
-              {!devServerRunning && (
-                <select
-                  value={selectedPort || ''}
-                  onChange={(e) => handlePortChange(Number(e.target.value))}
-                  className="px-3 py-1.5 rounded-md border bg-white dark:bg-gray-800 text-sm"
-                  disabled={ports.length === 0}
-                >
-                  <option value="" disabled>포트 선택</option>
-                  {ports.map((p) => (
-                    <option key={p.port} value={p.port}>
-                      {p.alive ? '🟢' : '🔴'} Port {p.port}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {/* URL 입력 */}
-              <div className="flex-1 flex items-center gap-1 border rounded-md px-2 bg-white dark:bg-gray-800 min-w-[120px]">
-                <span className="text-xs text-gray-500">
-                  localhost:{devServerPort || selectedPort || '----'}
-                </span>
-                <input
-                  type="text"
-                  value={urlPath}
-                  onChange={(e) => setUrlPath(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
-                  placeholder="/path"
-                  className="flex-1 px-2 py-1 text-sm bg-transparent outline-none"
-                  disabled={!devServerPort && !selectedPort}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-2 flex-1">
-              <div className="flex-1 flex items-center gap-1 border rounded-md px-2 bg-white dark:bg-gray-800 min-w-[120px]">
-                <FileCode className="w-4 h-4 text-gray-500" />
-                <span className="text-sm truncate">
-                  {currentFilePath ? currentFilePath.split(/[/\\]/).pop() : 'No file selected'}
-                </span>
-              </div>
-              {/* HTML 파일 선택 버튼 */}
+          {/* 서버 시작/중지 버튼 */}
+          {sourceMode === 'port' && (
+            devServerRunning ? (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={async () => {
-                  if (!isTauri) {
-                    console.warn('File dialog only available in Tauri');
-                    return;
-                  }
-                  try {
-                    const { open } = await import('@tauri-apps/plugin-dialog');
-                    const selected = await open({
-                      multiple: false,
-                      filters: [{ name: 'HTML Files', extensions: ['html', 'htm'] }],
-                      directory: false,
-                    });
-                    if (selected && typeof selected === 'string') {
-                      setCurrentFilePath(selected);
-                      loadHtmlFile(selected);
-                    }
-                  } catch (err) {
-                    console.error('Failed to open file dialog:', err);
-                  }
-                }}
+                onClick={stopDevServer}
+                disabled={isLoading}
+                className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
               >
-                <FolderOpen className="w-4 h-4 mr-1" />
-                열기
+                <Square className="w-3.5 h-3.5 mr-1" />
+                중지
               </Button>
-            </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startDevServer}
+                disabled={isLoading || !projectPath}
+                className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+              >
+                <Play className="w-3.5 h-3.5 mr-1" />
+                시작
+              </Button>
+            )
           )}
-
-          {/* 네비게이션 버튼 */}
-          <div className="flex items-center border rounded-md">
-            <Button variant="ghost" size="icon" onClick={handleBack} disabled={!hasContent}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleForward} disabled={!hasContent}>
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* 요소 선택기 */}
-          <Button
-            variant={isSelectorActive ? 'default' : 'ghost'}
-            size="icon"
-            onClick={handleToggleSelector}
-            disabled={!hasContent}
-            title={`요소 선택 모드 ${isSelectorActive ? '(활성화)' : ''} - Cmd+Shift+C`}
-            className={cn(isSelectorActive && 'bg-purple-500 hover:bg-purple-600')}
-          >
-            <MousePointer2 className="w-4 h-4" />
-          </Button>
-
-          {/* 디바이스 선택 */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant={isDeviceMode ? 'default' : 'ghost'} size="icon" disabled={!hasContent}>
-                {DEVICE_ICONS[selectedDevice.frameType]}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setIsDeviceMode(!isDeviceMode)}>
-                <Monitor className="w-4 h-4 mr-2" />
-                {isDeviceMode ? 'Disable' : 'Enable'} Device Mode
-              </DropdownMenuItem>
-              {isDeviceMode && (
-                <>
-                  <DropdownMenuSeparator />
-                  {DEVICE_SIZES.map((device) => (
-                    <DropdownMenuItem
-                      key={device.name}
-                      onClick={() => setSelectedDevice(device)}
-                      className={selectedDevice.name === device.name ? 'bg-purple-100 dark:bg-purple-900/30' : ''}
-                    >
-                      <span className="mr-2">{DEVICE_ICONS[device.frameType]}</span>
-                      <span className="flex-1">{device.name}</span>
-                      <span className="text-xs text-gray-500 ml-2">
-                        {device.width}×{device.height}
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* 회전 버튼 */}
-          {isDeviceMode && (
-            <Button variant="ghost" size="icon" onClick={toggleOrientation} title={isLandscape ? 'Portrait' : 'Landscape'}>
-              <RotateCw className="w-4 h-4" />
-            </Button>
-          )}
-
-          {/* 줌 컨트롤 */}
-          {isDeviceMode && (
-            <>
-              <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={scale <= 0.25}>
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleResetZoom} className="px-2 min-w-[60px]">
-                <span className="text-xs">{Math.round(scale * 100)}%</span>
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={scale >= 2}>
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-            </>
-          )}
-
-          {/* 새로고침, 풀스크린, 외부 열기 */}
-          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={!hasContent}>
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleFullscreen} disabled={!hasContent}>
-            <Maximize className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleOpenExternal} disabled={!hasContent}>
-            <ExternalLink className="w-4 h-4" />
-          </Button>
         </div>
-      )}
+
+        {/* 소스 모드 토글 */}
+        <div className="flex items-center gap-1 border rounded-md p-0.5 bg-white dark:bg-gray-800">
+          <button
+            onClick={() => handleSourceModeChange('port')}
+            className={cn(
+              "px-2 py-1 text-xs rounded transition-colors",
+              sourceMode === 'port'
+                ? "bg-gray-100 dark:bg-gray-700 font-medium"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <Server className="w-3.5 h-3.5 inline mr-1" />
+            서버
+          </button>
+          <button
+            onClick={() => handleSourceModeChange('file')}
+            className={cn(
+              "px-2 py-1 text-xs rounded transition-colors",
+              sourceMode === 'file'
+                ? "bg-gray-100 dark:bg-gray-700 font-medium"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <FileCode className="w-3.5 h-3.5 inline mr-1" />
+            파일
+          </button>
+        </div>
+      </div>
 
       {/* 컨텐츠 영역 */}
       <div ref={containerRef} className="flex-1 relative overflow-auto">
         {renderContent()}
+      </div>
+
+      {/* 하단 툴바 - 모든 모드에서 표시 */}
+      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        {/* 확장 가능한 고급 옵션 - preview 모드에서만 */}
+        {previewMode === 'preview' && isToolbarExpanded && (
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2 flex-wrap">
+              {sourceMode === 'port' ? (
+                <>
+                  {/* URL 입력 */}
+                  <div className="flex-1 flex items-center gap-1 border rounded-md px-2 bg-white dark:bg-gray-800 min-w-[150px]">
+                    <span className="text-xs text-gray-500">
+                      localhost:{devServerPort || selectedPort || '----'}
+                    </span>
+                    <input
+                      type="text"
+                      value={urlPath}
+                      onChange={(e) => setUrlPath(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
+                      placeholder="/path"
+                      className="flex-1 px-2 py-1 text-sm bg-transparent outline-none"
+                      disabled={!devServerPort && !selectedPort}
+                    />
+                  </div>
+
+                  {/* 포트 선택 (dev server가 없을 때만) */}
+                  {!devServerRunning && ports.length > 0 && (
+                    <select
+                      value={selectedPort || ''}
+                      onChange={(e) => handlePortChange(Number(e.target.value))}
+                      className="px-2 py-1 rounded-md border bg-white dark:bg-gray-800 text-sm"
+                    >
+                      <option value="" disabled>포트 선택</option>
+                      {ports.map((p) => (
+                        <option key={p.port} value={p.port}>
+                          {p.alive ? '[ON]' : '[OFF]'} Port {p.port}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* 파일 경로 표시 */}
+                  <div className="flex-1 flex items-center gap-1 border rounded-md px-2 bg-white dark:bg-gray-800 min-w-[150px]">
+                    <FileCode className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm truncate">
+                      {currentFilePath ? currentFilePath.split(/[/\\]/).pop() : '파일 없음'}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!isTauri) return;
+                      try {
+                        const { open } = await import('@tauri-apps/plugin-dialog');
+                        const selected = await open({
+                          multiple: false,
+                          filters: [{ name: 'HTML Files', extensions: ['html', 'htm'] }],
+                          directory: false,
+                        });
+                        if (selected && typeof selected === 'string') {
+                          setCurrentFilePath(selected);
+                          loadHtmlFile(selected);
+                        }
+                      } catch (err) {
+                        console.error('Failed to open file dialog:', err);
+                      }
+                    }}
+                  >
+                    <FolderOpen className="w-4 h-4 mr-1" />
+                    열기
+                  </Button>
+                </>
+              )}
+
+              {/* 디바이스 모드 컨트롤 */}
+              {isDeviceMode && (
+                <>
+                  <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        {DEVICE_ICONS[selectedDevice.frameType]}
+                        <span className="ml-1 text-xs">{selectedDevice.name}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      {DEVICE_SIZES.map((device) => (
+                        <DropdownMenuItem
+                          key={device.name}
+                          onClick={() => setSelectedDevice(device)}
+                          className={selectedDevice.name === device.name ? 'bg-gray-100 dark:bg-gray-800' : ''}
+                        >
+                          <span className="mr-2">{DEVICE_ICONS[device.frameType]}</span>
+                          <span className="flex-1">{device.name}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {device.width}x{device.height}
+                          </span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="ghost" size="icon" onClick={toggleOrientation} className="h-8 w-8">
+                    <RotateCw className="w-4 h-4" />
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={scale <= 0.25} className="h-8 w-8">
+                      <ZoomOut className="w-4 h-4" />
+                    </Button>
+                    <button onClick={handleResetZoom} className="text-xs px-2 min-w-[50px]">
+                      {Math.round(scale * 100)}%
+                    </button>
+                    <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={scale >= 2} className="h-8 w-8">
+                      <ZoomIn className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+        )}
+
+        {/* 메인 툴바 */}
+          <div className="flex items-center justify-between px-3 py-1.5">
+            {/* 왼쪽: 탭 */}
+            <ActionHeader
+              problemCount={problemCount}
+              onCleanRestart={() => console.log('Clean restart')}
+              onClearCache={() => console.log('Clear cache')}
+            />
+
+            {/* 오른쪽: 액션 버튼들 */}
+            <div className="flex items-center gap-1">
+              {/* 네비게이션 */}
+              <Button variant="ghost" size="icon" onClick={handleBack} disabled={!hasContent} className="h-8 w-8">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleForward} disabled={!hasContent} className="h-8 w-8">
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+
+              <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+
+              {/* 새로고침 */}
+              <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={!hasContent} className="h-8 w-8">
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+
+              {/* 요소 선택기 */}
+              <Button
+                variant={isSelectorActive ? 'default' : 'ghost'}
+                size="icon"
+                onClick={handleToggleSelector}
+                disabled={!hasContent}
+                title="요소 선택 모드 (Cmd+Shift+C)"
+                className={cn("h-8 w-8", isSelectorActive && 'bg-purple-500 hover:bg-purple-600')}
+              >
+                <MousePointer2 className="w-4 h-4" />
+              </Button>
+
+              {/* 디바이스 모드 토글 */}
+              <Button
+                variant={isDeviceMode ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => setIsDeviceMode(!isDeviceMode)}
+                disabled={!hasContent}
+                className="h-8 w-8"
+              >
+                <Smartphone className="w-4 h-4" />
+              </Button>
+
+              <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+
+              {/* 고급 옵션 토글 */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsToolbarExpanded(!isToolbarExpanded)}
+                className={cn("h-8 w-8", isToolbarExpanded && "bg-gray-100 dark:bg-gray-700")}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+
+              {/* 외부 열기 */}
+              <Button variant="ghost" size="icon" onClick={handleOpenExternal} disabled={!hasContent} className="h-8 w-8">
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+
+              {/* 풀스크린 */}
+              <Button variant="ghost" size="icon" onClick={handleFullscreen} disabled={!hasContent} className="h-8 w-8">
+                <Maximize className="w-4 h-4" />
+              </Button>
+            </div>
+        </div>
       </div>
     </div>
   );

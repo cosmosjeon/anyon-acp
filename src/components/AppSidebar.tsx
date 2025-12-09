@@ -96,7 +96,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               onClick={onLogoClick}
               className="p-1 rounded-lg cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
+              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
             </button>
           </TooltipSimple>
         </div>

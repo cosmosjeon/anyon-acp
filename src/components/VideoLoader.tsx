@@ -19,6 +19,7 @@ const sizeClasses = {
  *
  * Replaces the default Loader2 spinner with a custom loading animation video.
  * Uses radial gradient mask for smooth edge blending with any background.
+ * Uses CSS class 'video-invert' for dark mode color inversion.
  */
 export const VideoLoader: React.FC<VideoLoaderProps> = ({
   className,
@@ -38,7 +39,7 @@ export const VideoLoader: React.FC<VideoLoaderProps> = ({
           loop
           muted
           playsInline
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain video-invert"
         >
           <source src={loadingVideo} type="video/mp4" />
         </video>

@@ -116,7 +116,7 @@ export const LoginPage: React.FC = () => {
       <Card className="max-w-md w-full p-8 space-y-6">
         {/* 로고 */}
         <div className="text-center space-y-4">
-          <img src={anyonLogo} alt="ANYON" className="h-12 mx-auto" />
+          <img src={anyonLogo} alt="ANYON" className="h-12 mx-auto logo-invert" />
           <p className="text-muted-foreground">
             AI 기반 개발 플랫폼
           </p>

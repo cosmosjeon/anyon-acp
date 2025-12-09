@@ -165,7 +165,7 @@ export const ActionHeader: React.FC<ActionHeaderProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="flex items-center justify-between px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+      <div className="flex items-center justify-between px-2 py-1.5">
         {/* 탭 버튼들 */}
         <div className="relative flex rounded-md p-0.5 gap-0.5">
           {/* 애니메이션 인디케이터 */}

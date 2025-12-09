@@ -63,12 +63,12 @@ export function StartupIntro({ visible }: { visible: boolean }) {
               <img
                 src={logoSpiral}
                 alt="ANYON"
-                className="h-20 w-20"
+                className="h-20 w-20 logo-invert"
               />
               <img
                 src={logoText}
                 alt="ANYON"
-                className="h-12"
+                className="h-12 logo-invert"
               />
             </motion.div>
 

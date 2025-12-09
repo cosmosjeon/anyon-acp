@@ -952,4 +952,10 @@ code::-webkit-scrollbar-thumb:hover {
 
 .image-move-to-input {
   animation: moveToInput 0.8s ease-in-out forwards;
-} 
+}
+
+/* Logo and video inversion for dark mode */
+.theme-dark .logo-invert,
+.theme-dark .video-invert {
+  filter: invert(1);
+}

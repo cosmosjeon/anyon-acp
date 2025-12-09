@@ -82,7 +82,7 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
               onClick={onLogoClick}
               className="flex items-center gap-1.5 rounded-lg flex-shrink-0 cursor-pointer"
             >
-              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
+              <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
               <img src={logoText} alt="ANYON" className="h-5 object-contain" />
             </button>
           ) : (
@@ -91,7 +91,7 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
                 onClick={onLogoClick}
                 className="p-1 rounded-lg flex-shrink-0 cursor-pointer"
               >
-                <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain" />
+                <img src={logoAnyon} alt="ANYON" className="w-8 h-8 object-contain logo-invert" />
               </button>
             </TooltipSimple>
           )}
