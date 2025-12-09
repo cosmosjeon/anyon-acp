@@ -17,20 +17,24 @@ interface DevDocsPanelProps {
 
 /**
  * Get next workflow step based on current step
- * Orchestrator → Executor → Reviewer → Executor → Reviewer ... (cycle)
+ * Opensource → Orchestrator → Executor → Reviewer → Executor → Reviewer ... (cycle)
  */
 const getNextStep = (currentStepId: string): typeof DEV_WORKFLOW_SEQUENCE[0] | null => {
-  // Orchestrator → Executor
+  // pm-opensource → pm-orchestrator
+  if (currentStepId === 'pm-opensource') {
+    return DEV_WORKFLOW_SEQUENCE.find(s => s.id === 'pm-orchestrator') ?? null;
+  }
+  // pm-orchestrator → pm-executor
   if (currentStepId === 'pm-orchestrator') {
-    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
+    return DEV_WORKFLOW_SEQUENCE.find(s => s.id === 'pm-executor') ?? null;
   }
-  // Executor → Reviewer
+  // pm-executor → pm-reviewer
   if (currentStepId === 'pm-executor') {
-    return DEV_WORKFLOW_SEQUENCE[2]; // pm-reviewer
+    return DEV_WORKFLOW_SEQUENCE.find(s => s.id === 'pm-reviewer') ?? null;
   }
-  // Reviewer → Executor (cycle back)
+  // pm-reviewer → pm-executor (cycle back)
   if (currentStepId === 'pm-reviewer') {
-    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
+    return DEV_WORKFLOW_SEQUENCE.find(s => s.id === 'pm-executor') ?? null;
   }
   return null;
 };
@@ -79,7 +83,7 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
             // Check again in case stop was pressed during the delay
             if (!isStoppedRef.current) {
               setCurrentRunningStep(nextStep.id);
-              onStartNewSession?.(nextStep.prompt);
+              onStartNewSession?.(nextStep.workflowId);
             }
           }, 500);
         }
@@ -90,12 +94,12 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
   }, [isSessionLoading, currentRunningStep, onStartNewSession, projectPath]);
 
   // Start a step (clicking any step starts and continues from there)
-  const handleStart = (stepId: string, prompt: string) => {
+  const handleStart = (stepId: string, workflowId: string) => {
     isStoppedRef.current = false;
     setIsStopped(false);
     setIsDevComplete(false);
     setCurrentRunningStep(stepId);
-    onStartNewSession?.(prompt);
+    onStartNewSession?.(workflowId);
   };
 
   // Stop - prevents next step from running
@@ -151,7 +155,7 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
           return (
             <React.Fragment key={step.id}>
               <button
-                onClick={() => handleStart(step.id, step.prompt)}
+                onClick={() => handleStart(step.id, step.workflowId)}
                 disabled={!onStartNewSession || isRunningWorkflow}
                 className={cn(
                   'flex flex-col items-center gap-1.5 px-4 py-3 rounded-lg transition-all',

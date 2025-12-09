@@ -14,6 +14,7 @@ import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
+import { shouldUseSdkForWorkflow } from '@/config/featureFlags';
 
 // Lazy load ClaudeCodeSession for better performance
 const ClaudeCodeSession = lazy(() =>
@@ -107,12 +108,26 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   }, []);
 
   // Start a new workflow (new conversation) from PlanningDocsPanel
-  const handleStartNewWorkflow = useCallback((workflowPrompt: string) => {
-    if (claudeSessionRef.current) {
-      // Start a new session with the workflow prompt
-      claudeSessionRef.current.startNewSession(workflowPrompt);
+  const handleStartNewWorkflow = useCallback(async (workflowId: string) => {
+    // Check if SDK mode should be used for this workflow
+    if (shouldUseSdkForWorkflow(workflowId) && project?.path) {
+      // SDK mode: inject system prompt via ClaudeCodeSession
+      console.log(`[Workflow] Executing via SDK mode: ${workflowId}`);
+
+      // Dynamically import to get the system prompt
+      const { getWorkflowPromptConfig } = await import('@/constants/workflowPrompts');
+      const config = getWorkflowPromptConfig(workflowId);
+
+      if (config && claudeSessionRef.current) {
+        // Use ClaudeCodeSession with system prompt injection
+        claudeSessionRef.current.startNewSession(config.defaultUserPrompt, config.systemPrompt);
+      } else {
+        console.error(`[Workflow] Config not found for ${workflowId}`);
+      }
+    } else {
+      console.error(`[Workflow] SDK mode disabled or project path not set for ${workflowId}`);
     }
-  }, []);
+  }, [project?.path]);
 
   // Send prompt to existing session (for development workflow)
   const handleSendPlanningPrompt = useCallback((prompt: string) => {

@@ -73,8 +73,8 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
     // Mark this workflow as active (disable button)
     setActiveWorkflows(prev => new Set(prev).add(step.id));
 
-    // Call the parent to start a new workflow
-    onStartNewWorkflow(step.workflow);
+    // Call the parent to start a new workflow (use workflowId instead of slash command)
+    onStartNewWorkflow(step.workflowId);
 
     // Keep the current document selected in the planning panel
     setActiveDocId(step.id);

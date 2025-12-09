@@ -9,7 +9,7 @@ export interface WorkflowStep {
   id: string;
   title: string;
   filename: string;
-  workflow: string;
+  workflowId: string;
   displayText: string;
   icon: WorkflowIconType;
   nextId: string | null;
@@ -20,7 +20,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'prd',
     title: 'PRD',
     filename: 'prd.md',
-    workflow: '/anyon:anyon-method:workflows:startup-prd',
+    workflowId: 'startup-prd',
     displayText: 'PRD 문서 작성 시작',
     icon: 'file-text',
     nextId: 'ux-design',
@@ -29,7 +29,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'ux-design',
     title: 'UX Design',
     filename: 'ux-design.md',
-    workflow: '/anyon:anyon-method:workflows:startup-ux',
+    workflowId: 'startup-ux',
     displayText: 'UX 디자인 문서 작성',
     icon: 'palette',
     nextId: 'design-guide',
@@ -38,7 +38,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'design-guide',
     title: 'Design Guide',
     filename: 'ui-design-guide.md',
-    workflow: '/anyon:anyon-method:workflows:startup-ui',
+    workflowId: 'startup-ui',
     displayText: 'UI 디자인 가이드 작성',
     icon: 'paintbrush',
     nextId: 'trd',
@@ -47,7 +47,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'trd',
     title: 'TRD',
     filename: 'trd.md',
-    workflow: '/anyon:anyon-method:workflows:startup-trd',
+    workflowId: 'startup-trd',
     displayText: '기술 요구사항 문서 작성',
     icon: 'settings',
     nextId: 'architecture',
@@ -56,7 +56,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'architecture',
     title: 'Architecture',
     filename: 'architecture.md',
-    workflow: '/anyon:anyon-method:workflows:startup-architecture',
+    workflowId: 'startup-architecture',
     displayText: '시스템 아키텍처 설계',
     icon: 'boxes',
     nextId: 'erd',
@@ -65,7 +65,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'erd',
     title: 'ERD',
     filename: 'erd.md',
-    workflow: '/anyon:anyon-method:workflows:startup-erd',
+    workflowId: 'startup-erd',
     displayText: 'ERD 데이터베이스 설계',
     icon: 'database',
     nextId: null,
@@ -94,10 +94,3 @@ export const getWorkflowStepById = (id: string): WorkflowStep | undefined => {
   return WORKFLOW_SEQUENCE.find((step) => step.id === id);
 };
 
-/**
- * Get display text for a workflow command
- */
-export const getWorkflowDisplayText = (workflow: string): string | null => {
-  const step = WORKFLOW_SEQUENCE.find((s) => s.workflow === workflow);
-  return step?.displayText ?? null;
-};
