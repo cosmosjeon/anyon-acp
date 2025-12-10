@@ -10,8 +10,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Rocket,
+  Loader2,
 } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { FileExplorer } from '@/components/FileExplorer';
@@ -248,7 +248,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <VideoLoader size="lg" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -319,7 +319,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
+              <Suspense fallback={<div className="p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -395,7 +395,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               session={currentSession || undefined}

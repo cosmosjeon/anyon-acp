@@ -12,8 +12,8 @@ import {
   X,
   Sun,
   Moon,
+  Loader2,
 } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
@@ -272,7 +272,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <div className="p-2">
             {loadingSessions ? (
               <div className="flex items-center justify-center py-4">
-                <VideoLoader size="sm" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             ) : sessions.length === 0 ? (
               !collapsed && (

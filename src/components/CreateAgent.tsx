@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Save, ChevronDown, Zap, AlertCircle } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { ArrowLeft, Save, ChevronDown, Zap, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,7 +162,7 @@ export const CreateAgent: React.FC<CreateAgentProps> = ({
               >
                 {saving ? (
                   <>
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Saving...
                   </>
                 ) : (

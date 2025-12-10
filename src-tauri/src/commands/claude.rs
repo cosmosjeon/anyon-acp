@@ -1005,18 +1005,16 @@ pub async fn execute_claude_code(
     project_path: String,
     prompt: String,
     model: String,
-    system_prompt: Option<String>,
 ) -> Result<(), String> {
     log::info!(
-        "Starting new Claude Code session in: {} with model: {}, has_system_prompt: {}",
+        "Starting new Claude Code session in: {} with model: {}",
         project_path,
-        model,
-        system_prompt.is_some()
+        model
     );
 
     let claude_path = find_claude_binary(&app)?;
 
-    let mut args = vec![
+    let args = vec![
         "-p".to_string(),
         prompt.clone(),
         "--model".to_string(),
@@ -1026,12 +1024,6 @@ pub async fn execute_claude_code(
         "--verbose".to_string(),
         "--dangerously-skip-permissions".to_string(),
     ];
-
-    // Add system prompt if provided
-    if let Some(sys_prompt) = &system_prompt {
-        args.push("--append-system-prompt".to_string());
-        args.push(sys_prompt.clone());
-    }
 
     let cmd = create_system_command(&claude_path, args, &project_path);
     spawn_claude_process(app, cmd, prompt, model, project_path).await
@@ -1044,18 +1036,16 @@ pub async fn continue_claude_code(
     project_path: String,
     prompt: String,
     model: String,
-    system_prompt: Option<String>,
 ) -> Result<(), String> {
     log::info!(
-        "Continuing Claude Code conversation in: {} with model: {}, has_system_prompt: {}",
+        "Continuing Claude Code conversation in: {} with model: {}",
         project_path,
-        model,
-        system_prompt.is_some()
+        model
     );
 
     let claude_path = find_claude_binary(&app)?;
 
-    let mut args = vec![
+    let args = vec![
         "-c".to_string(), // Continue flag
         "-p".to_string(),
         prompt.clone(),
@@ -1066,12 +1056,6 @@ pub async fn continue_claude_code(
         "--verbose".to_string(),
         "--dangerously-skip-permissions".to_string(),
     ];
-
-    // Add system prompt if provided
-    if let Some(sys_prompt) = &system_prompt {
-        args.push("--append-system-prompt".to_string());
-        args.push(sys_prompt.clone());
-    }
 
     let cmd = create_system_command(&claude_path, args, &project_path);
     spawn_claude_process(app, cmd, prompt, model, project_path).await
@@ -1085,19 +1069,17 @@ pub async fn resume_claude_code(
     session_id: String,
     prompt: String,
     model: String,
-    system_prompt: Option<String>,
 ) -> Result<(), String> {
     log::info!(
-        "Resuming Claude Code session: {} in: {} with model: {}, has_system_prompt: {}",
+        "Resuming Claude Code session: {} in: {} with model: {}",
         session_id,
         project_path,
-        model,
-        system_prompt.is_some()
+        model
     );
 
     let claude_path = find_claude_binary(&app)?;
 
-    let mut args = vec![
+    let args = vec![
         "--resume".to_string(),
         session_id.clone(),
         "-p".to_string(),
@@ -1110,87 +1092,8 @@ pub async fn resume_claude_code(
         "--dangerously-skip-permissions".to_string(),
     ];
 
-    // Add system prompt if provided
-    if let Some(sys_prompt) = &system_prompt {
-        args.push("--append-system-prompt".to_string());
-        args.push(sys_prompt.clone());
-    }
-
     let cmd = create_system_command(&claude_path, args, &project_path);
     spawn_claude_process(app, cmd, prompt, model, project_path).await
-}
-
-/// Execute workflow with SDK-style system prompt injection
-/// This injects the workflow instructions directly via --append-system-prompt
-#[tauri::command]
-pub async fn execute_workflow_sdk(
-    app: AppHandle,
-    project_path: String,
-    workflow_id: String,
-    user_prompt: String,
-    system_prompt: String,
-    model: String,
-) -> Result<(), String> {
-    log::info!(
-        "Starting workflow via SDK: {} in: {} with model: {}",
-        workflow_id,
-        project_path,
-        model
-    );
-
-    let claude_path = find_claude_binary(&app)?;
-
-    let args = vec![
-        "-p".to_string(),
-        user_prompt.clone(),
-        "--append-system-prompt".to_string(),
-        system_prompt,
-        "--model".to_string(),
-        model.clone(),
-        "--output-format".to_string(),
-        "stream-json".to_string(),
-        "--verbose".to_string(),
-        "--dangerously-skip-permissions".to_string(),
-    ];
-
-    let cmd = create_system_command(&claude_path, args, &project_path);
-    spawn_claude_process(app, cmd, user_prompt, model, project_path).await
-}
-
-/// Continue workflow with SDK-style system prompt injection
-#[tauri::command]
-pub async fn continue_workflow_sdk(
-    app: AppHandle,
-    project_path: String,
-    workflow_id: String,
-    user_prompt: String,
-    system_prompt: String,
-    model: String,
-) -> Result<(), String> {
-    log::info!(
-        "Continuing workflow via SDK: {} in: {}",
-        workflow_id,
-        project_path
-    );
-
-    let claude_path = find_claude_binary(&app)?;
-
-    let args = vec![
-        "-c".to_string(), // Continue flag
-        "-p".to_string(),
-        user_prompt.clone(),
-        "--append-system-prompt".to_string(),
-        system_prompt,
-        "--model".to_string(),
-        model.clone(),
-        "--output-format".to_string(),
-        "stream-json".to_string(),
-        "--verbose".to_string(),
-        "--dangerously-skip-permissions".to_string(),
-    ];
-
-    let cmd = create_system_command(&claude_path, args, &project_path);
-    spawn_claude_process(app, cmd, user_prompt, model, project_path).await
 }
 
 /// Cancel the currently running Claude Code execution
@@ -1788,10 +1691,10 @@ pub async fn check_file_exists(file_path: String) -> Result<bool, String> {
     Ok(path.exists() && path.is_file())
 }
 
-/// Lists files in the anyon-docs/conversation directory of a project
+/// Lists files in the anyon-docs/planning directory of a project
 #[tauri::command]
 pub async fn list_anyon_docs(project_path: String) -> Result<Vec<String>, String> {
-    let docs_path = PathBuf::from(&project_path).join("anyon-docs").join("conversation");
+    let docs_path = PathBuf::from(&project_path).join("anyon-docs").join("planning");
 
     if !docs_path.exists() {
         return Ok(vec![]);

@@ -4,10 +4,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Trash2, 
-  AlertTriangle, 
+import {
+  Plus,
+  Trash2,
+  AlertTriangle,
   Code2,
   Terminal,
   FileText,
@@ -19,9 +19,8 @@ import {
   PlayCircle,
   Info,
   Save,
-  
+  Loader2,
 } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -736,7 +735,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
       {/* Loading State */}
       {isLoading && (
         <div className="flex items-center justify-center p-8">
-          <VideoLoader size="md" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       )}
       
@@ -777,7 +776,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
                         disabled={!hasUnsavedChanges || isSaving || !projectPath}
                       >
                         {isSaving ? (
-                          <VideoLoader size="sm" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <Save className="h-4 w-4 mr-2" />
                         )}

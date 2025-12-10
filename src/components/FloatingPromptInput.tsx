@@ -12,8 +12,8 @@ import {
   Lightbulb,
   Cpu,
   Rocket,
+  Loader2,
 } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover } from "@/components/ui/popover";
@@ -1049,7 +1049,7 @@ const FloatingPromptInputInner = (
                       className="min-w-[60px]"
                     >
                       {isLoading ? (
-                        <VideoLoader size="sm" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Send className="h-4 w-4" />
                       )}

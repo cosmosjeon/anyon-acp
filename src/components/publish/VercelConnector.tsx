@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Check, AlertTriangle, ExternalLink, RefreshCw, Unlink, Globe } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -279,8 +280,12 @@ export const VercelConnector: React.FC<VercelConnectorProps> = ({
     setDeployments([]);
   };
 
-  const openInBrowser = (url: string) => {
-    window.open(url, '_blank');
+  const openInBrowser = async (url: string) => {
+    try {
+      await open(url);
+    } catch (error) {
+      console.error('Failed to open URL:', error);
+    }
   };
 
   const getDeploymentStatusColor = (status: string) => {

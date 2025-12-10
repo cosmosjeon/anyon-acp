@@ -30,8 +30,8 @@ import {
   Clock,
   MessageSquare,
   GitBranch,
+  Loader2,
 } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1207,7 +1207,7 @@ export const Settings: React.FC<SettingsProps> = ({
             >
               {saving ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   {t('settings.saving')}
                 </>
               ) : (
@@ -1224,7 +1224,7 @@ export const Settings: React.FC<SettingsProps> = ({
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="h-full flex items-center justify-center">
-              <VideoLoader size="lg" />
+              <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : (
             <div className="p-6">

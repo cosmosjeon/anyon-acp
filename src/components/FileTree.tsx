@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen , Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api, type FileEntry } from '@/lib/api';
 
@@ -240,7 +239,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
   if (isLoading) {
     return (
       <div className={cn('flex items-center justify-center h-full', className)}>
-        <VideoLoader size="sm" />
+        <Loader2 className="h-4 w-4 animate-spin" />
       </div>
     );
   }
@@ -301,7 +300,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
                 {/* Expand/Collapse Icon */}
                 {node.hasChildren ? (
                   node.isLoading ? (
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : node.isExpanded ? (
                     <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
                   ) : (

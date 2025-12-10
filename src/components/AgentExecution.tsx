@@ -10,9 +10,9 @@ import {
   ChevronDown,
   Maximize2,
   X,
-  Settings2
+  Settings2,
+  Loader2
 } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -755,7 +755,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {isRunning && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <VideoLoader size="md" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                     <span className="text-sm text-muted-foreground">Initializing agent...</span>
                   </div>
                 </div>
@@ -896,7 +896,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {isRunning && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <VideoLoader size="md" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                     <span className="text-sm text-muted-foreground">Initializing agent...</span>
                   </div>
                 </div>

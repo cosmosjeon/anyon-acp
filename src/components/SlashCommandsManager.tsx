@@ -13,12 +13,11 @@ import {
   Zap,
   Code,
   AlertCircle,
-  
   Search,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -358,7 +357,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       {/* Commands List */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <VideoLoader size="md" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : filteredCommands.length === 0 ? (
         <Card className="p-8">
@@ -665,7 +664,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
             >
               {saving ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
@@ -712,7 +711,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
             >
               {deleting ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Deleting...
                 </>
               ) : (

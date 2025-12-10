@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderOpen, Search, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar, Trash2, X } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { FolderOpen, Search, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar, Trash2, X, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -288,7 +287,7 @@ export const ProjectListView: React.FC = () => {
           onProjectSelect={handleSidebarProjectSelect}
         />
         <div className="flex-1 flex items-center justify-center">
-          <VideoLoader size="lg" />
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
@@ -320,7 +319,7 @@ export const ProjectListView: React.FC = () => {
                   ? 'bg-green-600/90 border-green-500/30 text-white'
                   : 'bg-background/95 border-border text-foreground'
               }`}>
-                {installStatus.type === 'info' && <VideoLoader size="sm" />}
+                {installStatus.type === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
                 {installStatus.type === 'success' && <CheckCircle className="h-4 w-4" />}
                 {installStatus.type === 'error' && <AlertCircle className="h-4 w-4" />}
                 <span className="text-sm font-medium">{installStatus.text}</span>
@@ -349,7 +348,7 @@ export const ProjectListView: React.FC = () => {
                   className="flex items-center gap-2"
                 >
                   {isOpeningFolder ? (
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : isInstallingAnyon ? (
                     <>
                       <Download className="h-4 w-4 animate-pulse" />
@@ -527,7 +526,7 @@ export const ProjectListView: React.FC = () => {
                     className="flex items-center gap-2"
                   >
                     {isOpeningFolder ? (
-                      <VideoLoader size="sm" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : isInstallingAnyon ? (
                       <>
                         <Download className="h-4 w-4 animate-pulse" />

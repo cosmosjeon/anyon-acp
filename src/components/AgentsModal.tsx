@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Plus, Play, Clock, CheckCircle, XCircle, Trash2, Import, ChevronDown, FileJson, Globe, Download } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { Bot, Plus, Play, Clock, CheckCircle, XCircle, Trash2, Import, ChevronDown, FileJson, Globe, Download , Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -204,7 +203,7 @@ export const AgentsModal: React.FC<AgentsModalProps> = ({ open, onOpenChange }) 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'running':
-        return <VideoLoader size="sm" />;
+        return <Loader2 className="h-4 w-4 animate-spin" />;
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'failed':
@@ -272,7 +271,7 @@ export const AgentsModal: React.FC<AgentsModalProps> = ({ open, onOpenChange }) 
                 </div>
                 {loading ? (
                   <div className="flex items-center justify-center h-full">
-                    <VideoLoader size="lg" />
+                    <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : agents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center">

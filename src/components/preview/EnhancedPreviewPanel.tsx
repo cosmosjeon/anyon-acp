@@ -22,9 +22,9 @@ import {
   Square,
   MoreVertical,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -188,21 +188,19 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
 
     try {
-      const resolvedProjectPath = projectPath || filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
-      console.log('[Preview] Starting preview server for:', resolvedProjectPath);
+      // 파일 내용 직접 읽기
+      const content = await invoke<string>('read_file_content', { filePath });
+      console.log('[Preview] File content loaded, length:', content.length);
 
-      const serverInfo = await invoke('start_file_preview_server', { projectPath: resolvedProjectPath });
-      console.log('[Preview] Server started:', serverInfo);
+      // data URL로 변환하여 iframe에서 직접 렌더링
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(content)}`;
+      setCurrentUrl(dataUrl);
 
-      const previewUrl = await invoke<string>('get_file_preview_url', { filePath, projectPath: resolvedProjectPath });
-      console.log('[Preview] Got preview URL:', previewUrl);
-
-      setCurrentUrl(previewUrl);
       addAppOutput({
         type: 'info',
-        message: `[preview] Loading ${filePath.split(/[/\\]/).pop()} at ${previewUrl}`,
+        message: `[preview] Loading ${filePath.split(/[/\\]/).pop()}`,
         timestamp: Date.now(),
-        projectPath: resolvedProjectPath,
+        projectPath: projectPath || '',
       });
     } catch (err) {
       console.error('[Preview] Failed to load HTML file:', err);
@@ -458,7 +456,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
                   : "bg-muted"
             )}>
               {isLoading ? (
-                <VideoLoader size="md" />
+                <Loader2 className="h-6 w-6 animate-spin" />
               ) : previewError ? (
                 <Monitor className="w-8 h-8 text-red-500" />
               ) : (

@@ -4,13 +4,12 @@ import { open } from '@tauri-apps/plugin-shell';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
-import { Terminal } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { Terminal, Loader2 } from 'lucide-react';
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import anyonTextLogo from '@/assets/ANYON.png';
 
-const API_URL = 'https://claude-anyon-web-production.up.railway.app';
+const API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://claude-anyon-web-production.up.railway.app';
 
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);
@@ -200,7 +199,7 @@ export const LoginPage: React.FC = () => {
             >
               {isLoading ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                   <span className="text-muted-foreground">로그인 중...</span>
                 </>
               ) : (
@@ -238,7 +237,7 @@ export const LoginPage: React.FC = () => {
                 size="lg"
               >
                 {isLoading ? (
-                  <VideoLoader size="sm" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Terminal className="w-4 h-4" />
                 )}

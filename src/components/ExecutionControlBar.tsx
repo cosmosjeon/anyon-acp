@@ -1,7 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { StopCircle, Clock, Hash } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { StopCircle, Clock, Hash , Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +58,7 @@ export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({
         >
           {/* Loading indicator */}
           <div className="relative flex items-center justify-center">
-            <VideoLoader size="sm" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           </div>
 
           {/* Status text */}

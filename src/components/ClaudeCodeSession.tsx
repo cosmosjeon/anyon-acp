@@ -15,9 +15,9 @@ import {
   Database,
   LayoutList,
   Rocket,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -114,8 +114,7 @@ interface ClaudeCodeSessionProps {
  */
 export interface ClaudeCodeSessionRef {
   sendPrompt: (prompt: string, model?: "sonnet" | "opus") => void;
-  startNewSession: (initialPrompt: string, systemPrompt?: string) => void;
-  continueSession: (prompt: string, systemPrompt?: string) => void;
+  startNewSession: (initialPrompt: string) => void;
   isLoading: boolean;
 }
 
@@ -531,25 +530,21 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     sendPrompt: (prompt: string, model: "sonnet" | "opus" = "sonnet") => {
       handleSendPrompt(prompt, model);
     },
-    startNewSession: (initialPrompt: string, systemPrompt?: string) => {
+    startNewSession: (initialPrompt: string) => {
       // Clear current session and start a new one
       setMessages([]);
       setRawJsonlOutput([]);
       setError(null);
       setIsFirstPrompt(true);
       setTotalTokens(0);
-      // Send the initial prompt with optional system prompt
-      handleSendPrompt(initialPrompt, "sonnet", systemPrompt);
-    },
-    continueSession: (prompt: string, systemPrompt?: string) => {
-      // Continue existing session with optional system prompt
-      handleSendPrompt(prompt, "sonnet", systemPrompt);
+      // Send the initial prompt (slash command will be processed by Claude Code directly)
+      handleSendPrompt(initialPrompt, "sonnet");
     },
     isLoading,
   }), [isLoading]);
 
-  const handleSendPrompt = async (prompt: string, model: "sonnet" | "opus", systemPrompt?: string) => {
-    console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, systemPrompt: !!systemPrompt, projectPath, claudeSessionId, effectiveSession });
+  const handleSendPrompt = async (prompt: string, model: "sonnet" | "opus") => {
+    console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, projectPath, claudeSessionId, effectiveSession });
 
     if (!projectPath) {
       setError("Please select a project directory first");
@@ -959,13 +954,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           console.log('[ClaudeCodeSession] Resuming session:', effectiveSession.id);
           trackEvent.sessionResumed(effectiveSession.id);
           trackEvent.modelSelected(model);
-          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model, systemPrompt);
+          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model);
         } else {
           console.log('[ClaudeCodeSession] Starting new session');
           setIsFirstPrompt(false);
           trackEvent.sessionCreated(model, 'prompt_input');
           trackEvent.modelSelected(model);
-          await api.executeClaudeCode(projectPath, prompt, model, systemPrompt);
+          await api.executeClaudeCode(projectPath, prompt, model);
         }
       }
     } catch (err) {
@@ -1355,7 +1350,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           transition={{ duration: 0.15 }}
           className="flex items-center justify-center py-4 mb-20"
         >
-          <VideoLoader size="md" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         </motion.div>
       )}
 
@@ -1442,7 +1437,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               {isLoading && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex flex-col items-center gap-3">
-                    <VideoLoader size="lg" />
+                    <Loader2 className="h-8 w-8 animate-spin" />
                     <span className="text-sm text-muted-foreground">
                       {session ? "Loading session history..." : "Initializing Claude Code..."}
                     </span>

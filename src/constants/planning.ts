@@ -9,7 +9,7 @@ export interface WorkflowStep {
   id: string;
   title: string;
   filename: string;
-  workflowId: string;
+  workflow: string;
   displayText: string;
   icon: WorkflowIconType;
   nextId: string | null;
@@ -20,7 +20,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'prd',
     title: 'PRD',
     filename: 'prd.md',
-    workflowId: 'startup-prd',
+    workflow: '/anyon:anyon-method:workflows:startup-prd',
     displayText: 'PRD 문서 작성 시작',
     icon: 'file-text',
     nextId: 'ux-design',
@@ -28,8 +28,8 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
   {
     id: 'ux-design',
     title: 'UX Design',
-    filename: 'ux-design.md',
-    workflowId: 'startup-ux',
+    filename: 'ui-ux.html',
+    workflow: '/anyon:anyon-method:workflows:startup-ux',
     displayText: 'UX 디자인 문서 작성',
     icon: 'palette',
     nextId: 'design-guide',
@@ -37,8 +37,8 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
   {
     id: 'design-guide',
     title: 'Design Guide',
-    filename: 'ui-design-guide.md',
-    workflowId: 'startup-ui',
+    filename: 'design-guide.md',
+    workflow: '/anyon:anyon-method:workflows:startup-ui',
     displayText: 'UI 디자인 가이드 작성',
     icon: 'paintbrush',
     nextId: 'trd',
@@ -47,7 +47,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'trd',
     title: 'TRD',
     filename: 'trd.md',
-    workflowId: 'startup-trd',
+    workflow: '/anyon:anyon-method:workflows:startup-trd',
     displayText: '기술 요구사항 문서 작성',
     icon: 'settings',
     nextId: 'architecture',
@@ -56,7 +56,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'architecture',
     title: 'Architecture',
     filename: 'architecture.md',
-    workflowId: 'startup-architecture',
+    workflow: '/anyon:anyon-method:workflows:startup-architecture',
     displayText: '시스템 아키텍처 설계',
     icon: 'boxes',
     nextId: 'erd',
@@ -65,14 +65,14 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
     id: 'erd',
     title: 'ERD',
     filename: 'erd.md',
-    workflowId: 'startup-erd',
+    workflow: '/anyon:anyon-method:workflows:startup-erd',
     displayText: 'ERD 데이터베이스 설계',
     icon: 'database',
     nextId: null,
   },
 ];
 
-export const ANYON_DOCS_DIR = 'anyon-docs/conversation';
+export const ANYON_DOCS_DIR = 'anyon-docs/planning';
 
 /**
  * Get the next workflow step after the given filename
@@ -94,3 +94,10 @@ export const getWorkflowStepById = (id: string): WorkflowStep | undefined => {
   return WORKFLOW_SEQUENCE.find((step) => step.id === id);
 };
 
+/**
+ * Get display text for a workflow command
+ */
+export const getWorkflowDisplayText = (workflow: string): string | null => {
+  const step = WORKFLOW_SEQUENCE.find((s) => s.workflow === workflow);
+  return step?.displayText ?? null;
+};

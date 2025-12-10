@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import { motion } from "framer-motion";
-import { Save } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -94,7 +93,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             >
               {saving ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Saving...
                 </>
               ) : (
@@ -123,7 +122,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         <div className="flex-1 overflow-hidden p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <VideoLoader size="lg" />
+              <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : (
             <div className="h-full rounded-lg border border-border overflow-hidden shadow-sm" data-color-mode="dark">

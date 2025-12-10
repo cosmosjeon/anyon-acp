@@ -27,3 +27,4 @@ export { TAB_SCREEN_NAMES } from './useAnalytics';
 export { useUpdater } from './useUpdater';
 export { useTranslation } from './useTranslation';
 export type { Language, TranslationKey } from './useTranslation';
+export { useWorkflowPreview, isPreviewableFile, getPreviewFileForWorkflow } from './useWorkflowPreview';

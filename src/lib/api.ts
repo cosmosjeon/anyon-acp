@@ -1083,78 +1083,23 @@ export const api = {
 
   /**
    * Executes a new interactive Claude Code session with streaming output
-   * @param systemPrompt - Optional system prompt to inject via --append-system-prompt
    */
-  async executeClaudeCode(projectPath: string, prompt: string, model: string, systemPrompt?: string): Promise<void> {
-    return apiCall("execute_claude_code", { projectPath, prompt, model, systemPrompt });
+  async executeClaudeCode(projectPath: string, prompt: string, model: string): Promise<void> {
+    return apiCall("execute_claude_code", { projectPath, prompt, model });
   },
 
   /**
    * Continues an existing Claude Code conversation with streaming output
-   * @param systemPrompt - Optional system prompt to inject via --append-system-prompt
    */
-  async continueClaudeCode(projectPath: string, prompt: string, model: string, systemPrompt?: string): Promise<void> {
-    return apiCall("continue_claude_code", { projectPath, prompt, model, systemPrompt });
+  async continueClaudeCode(projectPath: string, prompt: string, model: string): Promise<void> {
+    return apiCall("continue_claude_code", { projectPath, prompt, model });
   },
 
   /**
    * Resumes an existing Claude Code session by ID with streaming output
-   * @param systemPrompt - Optional system prompt to inject via --append-system-prompt
    */
-  async resumeClaudeCode(projectPath: string, sessionId: string, prompt: string, model: string, systemPrompt?: string): Promise<void> {
-    return apiCall("resume_claude_code", { projectPath, sessionId, prompt, model, systemPrompt });
-  },
-
-  /**
-   * Execute workflow with SDK-style system prompt injection
-   * @param workflowId - The workflow ID (e.g., 'startup-prd', 'pm-orchestrator')
-   * @param projectPath - The project path
-   * @param model - The model to use ('sonnet' or 'opus')
-   * @param userPrompt - Optional custom user prompt
-   */
-  async executeWorkflowSdk(request: {
-    workflowId: string;
-    projectPath: string;
-    model?: string;
-    userPrompt?: string;
-  }): Promise<void> {
-    const { getWorkflowPromptConfig } = await import('@/constants/workflowPrompts');
-    const config = getWorkflowPromptConfig(request.workflowId);
-    if (!config) {
-      throw new Error(`Unknown workflow: ${request.workflowId}`);
-    }
-
-    return apiCall("execute_workflow_sdk", {
-      projectPath: request.projectPath,
-      workflowId: request.workflowId,
-      userPrompt: request.userPrompt || config.defaultUserPrompt,
-      systemPrompt: config.systemPrompt,
-      model: request.model || 'sonnet',
-    });
-  },
-
-  /**
-   * Continue workflow with SDK-style system prompt injection
-   */
-  async continueWorkflowSdk(request: {
-    workflowId: string;
-    projectPath: string;
-    model?: string;
-    userPrompt?: string;
-  }): Promise<void> {
-    const { getWorkflowPromptConfig } = await import('@/constants/workflowPrompts');
-    const config = getWorkflowPromptConfig(request.workflowId);
-    if (!config) {
-      throw new Error(`Unknown workflow: ${request.workflowId}`);
-    }
-
-    return apiCall("continue_workflow_sdk", {
-      projectPath: request.projectPath,
-      workflowId: request.workflowId,
-      userPrompt: request.userPrompt || config.defaultUserPrompt,
-      systemPrompt: config.systemPrompt,
-      model: request.model || 'sonnet',
-    });
+  async resumeClaudeCode(projectPath: string, sessionId: string, prompt: string, model: string): Promise<void> {
+    return apiCall("resume_claude_code", { projectPath, sessionId, prompt, model });
   },
 
   /**

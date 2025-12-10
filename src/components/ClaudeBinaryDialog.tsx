@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { api, type ClaudeInstallation } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ExternalLink, FileQuestion, Terminal, AlertCircle } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { ExternalLink, FileQuestion, Terminal, AlertCircle , Loader2 } from "lucide-react";
 import { ClaudeVersionSelector } from "./ClaudeVersionSelector";
 
 interface ClaudeBinaryDialogProps {
@@ -68,7 +67,7 @@ export function ClaudeBinaryDialog({ open, onOpenChange, onSuccess, onError }: C
           <DialogDescription className="space-y-3 mt-4">
             {checkingInstallations ? (
               <div className="flex items-center justify-center py-8">
-                <VideoLoader size="md" />
+                <Loader2 className="h-6 w-6 animate-spin" />
                 <span className="ml-2 text-sm text-muted-foreground">Searching for Claude installations...</span>
               </div>
             ) : hasInstallations ? (

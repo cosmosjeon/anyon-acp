@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, AlertTriangle, FolderOpen, CheckCircle } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { Download, AlertTriangle, FolderOpen, CheckCircle , Loader2 } from 'lucide-react';
 import maintainTabIcon from '@/assets/maintain-tab-icon.png';
 import mvpTabIcon from '@/assets/mvp-tab-icon.png';
 import { Button } from '@/components/ui/button';
@@ -155,7 +154,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
           onLogoClick={goToProjectList}
         />
         <div className="flex-1 flex items-center justify-center">
-          <VideoLoader size="lg" />
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
@@ -219,7 +218,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
                 }`}>
                   {isInstalling ? (
                     <>
-                      <VideoLoader size="sm" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                       <span className="text-sm font-medium">Installing ANYON agents...</span>
                     </>
                   ) : installMessage && (

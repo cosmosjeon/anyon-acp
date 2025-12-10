@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { X, Plus, MessageSquare, Bot, AlertCircle, Folder, BarChart, Server, Settings, FileText } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { X, Plus, MessageSquare, Bot, AlertCircle, Folder, BarChart, Server, Settings, FileText , Loader2 } from 'lucide-react';
 import { useTabState } from '@/hooks/useTabState';
 import { Tab, useTabContext } from '@/contexts/TabContext';
 import { cn } from '@/lib/utils';
@@ -49,7 +48,7 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
   const getStatusIcon = () => {
     switch (tab.status) {
       case 'running':
-        return <VideoLoader size="sm" />;
+        return <Loader2 className="h-4 w-4 animate-spin" />;
       case 'error':
         return <AlertCircle className="w-3 h-3 text-red-500" />;
       default:

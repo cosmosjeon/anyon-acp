@@ -11,8 +11,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Rocket,
+  Loader2,
 } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
@@ -23,12 +23,12 @@ import { PublishPanel } from '@/components/publish';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
+import { useWorkflowPreview } from '@/hooks/useWorkflowPreview';
 import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
 import { cn } from '@/lib/utils';
-import { shouldUseSdkForWorkflow } from '@/config/featureFlags';
 import { usePreviewStore } from '@/stores/previewStore';
 import { usePublishStore } from '@/stores/publishStore';
 
@@ -177,6 +177,33 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const { progress } = usePlanningDocs(project?.path);
   const isPlanningComplete = progress.isAllComplete;
 
+  // Workflow preview file detection (e.g., ui-ux.html from startup-ux workflow)
+  const [workflowPreviewPath, setWorkflowPreviewPath] = useState<string | null>(null);
+
+  const handlePreviewFileDetected = useCallback((filePath: string) => {
+    console.log('[MvpWorkspace] Preview file detected:', filePath);
+    setWorkflowPreviewPath(filePath);
+    // 자동으로 프리뷰 탭으로 전환
+    setActiveTab('preview');
+    // 패널이 닫혀있으면 열기
+    if (!rightPanelVisible) {
+      setRightPanelVisible(true);
+    }
+  }, [rightPanelVisible]);
+
+  const { hasNewPreview, markPreviewSeen } = useWorkflowPreview({
+    projectPath: project?.path,
+    onPreviewFileDetected: handlePreviewFileDetected,
+    pollingInterval: 1000,
+  });
+
+  // 프리뷰 탭으로 전환하면 새 프리뷰 표시 제거
+  useEffect(() => {
+    if (activeTab === 'preview' && hasNewPreview) {
+      markPreviewSeen();
+    }
+  }, [activeTab, hasNewPreview, markPreviewSeen]);
+
   useEffect(() => {
     if (projectId && projects.length > 0) {
       const found = getProjectById(projectId);
@@ -295,26 +322,12 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   }, []);
 
   // Start a new workflow (new conversation) from PlanningDocsPanel
-  const handleStartNewWorkflow = useCallback(async (workflowId: string) => {
-    // Check if SDK mode should be used for this workflow
-    if (shouldUseSdkForWorkflow(workflowId) && project?.path) {
-      // SDK mode: inject system prompt via ClaudeCodeSession
-      console.log(`[Workflow] Executing via SDK mode: ${workflowId}`);
-
-      // Dynamically import to get the system prompt
-      const { getWorkflowPromptConfig } = await import('@/constants/workflowPrompts');
-      const config = getWorkflowPromptConfig(workflowId);
-
-      if (config && claudeSessionRef.current) {
-        // Use ClaudeCodeSession with system prompt injection
-        claudeSessionRef.current.startNewSession(config.defaultUserPrompt, config.systemPrompt);
-      } else {
-        console.error(`[Workflow] Config not found for ${workflowId}`);
-      }
-    } else {
-      console.error(`[Workflow] SDK mode disabled or project path not set for ${workflowId}`);
+  const handleStartNewWorkflow = useCallback((workflowPrompt: string) => {
+    if (claudeSessionRef.current) {
+      // Start a new session with the workflow prompt (slash command)
+      claudeSessionRef.current.startNewSession(workflowPrompt);
     }
-  }, [project?.path]);
+  }, []);
 
   const handleSessionSelect = useCallback((session: Session | null) => {
     setCurrentSession(session);
@@ -340,7 +353,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <VideoLoader size="lg" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -411,7 +424,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
+              <Suspense fallback={<div className="p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -487,7 +500,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               ref={claudeSessionRef}
@@ -610,7 +623,12 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                     isSessionLoading={isSessionLoading}
                   />
                 )}
-                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
+                {activeTab === 'preview' && (
+                  <EnhancedPreviewPanel
+                    projectPath={project?.path}
+                    htmlFilePath={workflowPreviewPath || undefined}
+                  />
+                )}
                 {activeTab === 'publish' && <PublishPanel projectPath={project?.path} />}
               </div>
             </motion.div>

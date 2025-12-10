@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText , Loader2 } from 'lucide-react';
 import prdIcon from '@/assets/prd-icon.png';
 import uiuxIcon from '@/assets/uiux-icon.png';
 import trdIcon from '@/assets/trd-icon.png';
@@ -7,7 +7,6 @@ import architectureIcon from '@/assets/architecture-icon.png';
 import erdIcon from '@/assets/erd-icon.png';
 import designIcon from '@/assets/design-icon.png';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
@@ -72,7 +71,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   // Start workflow for a step
   const handleStartWorkflow = useCallback((step: WorkflowStep) => {
     setActiveWorkflows(prev => new Set(prev).add(step.id));
-    onStartNewWorkflow(step.workflowId);
+    onStartNewWorkflow(step.workflow);
     setActiveDocId(step.id);
   }, [onStartNewWorkflow]);
 
@@ -103,7 +102,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   if (isLoading && documents.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <VideoLoader size="md" />
+        <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -208,7 +207,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {activeDoc?.exists && activeDoc.content ? (
           // 문서 내용 표시
-          <PlanningDocViewer content={activeDoc.content} />
+          <PlanningDocViewer content={activeDoc.content} filename={activeDoc.filename} />
         ) : (
           // 작성 시작 프롬프트
           <div className="flex-1 flex items-center justify-center p-8">
@@ -254,7 +253,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
                     >
                       {activeWorkflows.has(activeStep.id) ? (
                         <>
-                          <VideoLoader size="sm" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                           작성 중...
                         </>
                       ) : (
@@ -295,7 +294,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
           >
             {activeWorkflows.has(progress.nextStep.id) ? (
               <>
-                <VideoLoader size="sm" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 작성 중...
               </>
             ) : (

@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
+import { Loader2 } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { ProjectRoutes } from '@/components/ProjectRoutes';
 import { useTabContext } from '@/contexts/TabContext';
-import { VideoLoader } from '@/components/VideoLoader';
 
 interface AppLayoutProps {
   className?: string;
@@ -22,7 +22,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ className }) => {
 
   return (
     <div className={cn('h-full w-full overflow-hidden bg-background', className)}>
-      <Suspense fallback={<VideoLoader size="lg" />}>
+      <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin" />}>
         <ProjectRoutes tabId={activeTabId || 'default'} />
       </Suspense>
     </div>

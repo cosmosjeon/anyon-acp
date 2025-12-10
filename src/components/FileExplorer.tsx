@@ -1,9 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FileCode, FolderOpen, Code } from 'lucide-react';
+import { FileCode, FolderOpen, Code , Loader2 } from 'lucide-react';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
-import { VideoLoader } from '@/components/VideoLoader';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { SplitPane } from '@/components/ui/split-pane';
@@ -192,7 +191,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
               <div className="flex-1 overflow-auto">
                 {isLoadingFile ? (
                   <div className="flex items-center justify-center h-full">
-                    <VideoLoader size="md" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : fileError ? (
                   <div className="flex items-center justify-center h-full p-4">

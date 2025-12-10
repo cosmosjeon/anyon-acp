@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Github, Check, AlertTriangle, ExternalLink, RefreshCw, Unlink } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -269,8 +270,12 @@ export const GitHubConnector: React.FC<GitHubConnectorProps> = ({
     setGithubConnected(false);
   };
 
-  const openInBrowser = (url: string) => {
-    window.open(url, '_blank');
+  const openInBrowser = async (url: string) => {
+    try {
+      await open(url);
+    } catch (error) {
+      console.error('Failed to open URL:', error);
+    }
   };
 
   // Already connected view

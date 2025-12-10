@@ -22,8 +22,8 @@ use commands::agents::{
 };
 use commands::claude::{
     cancel_claude_execution, check_anyon_installed, check_auto_checkpoint, check_claude_version,
-    cleanup_old_checkpoints, clear_checkpoint_manager, continue_claude_code, continue_workflow_sdk,
-    create_checkpoint, create_project, execute_claude_code, execute_workflow_sdk,
+    cleanup_old_checkpoints, clear_checkpoint_manager, continue_claude_code,
+    create_checkpoint, create_project, execute_claude_code,
     find_claude_md_files, fork_from_checkpoint, get_checkpoint_diff, get_checkpoint_settings,
     get_checkpoint_state_stats, get_claude_session_output, get_claude_settings, get_home_directory,
     get_hooks_config, get_project_sessions, get_recently_modified_files, get_session_timeline,
@@ -330,8 +330,6 @@ fn main() {
             execute_claude_code,
             continue_claude_code,
             resume_claude_code,
-            execute_workflow_sdk,
-            continue_workflow_sdk,
             cancel_claude_execution,
             list_running_claude_sessions,
             get_claude_session_output,
