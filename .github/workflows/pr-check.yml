@@ -37,7 +37,7 @@ jobs:
             ${{ runner.os }}-bun-
 
       - name: Install JS/TS dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Set up Rust (stable)
         uses: dtolnay/rust-toolchain@stable
