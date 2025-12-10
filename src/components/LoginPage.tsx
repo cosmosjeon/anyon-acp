@@ -10,7 +10,7 @@ import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import anyonTextLogo from '@/assets/ANYON.png';
 
-const API_URL = 'http://localhost:4000';
+const API_URL = 'https://claude-anyon-web-production.up.railway.app';
 
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);
