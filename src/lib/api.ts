@@ -2241,6 +2241,65 @@ export const api = {
   },
 
   /**
+   * Git add all files
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to the command result
+   */
+  async gitAddAll(projectPath: string): Promise<NpxRunResult> {
+    return apiCall<NpxRunResult>('git_add_all', { projectPath });
+  },
+
+  /**
+   * Git commit with message
+   * @param projectPath - The absolute path to the project
+   * @param message - Commit message
+   * @returns Promise resolving to the command result
+   */
+  async gitCommit(projectPath: string, message: string): Promise<NpxRunResult> {
+    return apiCall<NpxRunResult>('git_commit', { projectPath, message });
+  },
+
+  /**
+   * Git set remote origin
+   * @param projectPath - The absolute path to the project
+   * @param remoteUrl - Remote repository URL
+   * @returns Promise resolving to the command result
+   */
+  async gitSetRemote(projectPath: string, remoteUrl: string): Promise<NpxRunResult> {
+    return apiCall<NpxRunResult>('git_set_remote', { projectPath, remoteUrl });
+  },
+
+  /**
+   * Git push to remote
+   * @param projectPath - The absolute path to the project
+   * @param remoteUrl - Remote repository URL
+   * @param token - GitHub Personal Access Token
+   * @param branch - Branch name (defaults to 'main')
+   * @returns Promise resolving to the command result
+   */
+  async gitPush(projectPath: string, remoteUrl: string, token: string, branch?: string): Promise<NpxRunResult> {
+    return apiCall<NpxRunResult>('git_push', { projectPath, remoteUrl, token, branch });
+  },
+
+  /**
+   * Git status (porcelain format)
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to the command result
+   */
+  async gitStatus(projectPath: string): Promise<NpxRunResult> {
+    return apiCall<NpxRunResult>('git_status', { projectPath });
+  },
+
+  /**
+   * Get current git branch
+   * @param projectPath - The absolute path to the project
+   * @returns Promise resolving to the command result
+   */
+  async gitCurrentBranch(projectPath: string): Promise<NpxRunResult> {
+    return apiCall<NpxRunResult>('git_current_branch', { projectPath });
+  },
+
+  /**
    * Start development workflow
    */
   async startDevWorkflow(projectPath: string, model: string): Promise<void> {

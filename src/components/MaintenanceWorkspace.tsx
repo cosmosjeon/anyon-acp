@@ -9,12 +9,14 @@ import {
   Lightbulb,
   PanelRightClose,
   PanelRightOpen,
+  Rocket,
 } from 'lucide-react';
 import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { FileExplorer } from '@/components/FileExplorer';
 import { EnhancedPreviewPanel } from '@/components/preview';
+import { PublishPanel } from '@/components/publish';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
@@ -22,6 +24,7 @@ import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
 import { cn } from '@/lib/utils';
+import { usePublishStore } from '@/stores/publishStore';
 
 // Lazy load components
 const ClaudeCodeSession = lazy(() =>
@@ -29,7 +32,51 @@ const ClaudeCodeSession = lazy(() =>
 );
 const FileTree = lazy(() => import('@/components/FileTree'));
 
-type MaintenanceTabType = 'code' | 'preview';
+// Publish Tab Button with deployment status from store
+const PublishTabButton: React.FC<{ isActive: boolean; onClick: () => void }> = ({ isActive, onClick }) => {
+  const { githubConnected, vercelConnected } = usePublishStore();
+  
+  const getStatusBadge = () => {
+    if (githubConnected && vercelConnected) {
+      return (
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          배포됨
+        </span>
+      );
+    }
+    if (githubConnected) {
+      return (
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+          GitHub
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+        미연결
+      </span>
+    );
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors border-b-2",
+        isActive
+          ? "border-primary text-primary bg-primary/5"
+          : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+      )}
+    >
+      <Rocket className="w-4 h-4" />
+      <span>배포</span>
+      {getStatusBadge()}
+    </button>
+  );
+};
+
+type MaintenanceTabType = 'code' | 'preview' | 'publish';
 
 interface MaintenanceWorkspaceProps {
   projectId: string;
@@ -383,31 +430,42 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               transition={{ duration: 0.2 }}
               className="h-full bg-background border-l border-border overflow-hidden flex flex-col shadow-[-2px_0_8px_rgba(0,0,0,0.08)]"
             >
-              {/* Header - Preview focused with code toggle */}
+              {/* Header - Tabs */}
               <div className="flex-shrink-0 border-b border-border bg-card/50">
-                <div className="flex items-center justify-between px-3 py-2">
-                  {/* Left: Title */}
-                  <div className="flex items-center gap-2">
-                    <Monitor className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">
-                      {activeTab === 'preview' ? '프리뷰' : '코드'}
-                    </span>
-                  </div>
-
-                  {/* Right: Code toggle button */}
+                <div className="flex">
+                  {/* 코드 탭 */}
                   <button
-                    onClick={() => setActiveTab(activeTab === 'preview' ? 'code' : 'preview')}
+                    onClick={() => setActiveTab('code')}
                     className={cn(
-                      "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors border-b-2",
                       activeTab === 'code'
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        ? "border-primary text-primary bg-primary/5"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )}
-                    title={activeTab === 'preview' ? '코드 보기' : '프리뷰 보기'}
                   >
-                    <Code className="w-3.5 h-3.5" />
-                    <span>{activeTab === 'preview' ? '코드' : '프리뷰'}</span>
+                    <Code className="w-4 h-4" />
+                    <span>코드</span>
                   </button>
+
+                  {/* 프리뷰 탭 */}
+                  <button
+                    onClick={() => setActiveTab('preview')}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'preview'
+                        ? "border-primary text-primary bg-primary/5"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <Monitor className="w-4 h-4" />
+                    <span>프리뷰</span>
+                  </button>
+
+                  {/* 배포 탭 */}
+                  <PublishTabButton 
+                    isActive={activeTab === 'publish'}
+                    onClick={() => setActiveTab('publish')}
+                  />
                 </div>
               </div>
 
@@ -417,6 +475,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                   <FileExplorer rootPath={project?.path} />
                 )}
                 {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
+                {activeTab === 'publish' && <PublishPanel projectPath={project?.path} />}
               </div>
             </motion.div>
           </>

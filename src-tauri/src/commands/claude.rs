@@ -2652,8 +2652,216 @@ pub async fn init_git_repo(
     
     // Emit completion event
     let _ = app_handle.emit("git-init-complete", &result);
-    
+
     Ok(result)
+}
+
+/// Git add all files
+#[tauri::command]
+pub async fn git_add_all(
+    project_path: String,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Running 'git add .' at: {}", project_path);
+    let path = PathBuf::from(&project_path);
+
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let mut cmd = Command::new("git");
+    cmd.args(["add", "."])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to run git add: {}", e))?;
+
+    Ok(NpxRunResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code(),
+    })
+}
+
+/// Git commit with message
+#[tauri::command]
+pub async fn git_commit(
+    project_path: String,
+    message: String,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Running 'git commit' at: {}", project_path);
+    let path = PathBuf::from(&project_path);
+
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let mut cmd = Command::new("git");
+    cmd.args(["commit", "-m", &message])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to run git commit: {}", e))?;
+
+    Ok(NpxRunResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code(),
+    })
+}
+
+/// Git set remote origin
+#[tauri::command]
+pub async fn git_set_remote(
+    project_path: String,
+    remote_url: String,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Setting git remote to: {} at: {}", remote_url, project_path);
+    let path = PathBuf::from(&project_path);
+
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    // First try to remove existing origin (ignore errors)
+    let mut remove_cmd = Command::new("git");
+    remove_cmd.args(["remote", "remove", "origin"])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let _ = remove_cmd.output().await;
+
+    // Add new origin
+    let mut cmd = Command::new("git");
+    cmd.args(["remote", "add", "origin", &remote_url])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to set git remote: {}", e))?;
+
+    Ok(NpxRunResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code(),
+    })
+}
+
+/// Git push to remote with token authentication
+#[tauri::command]
+pub async fn git_push(
+    project_path: String,
+    remote_url: String,
+    token: String,
+    branch: Option<String>,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Running 'git push' at: {}", project_path);
+    let path = PathBuf::from(&project_path);
+
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let branch_name = branch.unwrap_or_else(|| "main".to_string());
+
+    // Convert https://github.com/user/repo.git to https://token@github.com/user/repo.git
+    let auth_url = if remote_url.starts_with("https://github.com/") {
+        remote_url.replace("https://github.com/", &format!("https://{}@github.com/", token))
+    } else {
+        remote_url.clone()
+    };
+
+    // Set remote with authenticated URL
+    let mut set_remote = Command::new("git");
+    set_remote.args(["remote", "set-url", "origin", &auth_url])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let _ = set_remote.output().await;
+
+    // Push
+    let mut cmd = Command::new("git");
+    cmd.args(["push", "-u", "origin", &branch_name])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to run git push: {}", e))?;
+
+    // Reset remote URL to non-authenticated version (security)
+    let mut reset_remote = Command::new("git");
+    reset_remote.args(["remote", "set-url", "origin", &remote_url])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let _ = reset_remote.output().await;
+
+    Ok(NpxRunResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code(),
+    })
+}
+
+/// Get git status
+#[tauri::command]
+pub async fn git_status(
+    project_path: String,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Running 'git status' at: {}", project_path);
+    let path = PathBuf::from(&project_path);
+
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let mut cmd = Command::new("git");
+    cmd.args(["status", "--porcelain"])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to run git status: {}", e))?;
+
+    Ok(NpxRunResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code(),
+    })
+}
+
+/// Get current git branch
+#[tauri::command]
+pub async fn git_current_branch(
+    project_path: String,
+) -> Result<NpxRunResult, String> {
+    log::info!("[Rust] Getting current branch at: {}", project_path);
+    let path = PathBuf::from(&project_path);
+
+    if !path.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let mut cmd = Command::new("git");
+    cmd.args(["branch", "--show-current"])
+        .current_dir(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to get current branch: {}", e))?;
+
+    Ok(NpxRunResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code(),
+    })
 }
 
 #[cfg(test)]

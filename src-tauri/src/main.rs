@@ -30,7 +30,7 @@ use commands::claude::{
     get_system_prompt, list_checkpoints, list_directory_contents, list_projects,
     list_running_claude_sessions, load_session_history, open_new_session, read_claude_md_file,
     read_file_content, check_file_exists, list_anyon_docs, restore_checkpoint, resume_claude_code,
-    run_npx_anyon_agents, check_is_git_repo, init_git_repo, save_claude_md_file, save_claude_settings,
+    run_npx_anyon_agents, check_is_git_repo, init_git_repo, git_add_all, git_commit, git_set_remote, git_push, git_status, git_current_branch, save_claude_md_file, save_claude_settings,
     save_system_prompt, search_files, track_checkpoint_message, track_session_messages,
     update_checkpoint_settings, update_hooks_config, validate_hook_command, ClaudeProcessState,
 };
@@ -350,6 +350,12 @@ fn main() {
             // Git Integration
             check_is_git_repo,
             init_git_repo,
+            git_add_all,
+            git_commit,
+            git_set_remote,
+            git_push,
+            git_status,
+            git_current_branch,
             // Checkpoint Management
             create_checkpoint,
             restore_checkpoint,
