@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { 
-  CheckCircle2, 
-  Circle, 
+import {
+  CheckCircle2,
+  Circle,
   Clock,
   FolderOpen,
   FileText,
@@ -47,6 +47,9 @@ import {
   LayoutList,
   Activity,
   Hash,
+  Loader2,
+  Users,
+  Server,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -2051,56 +2054,389 @@ export const SystemInitializedWidget: React.FC<{
 };
 
 /**
- * Widget for Task tool - displays sub-agent task information
+ * Widget for Task tool - displays sub-agent task information with status tracking
  */
-export const TaskWidget: React.FC<{ 
-  description?: string; 
+export const TaskWidget: React.FC<{
+  description?: string;
   prompt?: string;
   result?: any;
-}> = ({ description, prompt, result: _result }) => {
+  agentId?: string;
+  subagentType?: string;
+  isAsync?: boolean;
+  status?: 'running' | 'completed' | 'error';
+}> = ({ description, prompt, result, agentId, subagentType, isAsync, status: propStatus }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+  const [isResultExpanded, setIsResultExpanded] = useState(false);
+
+  // Determine status based on result
+  const status = propStatus || (result ? (result.is_error ? 'error' : 'completed') : 'running');
+
+  const statusConfig = {
+    running: {
+      icon: <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-500" />,
+      text: 'Running...',
+      bgClass: 'border-purple-500/20 bg-purple-500/5',
+      textClass: 'text-purple-600 dark:text-purple-400',
+    },
+    completed: {
+      icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />,
+      text: 'Completed',
+      bgClass: 'border-green-500/20 bg-green-500/5',
+      textClass: 'text-green-600 dark:text-green-400',
+    },
+    error: {
+      icon: <AlertCircle className="h-3.5 w-3.5 text-red-500" />,
+      text: 'Failed',
+      bgClass: 'border-red-500/20 bg-red-500/5',
+      textClass: 'text-red-600 dark:text-red-400',
+    },
+  };
+
+  const config = statusConfig[status];
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="relative">
-          <Bot className="h-4 w-4 text-purple-500" />
-          <Sparkles className="h-2.5 w-2.5 text-purple-400 absolute -top-1 -right-1" />
-        </div>
-        <span className="text-sm font-medium">Spawning Sub-Agent Task</span>
-      </div>
-      
-      <div className="ml-6 space-y-3">
-        {description && (
-          <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Zap className="h-3.5 w-3.5 text-purple-500" />
-              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Task Description</span>
-            </div>
-            <p className="text-sm text-foreground ml-5">{description}</p>
-          </div>
-        )}
-        
-        {prompt && (
-          <div className="space-y-2">
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
-              <span>Task Instructions</span>
-            </button>
-            
-            {isExpanded && (
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-                  {prompt}
-                </pre>
-              </div>
+    <div className={cn("rounded-lg border p-3 space-y-2", config.bgClass)}>
+      {/* Header with status */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Bot className="h-4 w-4 text-purple-500" />
+            {isAsync && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 bg-blue-500 rounded-full" />
             )}
           </div>
+          <span className="text-sm font-medium">
+            {isAsync ? 'Background Agent' : 'Sub-Agent Task'}
+          </span>
+          {subagentType && (
+            <Badge variant="outline" className="text-xs">
+              {subagentType}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {config.icon}
+          <span className={cn("text-xs font-medium", config.textClass)}>
+            {config.text}
+          </span>
+        </div>
+      </div>
+
+      {/* Description */}
+      {description && (
+        <div className="ml-6">
+          <p className="text-sm text-foreground">{description}</p>
+        </div>
+      )}
+
+      {/* Agent ID for async tasks */}
+      {agentId && (
+        <div className="ml-6 text-xs text-muted-foreground/60">
+          Agent ID: {agentId}
+        </div>
+      )}
+
+      {/* Task Instructions (collapsible) */}
+      {prompt && (
+        <div className="ml-6 space-y-2">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
+            <span>Task Instructions</span>
+          </button>
+
+          {isExpanded && (
+            <div className="rounded-lg border bg-muted/30 p-3 max-h-48 overflow-y-auto">
+              <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
+                {prompt}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Result (when completed) */}
+      {result && status !== 'running' && (
+        <div className="ml-6 space-y-2 border-t border-border/50 pt-2 mt-2">
+          <button
+            onClick={() => setIsResultExpanded(!isResultExpanded)}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronRight className={cn("h-3 w-3 transition-transform", isResultExpanded && "rotate-90")} />
+            <span>View Result</span>
+          </button>
+
+          {isResultExpanded && (
+            <div className="rounded-lg border bg-muted/30 p-3 max-h-64 overflow-y-auto">
+              <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
+                {typeof result.content === 'string'
+                  ? result.content.slice(0, 1000) + (result.content.length > 1000 ? '...' : '')
+                  : typeof result === 'string'
+                  ? result.slice(0, 1000) + (result.length > 1000 ? '...' : '')
+                  : JSON.stringify(result, null, 2).slice(0, 1000)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Widget for displaying multiple background agents running in parallel
+ */
+export const BackgroundAgentsPanel: React.FC<{
+  agents: Array<{
+    agentId: string;
+    description: string;
+    status: 'launched' | 'running' | 'completed' | 'error';
+    subagentType?: string;
+  }>;
+}> = ({ agents }) => {
+  if (agents.length === 0) return null;
+
+  const completed = agents.filter(a => a.status === 'completed').length;
+  const total = agents.length;
+
+  return (
+    <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
+      {/* Header with progress */}
+      <div className="flex items-center gap-3">
+        <Users className="h-4 w-4 text-blue-500" />
+        <span className="text-sm font-medium">Background Agents</span>
+        <span className="text-xs text-muted-foreground ml-auto">
+          {completed}/{total} completed
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full bg-blue-500 transition-all duration-300"
+          style={{ width: `${(completed / total) * 100}%` }}
+        />
+      </div>
+
+      {/* Individual agents */}
+      <div className="space-y-2">
+        {agents.map(agent => (
+          <div key={agent.agentId} className="flex items-center gap-2 text-xs">
+            {(agent.status === 'running' || agent.status === 'launched') && (
+              <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+            )}
+            {agent.status === 'completed' && (
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+            )}
+            {agent.status === 'error' && (
+              <AlertCircle className="h-3 w-3 text-red-500" />
+            )}
+            <span className="truncate flex-1">{agent.description}</span>
+            {agent.subagentType && (
+              <Badge variant="outline" className="text-[10px] px-1">
+                {agent.subagentType}
+              </Badge>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Widget for Skill tool - displays skill name with collapsible prompt
+ */
+export const SkillPromptWidget: React.FC<{
+  skillName?: string;
+  content: string;
+}> = ({ skillName, content }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg border border-purple-500/20 bg-purple-500/5">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-purple-500/10 transition-colors rounded-lg"
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-purple-500" />
+          <span className="text-sm font-medium">
+            {skillName ? `Skill: ${skillName}` : 'Skill Loaded'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {content.length.toLocaleString()} chars
+          </span>
+          <ChevronRight className={cn(
+            "h-4 w-4 transition-transform text-muted-foreground",
+            isExpanded && "rotate-90"
+          )} />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-purple-500/10">
+          <div className="mt-3 max-h-96 overflow-y-auto rounded-lg bg-muted/30 p-3">
+            <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
+              {content}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Widget for displaying session initialization info
+ */
+export const SessionInfoWidget: React.FC<{
+  model: string;
+  tools?: string[];
+  agents?: string[];
+  skills?: string[];
+  mcpServers?: Array<{ name: string; status: string }>;
+  version?: string;
+}> = ({ model, tools = [], agents = [], skills = [], mcpServers = [], version }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const connectedMcp = mcpServers.filter(s => s.status === 'connected').length;
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Cpu className="h-4 w-4 text-blue-500" />
+          <span className="text-sm font-medium">{model}</span>
+          {version && (
+            <Badge variant="outline" className="text-xs">
+              v{version}
+            </Badge>
+          )}
+        </div>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          {isExpanded ? 'Hide details' : 'Show details'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <Wrench className="h-3 w-3" />
+          <span>{tools.length} tools</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Bot className="h-3 w-3" />
+          <span>{agents.length} agents</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Sparkles className="h-3 w-3" />
+          <span>{skills.length} skills</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Server className="h-3 w-3" />
+          <span>{connectedMcp} MCP</span>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="mt-2 pt-2 border-t border-border/50 space-y-2 text-xs">
+          {mcpServers.length > 0 && (
+            <div>
+              <span className="font-medium">MCP Servers:</span>
+              <div className="ml-2 mt-1 space-y-1">
+                {mcpServers.map(server => (
+                  <div key={server.name} className="flex items-center gap-2">
+                    <span className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      server.status === 'connected' ? 'bg-green-500' : 'bg-red-500'
+                    )} />
+                    <span>{server.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Widget for displaying usage statistics
+ */
+export const UsageStatsWidget: React.FC<{
+  totalCost?: number;
+  durationMs?: number;
+  numTurns?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  modelUsage?: Record<string, {
+    inputTokens: number;
+    outputTokens: number;
+    costUSD: number;
+  }>;
+}> = ({ totalCost, durationMs, numTurns, inputTokens, outputTokens, modelUsage }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-green-500" />
+          <span className="text-sm font-medium">Session Stats</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        {totalCost !== undefined && (
+          <span className="flex items-center gap-1">
+            <span className="font-mono">${totalCost.toFixed(4)}</span>
+          </span>
+        )}
+        {durationMs !== undefined && (
+          <span>{(durationMs / 1000).toFixed(1)}s</span>
+        )}
+        {numTurns !== undefined && (
+          <span>{numTurns} turns</span>
+        )}
+        {(inputTokens !== undefined || outputTokens !== undefined) && (
+          <span className="flex items-center gap-1">
+            <Hash className="h-3 w-3" />
+            {inputTokens?.toLocaleString() || 0} in / {outputTokens?.toLocaleString() || 0} out
+          </span>
         )}
       </div>
+
+      {modelUsage && Object.keys(modelUsage).length > 0 && (
+        <>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            {isExpanded ? 'Hide model breakdown' : 'Show model breakdown'}
+          </button>
+
+          {isExpanded && (
+            <div className="mt-2 pt-2 border-t border-border/50 space-y-1 text-xs">
+              {Object.entries(modelUsage).map(([model, usage]) => (
+                <div key={model} className="flex items-center justify-between">
+                  <span className="font-mono text-muted-foreground">{model.split('-').slice(-2).join('-')}</span>
+                  <span className="text-muted-foreground">
+                    ${usage.costUSD.toFixed(4)} ({usage.inputTokens + usage.outputTokens} tokens)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
