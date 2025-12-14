@@ -634,8 +634,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode) => {
     console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
 
-    if (!projectPath) {
+    if (!projectPath?.trim()) {
       setError("Please select a project directory first");
+      return;
+    }
+
+    if (!prompt?.trim()) {
+      console.warn('[ClaudeCodeSession] Empty prompt received, ignoring');
       return;
     }
 
@@ -1223,7 +1228,14 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   };
 
   const handleCancelExecution = async () => {
-    if (!claudeSessionId || !isLoading) return;
+    if (!claudeSessionId) {
+      console.warn('[ClaudeCodeSession] Cannot cancel: no active session');
+      return;
+    }
+    if (!isLoading) {
+      console.log('[ClaudeCodeSession] Cancel called but not loading, ignoring');
+      return;
+    }
     
     try {
       const sessionStartTime = messages.length > 0 ? messages[0].timestamp || Date.now() : Date.now();
@@ -1349,7 +1361,19 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   };
 
   const handleConfirmFork = async () => {
-    if (!forkCheckpointId || !forkSessionName.trim() || !effectiveSession) return;
+    if (!forkCheckpointId) {
+      console.warn('[ClaudeCodeSession] Cannot fork: no checkpoint ID');
+      return;
+    }
+    if (!forkSessionName?.trim()) {
+      console.warn('[ClaudeCodeSession] Cannot fork: no session name');
+      return;
+    }
+    if (!effectiveSession) {
+      console.warn('[ClaudeCodeSession] Cannot fork: no effective session');
+      setError("Cannot fork: no active session");
+      return;
+    }
     
     try {
       setIsLoading(true);

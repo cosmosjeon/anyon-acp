@@ -204,6 +204,12 @@ export const TabContent: React.FC = () => {
     const handleOpenSessionInTab = (event: CustomEvent) => {
       const { session } = event.detail;
       
+      // Validate session data
+      if (!session?.id || !session?.project_path) {
+        console.warn('[TabContent] Invalid session data in open-session-in-tab event:', session);
+        return;
+      }
+      
       // Check if tab already exists for this session
       const existingTab = findTabBySessionId(session.id);
       if (existingTab) {
@@ -218,20 +224,30 @@ export const TabContent: React.FC = () => {
         const projectName = session.project_path.split('/').pop() || 'Session';
         const newTabId = createChatTab(session.id, projectName, session.project_path);
         // Update the new tab with session data
-        updateTab(newTabId, {
-          sessionData: session,
-          initialProjectPath: session.project_path
-        });
+        if (newTabId) {
+          updateTab(newTabId, {
+            sessionData: session,
+            initialProjectPath: session.project_path
+          });
+        }
       }
     };
 
     const handleOpenClaudeFile = (event: CustomEvent) => {
       const { file } = event.detail;
+      if (!file?.id) {
+        console.warn('[TabContent] Invalid file data in open-claude-file event:', file);
+        return;
+      }
       createClaudeFileTab(file.id, file.name || 'CLAUDE.md');
     };
 
     const handleOpenAgentExecution = (event: CustomEvent) => {
       const { agent, tabId, projectPath } = event.detail;
+      if (!agent) {
+        console.warn('[TabContent] Invalid agent data in open-agent-execution event');
+        return;
+      }
       createAgentExecutionTab(agent, tabId, projectPath);
     };
 
@@ -245,11 +261,22 @@ export const TabContent: React.FC = () => {
 
     const handleCloseTab = (event: CustomEvent) => {
       const { tabId } = event.detail;
+      if (!tabId) {
+        console.warn('[TabContent] Missing tabId in close-tab event');
+        return;
+      }
       closeTab(tabId);
     };
 
     const handleClaudeSessionSelected = (event: CustomEvent) => {
       const { session } = event.detail;
+      
+      // Validate session data
+      if (!session?.id || !session?.project_path) {
+        console.warn('[TabContent] Invalid session data in claude-session-selected event:', session);
+        return;
+      }
+      
       // Check if there's an existing tab for this session
       const existingTab = findTabBySessionId(session.id);
       if (existingTab) {
@@ -274,10 +301,12 @@ export const TabContent: React.FC = () => {
         } else {
           const projectName = session.project_path.split('/').pop() || 'Session';
           const newTabId = createChatTab(session.id, projectName, session.project_path);
-          updateTab(newTabId, {
-            sessionData: session,
-            initialProjectPath: session.project_path,
-          });
+          if (newTabId) {
+            updateTab(newTabId, {
+              sessionData: session,
+              initialProjectPath: session.project_path,
+            });
+          }
         }
       }
     };
@@ -298,7 +327,7 @@ export const TabContent: React.FC = () => {
       window.removeEventListener('close-tab', handleCloseTab as EventListener);
       window.removeEventListener('claude-session-selected', handleClaudeSessionSelected as EventListener);
     };
-  }, [createChatTab, findTabBySessionId, createClaudeFileTab, createAgentExecutionTab, createCreateAgentTab, createImportAgentTab, closeTab, updateTab]);
+  }, [createChatTab, findTabBySessionId, createClaudeFileTab, createAgentExecutionTab, createCreateAgentTab, createImportAgentTab, closeTab, updateTab, tabs, activeTabId]);
   
   return (
     <div className="flex-1 h-full relative">

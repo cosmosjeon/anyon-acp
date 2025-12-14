@@ -214,10 +214,16 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   // Load last session
   useEffect(() => {
     if (project?.path) {
-      const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
-      if (lastSessionData) {
-        const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
-        setCurrentSession(session);
+      try {
+        const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
+        if (lastSessionData) {
+          const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+          if (session) {
+            setCurrentSession(session);
+          }
+        }
+      } catch (err) {
+        console.error('[MvpWorkspace] Failed to load last session:', err);
       }
     }
   }, [project?.path]);
@@ -225,18 +231,19 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   // Git repo check
   useEffect(() => {
     const checkGitRepo = async () => {
-      if (project?.path) {
-        try {
-          const isGitRepo = await api.checkIsGitRepo(project.path);
-          if (!isGitRepo) {
-            const gitResult = await api.initGitRepo(project.path);
-            if (gitResult.success) {
-              console.log('Git repository initialized successfully');
-            }
+      if (!project?.path) return;
+      
+      try {
+        const isGitRepo = await api.checkIsGitRepo(project.path);
+        if (!isGitRepo) {
+          const gitResult = await api.initGitRepo(project.path);
+          if (gitResult?.success) {
+            console.log('[MvpWorkspace] Git repository initialized successfully');
           }
-        } catch (gitErr) {
-          console.error('Failed to check/init git repo:', gitErr);
         }
+      } catch (gitErr) {
+        // Git init failure is not critical, just log it
+        console.warn('[MvpWorkspace] Failed to check/init git repo:', gitErr);
       }
     };
     checkGitRepo();
@@ -332,14 +339,26 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const handleSessionSelect = useCallback((session: Session | null) => {
     setCurrentSession(session);
     setSessionKey(prev => prev + 1);
-    if (session && project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', session.id);
+    if (session?.id && project?.path) {
+      try {
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', session.id);
+      } catch (err) {
+        console.error('[MvpWorkspace] Failed to save session:', err);
+      }
     }
   }, [project?.path]);
 
   const handleSessionCreated = useCallback((sessionId: string) => {
+    if (!sessionId) {
+      console.warn('[MvpWorkspace] handleSessionCreated called with empty sessionId');
+      return;
+    }
     if (project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId);
+      try {
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId);
+      } catch (err) {
+        console.error('[MvpWorkspace] Failed to save session:', err);
+      }
     }
   }, [project?.path]);
 

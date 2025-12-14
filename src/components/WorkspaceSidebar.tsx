@@ -71,19 +71,33 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
   // Helper function to format session display text
   const getSessionDisplayText = (session: Session, maxLength: number = 35): string => {
+    if (!session) return 'Unknown Session';
+    
     if (session.first_message) {
       // Clean up the message - remove newlines and extra spaces
       const cleaned = session.first_message.replace(/\s+/g, ' ').trim();
-      return cleaned.substring(0, maxLength);
+      return cleaned.substring(0, maxLength) || 'New Session';
     }
+    
     // Fallback to date/time if no message
-    const date = new Date(session.created_at * 1000);
-    return date.toLocaleString('ko-KR', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      const timestamp = session.created_at;
+      if (!timestamp || isNaN(timestamp)) {
+        return 'New Session';
+      }
+      const date = new Date(timestamp * 1000);
+      if (isNaN(date.getTime())) {
+        return 'New Session';
+      }
+      return date.toLocaleString('ko-KR', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return 'New Session';
+    }
   };
 
   // Helper function to group sessions by date
@@ -133,18 +147,38 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   // Load sessions for current project
   useEffect(() => {
     const loadSessions = async () => {
-      if (!projectPath) return;
+      if (!projectPath?.trim()) {
+        setSessions([]);
+        setLoadingSessions(false);
+        return;
+      }
+      
       setLoadingSessions(true);
       try {
         // Get project ID from path
         const projectList = await api.listRegisteredProjects();
-        const currentProject = projectList.find(p => p.path === projectPath);
-        if (currentProject) {
+        
+        if (!projectList || !Array.isArray(projectList)) {
+          console.warn('[WorkspaceSidebar] Invalid project list received');
+          setSessions([]);
+          return;
+        }
+        
+        const currentProject = projectList.find(p => p?.path === projectPath);
+        if (currentProject?.id) {
           const allSessions = await api.getProjectSessions(currentProject.id);
-          setSessions(allSessions.slice(0, 20)); // Limit to recent 20
+          
+          if (allSessions && Array.isArray(allSessions)) {
+            setSessions(allSessions.slice(0, 20)); // Limit to recent 20
+          } else {
+            setSessions([]);
+          }
+        } else {
+          setSessions([]);
         }
       } catch (err) {
-        console.error('Failed to load sessions:', err);
+        console.error('[WorkspaceSidebar] Failed to load sessions:', err);
+        setSessions([]); // Reset to empty on error
       } finally {
         setLoadingSessions(false);
       }
@@ -153,6 +187,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   }, [projectPath]);
 
   const handleSessionClick = (session: Session) => {
+    if (!session?.id) {
+      console.warn('[WorkspaceSidebar] handleSessionClick called with invalid session');
+      return;
+    }
     onSessionSelect?.(session);
   };
 

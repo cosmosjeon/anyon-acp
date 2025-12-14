@@ -70,9 +70,19 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
 
   // Start workflow for a step
   const handleStartWorkflow = useCallback((step: WorkflowStep) => {
+    if (!step?.id) {
+      console.warn('[PlanningDocsPanel] handleStartWorkflow called with invalid step');
+      return;
+    }
+    
     setActiveWorkflows(prev => new Set(prev).add(step.id));
     // 내재화된 prompt가 있으면 사용, 없으면 슬래시 커맨드 사용
-    onStartNewWorkflow(getWorkflowPrompt(step));
+    const workflowPrompt = getWorkflowPrompt(step);
+    if (workflowPrompt) {
+      onStartNewWorkflow(workflowPrompt);
+    } else {
+      console.warn('[PlanningDocsPanel] No workflow prompt for step:', step.id);
+    }
     setActiveDocId(step.id);
   }, [onStartNewWorkflow]);
 
@@ -282,18 +292,21 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       </div>
 
       {/* 하단 CTA 영역 */}
-      {activeDoc?.exists && progress.nextStep && (
+      {activeDoc?.exists && progress?.nextStep?.id && (
         <div className="flex-shrink-0 border-t p-4 bg-gradient-to-r from-primary/5 to-primary/10">
           <Button
             className="w-full gap-2"
             size="lg"
             onClick={() => {
-              setActiveDocId(progress.nextStep!.id);
-              handleStartWorkflow(progress.nextStep!);
+              const nextStep = progress.nextStep;
+              if (nextStep?.id) {
+                setActiveDocId(nextStep.id);
+                handleStartWorkflow(nextStep);
+              }
             }}
-            disabled={isSessionLoading || activeWorkflows.has(progress.nextStep.id)}
+            disabled={isSessionLoading || !progress.nextStep || activeWorkflows.has(progress.nextStep.id)}
           >
-            {activeWorkflows.has(progress.nextStep.id) ? (
+            {progress.nextStep && activeWorkflows.has(progress.nextStep.id) ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 작성 중...
@@ -301,7 +314,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
             ) : (
               <>
                 <ArrowRight className="h-4 w-4" />
-                다음: {progress.nextStep.title} 작성하기
+                다음: {progress.nextStep?.title || '다음 단계'} 작성하기
               </>
             )}
           </Button>

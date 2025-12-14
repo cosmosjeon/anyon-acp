@@ -603,46 +603,59 @@ const FloatingPromptInputInner = (
   };
 
   const handleFileSelect = (entry: FileEntry) => {
-    if (textareaRef.current) {
-      // Find the @ position before cursor
-      let atPosition = -1;
-      for (let i = cursorPosition - 1; i >= 0; i--) {
-        if (prompt[i] === '@') {
-          atPosition = i;
-          break;
-        }
-        // Stop if we hit whitespace (new word)
-        if (prompt[i] === ' ' || prompt[i] === '\n') {
-          break;
-        }
-      }
-
-      if (atPosition === -1) {
-        // @ not found, this shouldn't happen but handle gracefully
-        console.error('[FloatingPromptInput] @ position not found');
-        return;
-      }
-
-      // Replace the @ and partial query with the selected path (file or directory)
-      const textarea = textareaRef.current;
-      const beforeAt = prompt.substring(0, atPosition);
-      const afterCursor = prompt.substring(cursorPosition);
-      const relativePath = entry.path.startsWith(projectPath || '')
-        ? entry.path.slice((projectPath || '').length + 1)
-        : entry.path;
-
-      const newPrompt = `${beforeAt}@${relativePath} ${afterCursor}`;
-      setPrompt(newPrompt);
+    if (!entry?.path) {
+      console.warn('[FloatingPromptInput] handleFileSelect called with invalid entry');
       setShowFilePicker(false);
-      setFilePickerQuery("");
+      return;
+    }
+    
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      console.warn('[FloatingPromptInput] handleFileSelect: textarea ref is null');
+      setShowFilePicker(false);
+      return;
+    }
+    
+    // Find the @ position before cursor
+    let atPosition = -1;
+    for (let i = cursorPosition - 1; i >= 0; i--) {
+      if (prompt[i] === '@') {
+        atPosition = i;
+        break;
+      }
+      // Stop if we hit whitespace (new word)
+      if (prompt[i] === ' ' || prompt[i] === '\n') {
+        break;
+      }
+    }
 
-      // Focus back on textarea and set cursor position after the inserted path
-      setTimeout(() => {
+    if (atPosition === -1) {
+      // @ not found, this shouldn't happen but handle gracefully
+      console.warn('[FloatingPromptInput] @ position not found');
+      setShowFilePicker(false);
+      return;
+    }
+
+    // Replace the @ and partial query with the selected path (file or directory)
+    const beforeAt = prompt.substring(0, atPosition);
+    const afterCursor = prompt.substring(cursorPosition);
+    const relativePath = entry.path.startsWith(projectPath || '')
+      ? entry.path.slice((projectPath || '').length + 1)
+      : entry.path;
+
+    const newPrompt = `${beforeAt}@${relativePath} ${afterCursor}`;
+    setPrompt(newPrompt);
+    setShowFilePicker(false);
+    setFilePickerQuery("");
+
+    // Focus back on textarea and set cursor position after the inserted path
+    setTimeout(() => {
+      if (textarea) {
         textarea.focus();
         const newCursorPos = beforeAt.length + relativePath.length + 2; // +2 for @ and space
         textarea.setSelectionRange(newCursorPos, newCursorPos);
-      }, 0);
-    }
+      }
+    }, 0);
   };
 
   const handleFilePickerClose = () => {
@@ -655,8 +668,18 @@ const FloatingPromptInputInner = (
   };
 
   const handleSlashCommandSelect = (command: SlashCommand) => {
+    if (!command?.full_command) {
+      console.warn('[FloatingPromptInput] handleSlashCommandSelect called with invalid command');
+      setShowSlashCommandPicker(false);
+      return;
+    }
+    
     const textarea = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-    if (!textarea) return;
+    if (!textarea) {
+      console.warn('[FloatingPromptInput] handleSlashCommandSelect: textarea ref is null');
+      setShowSlashCommandPicker(false);
+      return;
+    }
 
     // Find the / position before cursor
     let slashPosition = -1;
@@ -672,7 +695,8 @@ const FloatingPromptInputInner = (
     }
 
     if (slashPosition === -1) {
-      console.error('[FloatingPromptInput] / position not found');
+      console.warn('[FloatingPromptInput] / position not found');
+      setShowSlashCommandPicker(false);
       return;
     }
 
@@ -763,26 +787,39 @@ const FloatingPromptInputInner = (
       return;
     }
 
-    if (prompt.trim() && !disabled) {
-      let finalPrompt = prompt.trim();
+    const trimmedPrompt = prompt?.trim();
+    if (!trimmedPrompt || disabled) {
+      return;
+    }
 
-      // Check for @plan prefix to override execution mode
-      let effectiveExecutionMode = selectedExecutionMode;
-      if (finalPrompt.toLowerCase().startsWith('@plan ')) {
-        effectiveExecutionMode = 'plan';
-        finalPrompt = finalPrompt.substring(6).trim(); // Remove @plan prefix
-      }
+    let finalPrompt = trimmedPrompt;
 
-      // Append thinking phrase if not auto mode
-      const thinkingMode = THINKING_MODES.find(m => m.id === selectedThinkingMode);
-      if (thinkingMode && thinkingMode.phrase) {
-        finalPrompt = `${finalPrompt}.\n\n${thinkingMode.phrase}.`;
-      }
+    // Check for @plan prefix to override execution mode
+    let effectiveExecutionMode = selectedExecutionMode;
+    if (finalPrompt.toLowerCase().startsWith('@plan ')) {
+      effectiveExecutionMode = 'plan';
+      finalPrompt = finalPrompt.substring(6).trim(); // Remove @plan prefix
+    }
 
+    // Final validation after prefix removal
+    if (!finalPrompt) {
+      console.warn('[FloatingPromptInput] Empty prompt after processing');
+      return;
+    }
+
+    // Append thinking phrase if not auto mode
+    const thinkingMode = THINKING_MODES.find(m => m.id === selectedThinkingMode);
+    if (thinkingMode?.phrase) {
+      finalPrompt = `${finalPrompt}.\n\n${thinkingMode.phrase}.`;
+    }
+
+    try {
       onSend(finalPrompt, selectedModel, showExecutionMode ? effectiveExecutionMode : undefined);
       setPrompt("");
       setEmbeddedImages([]);
       setTextareaHeight(48); // Reset height after sending
+    } catch (err) {
+      console.error('[FloatingPromptInput] Failed to send prompt:', err);
     }
   };
 

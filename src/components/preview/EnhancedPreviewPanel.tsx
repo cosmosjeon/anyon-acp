@@ -177,11 +177,16 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const loadHtmlFile = async (filePath: string) => {
     console.log('[Preview] loadHtmlFile called:', { filePath, isTauri, projectPath });
 
+    if (!filePath?.trim()) {
+      console.warn('[Preview] loadHtmlFile called with empty filePath');
+      return;
+    }
+
     if (!isTauri) {
       console.warn('[Preview] Not in Tauri environment, cannot load HTML file directly');
       addAppOutput({
         type: 'info',
-        message: `[preview] Tauri 앱에서만 HTML 파일 미리보기가 가능합니다: ${filePath.split(/[/\\]/).pop()}`,
+        message: `[preview] Tauri 앱에서만 HTML 파일 미리보기가 가능합니다: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
         timestamp: Date.now(),
         projectPath: projectPath || '',
       });
@@ -191,6 +196,18 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     try {
       // 파일 내용 직접 읽기
       const content = await invoke<string>('read_file_content', { filePath });
+      
+      if (!content) {
+        console.warn('[Preview] Empty content received from file:', filePath);
+        addAppOutput({
+          type: 'stderr',
+          message: `[preview] File is empty: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
+          timestamp: Date.now(),
+          projectPath: projectPath || '',
+        });
+        return;
+      }
+      
       console.log('[Preview] File content loaded, length:', content.length);
 
       // 요소 선택기 스크립트 주입
@@ -203,15 +220,16 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
       addAppOutput({
         type: 'info',
-        message: `[preview] Loading ${filePath.split(/[/\\]/).pop()}`,
+        message: `[preview] Loading ${filePath.split(/[/\\]/).pop() || 'file'}`,
         timestamp: Date.now(),
         projectPath: projectPath || '',
       });
     } catch (err) {
       console.error('[Preview] Failed to load HTML file:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       addAppOutput({
         type: 'stderr',
-        message: `[preview] Failed to load HTML file: ${err}`,
+        message: `[preview] Failed to load HTML file: ${errorMessage}`,
         timestamp: Date.now(),
         projectPath: projectPath || '',
       });
@@ -310,17 +328,24 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const scanPorts = async () => {
     try {
       const result = await invoke<PortInfo[]>('scan_ports');
+      
+      if (!result || !Array.isArray(result)) {
+        console.warn('[Preview] Invalid port scan result:', result);
+        return;
+      }
+      
       setPorts(result);
 
       if (!selectedPort && result.length > 0) {
-        const alive = result.find((p) => p.alive);
-        if (alive) {
+        const alive = result.find((p) => p?.alive);
+        if (alive?.port && alive?.url) {
           setSelectedPort(alive.port);
           setCurrentUrl(alive.url);
         }
       }
     } catch (err) {
-      console.error('Port scan failed:', err);
+      // Port scan failure is not critical, suppress error in console
+      console.debug('[Preview] Port scan failed:', err);
     }
   };
 
@@ -366,7 +391,17 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
       currentUrl
     });
 
-    if (iframeRef.current?.contentWindow) {
+    if (!iframeRef.current) {
+      console.warn('[Preview] No iframe ref available');
+      return;
+    }
+    
+    if (!iframeRef.current.contentWindow) {
+      console.warn('[Preview] No iframe contentWindow available');
+      return;
+    }
+
+    try {
       if (isSelectorActive) {
         iframeRef.current.contentWindow.postMessage(
           { type: 'deactivate-anyon-component-selector' },
@@ -382,8 +417,8 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         );
         setSelectorActive(true);
       }
-    } else {
-      console.warn('[Preview] No iframe contentWindow available');
+    } catch (err) {
+      console.error('[Preview] Failed to toggle selector:', err);
     }
   };
 

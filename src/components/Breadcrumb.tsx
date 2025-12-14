@@ -62,9 +62,15 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, className }) => {
       const loadProjects = async () => {
         try {
           const projectList = await api.listRegisteredProjects();
-          setProjects(projectList);
+          if (projectList && Array.isArray(projectList)) {
+            setProjects(projectList);
+          } else {
+            console.warn('[Breadcrumb] Invalid project list received:', projectList);
+            setProjects([]);
+          }
         } catch (err) {
-          console.error('Failed to load projects:', err);
+          console.error('[Breadcrumb] Failed to load projects:', err);
+          setProjects([]);
         }
       };
       loadProjects();
@@ -88,9 +94,18 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, className }) => {
   const hasDropdown = (item: BreadcrumbItem) =>
     item.isProjectSelector || (item.dropdownOptions && item.dropdownOptions.length > 0);
 
+  // Early return if items is not valid
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+
   return (
     <nav className={cn('flex items-center gap-1.5 text-sm', className)}>
       {items.map((item, index) => {
+        // Skip invalid items
+        if (!item || typeof item.label !== 'string') {
+          return null;
+        }
         const isLast = index === items.length - 1;
         const isClickable = !!item.onClick || hasDropdown(item);
         const isDropdownOpen = openDropdownIndex === index;
@@ -150,8 +165,12 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, className }) => {
                                   key={project.id}
                                   onClick={() => {
                                     setOpenDropdownIndex(null);
-                                    if (!isActive && item.onProjectSelect) {
-                                      item.onProjectSelect(project);
+                                    if (!isActive && item.onProjectSelect && project) {
+                                      try {
+                                        item.onProjectSelect(project);
+                                      } catch (err) {
+                                        console.error('[Breadcrumb] Error in onProjectSelect:', err);
+                                      }
                                     }
                                   }}
                                   className={cn(
@@ -176,8 +195,12 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, className }) => {
                                 key={option.value}
                                 onClick={() => {
                                   setOpenDropdownIndex(null);
-                                  if (!isActive && item.onDropdownSelect) {
-                                    item.onDropdownSelect(option.value);
+                                  if (!isActive && item.onDropdownSelect && option?.value) {
+                                    try {
+                                      item.onDropdownSelect(option.value);
+                                    } catch (err) {
+                                      console.error('[Breadcrumb] Error in onDropdownSelect:', err);
+                                    }
                                   }
                                 }}
                                 className={cn(

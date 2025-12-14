@@ -121,10 +121,16 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   // Load last session
   useEffect(() => {
     if (project?.path) {
-      const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'maintenance');
-      if (lastSessionData) {
-        const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
-        setCurrentSession(session);
+      try {
+        const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'maintenance');
+        if (lastSessionData) {
+          const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+          if (session) {
+            setCurrentSession(session);
+          }
+        }
+      } catch (err) {
+        console.error('[MaintenanceWorkspace] Failed to load last session:', err);
       }
     }
   }, [project?.path]);
@@ -132,18 +138,19 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   // Git repo check
   useEffect(() => {
     const checkGitRepo = async () => {
-      if (project?.path) {
-        try {
-          const isGitRepo = await api.checkIsGitRepo(project.path);
-          if (!isGitRepo) {
-            const gitResult = await api.initGitRepo(project.path);
-            if (gitResult.success) {
-              console.log('Git repository initialized successfully');
-            }
+      if (!project?.path) return;
+      
+      try {
+        const isGitRepo = await api.checkIsGitRepo(project.path);
+        if (!isGitRepo) {
+          const gitResult = await api.initGitRepo(project.path);
+          if (gitResult?.success) {
+            console.log('[MaintenanceWorkspace] Git repository initialized successfully');
           }
-        } catch (gitErr) {
-          console.error('Failed to check/init git repo:', gitErr);
         }
+      } catch (gitErr) {
+        // Git init failure is not critical, just log it
+        console.warn('[MaintenanceWorkspace] Failed to check/init git repo:', gitErr);
       }
     };
     checkGitRepo();
@@ -227,14 +234,26 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   const handleSessionSelect = useCallback((session: Session | null) => {
     setCurrentSession(session);
     setSessionKey(prev => prev + 1);
-    if (session && project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', session.id);
+    if (session?.id && project?.path) {
+      try {
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', session.id);
+      } catch (err) {
+        console.error('[MaintenanceWorkspace] Failed to save session:', err);
+      }
     }
   }, [project?.path]);
 
   const handleSessionCreated = useCallback((sessionId: string) => {
+    if (!sessionId) {
+      console.warn('[MaintenanceWorkspace] handleSessionCreated called with empty sessionId');
+      return;
+    }
     if (project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId);
+      try {
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId);
+      } catch (err) {
+        console.error('[MaintenanceWorkspace] Failed to save session:', err);
+      }
     }
   }, [project?.path]);
 
