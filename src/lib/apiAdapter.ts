@@ -272,7 +272,6 @@ function mapCommandToEndpoint(command: string, _params?: any): string {
     // Project creation and management
     'create_project': '/api/projects/create',
     'get_home_directory': '/api/home',
-    'run_npx_anyon_agents': '/api/projects/install-anyon',
     'check_anyon_installed': '/api/projects/check-anyon',
     'list_directory_contents': '/api/files/list',
     'read_file_content': '/api/files/read',

@@ -140,7 +140,7 @@ export interface AnyonInstallationStatus {
 }
 
 /**
- * Result of running npx anyon-agents
+ * Result of running shell commands (git, etc.)
  */
 export interface NpxRunResult {
   /** Whether the command succeeded */
@@ -2143,20 +2143,6 @@ export const api = {
         has_claude_dir: false,
         missing_dirs: ['.anyon', '.claude'],
       };
-    }
-  },
-
-  /**
-   * Run npx anyon-agents@latest in the project directory
-   * @param projectPath - The absolute path to the project
-   * @returns Promise resolving to the command result
-   */
-  async runNpxAnyonAgents(projectPath: string): Promise<NpxRunResult> {
-    try {
-      return await apiCall<NpxRunResult>('run_npx_anyon_agents', { projectPath });
-    } catch (error) {
-      console.error('Failed to run npx anyon-agents:', error);
-      throw error;
     }
   },
 

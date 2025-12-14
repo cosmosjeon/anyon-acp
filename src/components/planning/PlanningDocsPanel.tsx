@@ -10,7 +10,7 @@ import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
-import { WORKFLOW_SEQUENCE, type WorkflowStep } from '@/constants/planning';
+import { WORKFLOW_SEQUENCE, type WorkflowStep, getWorkflowPrompt } from '@/constants/planning';
 import { PlanningDocViewer } from './PlanningDocViewer';
 
 interface PlanningDocsPanelProps {
@@ -71,7 +71,8 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   // Start workflow for a step
   const handleStartWorkflow = useCallback((step: WorkflowStep) => {
     setActiveWorkflows(prev => new Set(prev).add(step.id));
-    onStartNewWorkflow(step.workflow);
+    // 내재화된 prompt가 있으면 사용, 없으면 슬래시 커맨드 사용
+    onStartNewWorkflow(getWorkflowPrompt(step));
     setActiveDocId(step.id);
   }, [onStartNewWorkflow]);
 

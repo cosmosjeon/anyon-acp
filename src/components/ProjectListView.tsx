@@ -199,25 +199,10 @@ export const ProjectListView: React.FC = () => {
           // Continue even if git check/init fails
         }
 
-        // Run npx anyon-agents@latest automatically
-        setInstallStatus({ type: 'info', text: 'Installing ANYON agents...' });
-
-        try {
-          const result = await api.runNpxAnyonAgents(selected);
-          if (result.success) {
-            setInstallStatus({ type: 'success', text: 'ANYON agents installed successfully!' });
-            setTimeout(() => setInstallStatus(null), 3000);
-          } else {
-            setInstallStatus({ type: 'error', text: result.stderr || 'Installation completed with warnings' });
-            setTimeout(() => setInstallStatus(null), 5000);
-          }
-        } catch (installErr) {
-          console.error('Failed to install anyon-agents:', installErr);
-          setInstallStatus({ type: 'error', text: 'Installation failed. You can install later from project settings.' });
-          setTimeout(() => setInstallStatus(null), 5000);
-        } finally {
-          setIsInstallingAnyon(false);
-        }
+        // Project setup complete
+        setInstallStatus({ type: 'success', text: 'Project setup complete!' });
+        setTimeout(() => setInstallStatus(null), 2000);
+        setIsInstallingAnyon(false);
       }
     } catch (err) {
       console.error('Failed to open folder picker:', err);
