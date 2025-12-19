@@ -1,0 +1,133 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2025-12-19T20:10:00.000Z",
+    "completed": "2025-12-19T21:00:00.000Z"
+  },
+  "mode": "initial_scan",
+  "scan_level": "exhaustive",
+  "status": "completed",
+  "project_root": "/Users/cosmos/Documents/1/anyon-claude",
+  "output_folder": "/Users/cosmos/Documents/1/anyon-claude/_bmad-output",
+  "completed_steps": [
+    {
+      "step": "step_1",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:15:00.000Z",
+      "summary": "Classified as multi-part with 3 parts: frontend (web), desktop (desktop), server (backend)"
+    },
+    {
+      "step": "step_2",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:17:00.000Z",
+      "summary": "Found 26 existing docs in root, docs/, docs-dev/, server/"
+    },
+    {
+      "step": "step_3",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:20:00.000Z",
+      "summary": "Tech stack: React 18 + TypeScript + Vite (frontend), Tauri v2 + Rust (desktop), Node.js + Express (server)"
+    },
+    {
+      "step": "step_4",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:25:00.000Z",
+      "summary": "Exhaustive scan: 81 React components, 5 Zustand stores, 17 hooks, 120+ Tauri commands, 15 REST endpoints"
+    },
+    {
+      "step": "step_5",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:30:00.000Z",
+      "summary": "Generated source-tree-analysis.md"
+    },
+    {
+      "step": "step_6",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:35:00.000Z",
+      "summary": "Generated development-guide.md"
+    },
+    {
+      "step": "step_7",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:40:00.000Z",
+      "summary": "Generated integration-architecture.md"
+    },
+    {
+      "step": "step_8",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:45:00.000Z",
+      "summary": "Generated architecture-frontend.md, architecture-desktop.md, architecture-server.md"
+    },
+    {
+      "step": "step_9",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:50:00.000Z",
+      "summary": "Generated project-overview.md, component-inventory.md, api-contracts.md, data-models.md, project-parts.json"
+    },
+    {
+      "step": "step_10",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:55:00.000Z",
+      "summary": "Generated index.md master index"
+    },
+    {
+      "step": "step_11",
+      "status": "completed",
+      "timestamp": "2025-12-19T20:58:00.000Z",
+      "summary": "Validated all 13 output files"
+    },
+    {
+      "step": "step_12",
+      "status": "completed",
+      "timestamp": "2025-12-19T21:00:00.000Z",
+      "summary": "Workflow finalized"
+    }
+  ],
+  "findings": {
+    "project_classification": {
+      "repository_type": "multi-part",
+      "parts_count": 3,
+      "primary_language": "TypeScript/Rust",
+      "architecture_pattern": "Desktop + Web + Backend"
+    },
+    "technology_stack": {
+      "frontend": "React 18.3.1, TypeScript, Vite 6.0.3, Tailwind CSS 4.1.8, Zustand 5.0.6, React Router 7, Radix UI",
+      "desktop": "Tauri v2, Rust 2021 edition, Tokio, Axum, rusqlite, JWT, OAuth2",
+      "server": "Node.js, Express 4.18.2, Google Auth Library, JWT, CORS"
+    },
+    "components_count": {
+      "frontend_components": 81,
+      "zustand_stores": 5,
+      "custom_hooks": 17,
+      "context_providers": 3,
+      "tauri_commands": 120,
+      "database_tables": 4,
+      "server_endpoints": 15
+    }
+  },
+  "project_types": [
+    {"part_id": "frontend", "project_type_id": "web", "display_name": "Frontend (React/TypeScript)", "root_path": "src/"},
+    {"part_id": "desktop", "project_type_id": "desktop", "display_name": "Desktop App (Tauri/Rust)", "root_path": "src-tauri/"},
+    {"part_id": "server", "project_type_id": "backend", "display_name": "Auth Server (Node.js)", "root_path": "server/"}
+  ],
+  "outputs_generated": [
+    "index.md",
+    "project-overview.md",
+    "source-tree-analysis.md",
+    "architecture-frontend.md",
+    "architecture-desktop.md",
+    "architecture-server.md",
+    "integration-architecture.md",
+    "development-guide.md",
+    "component-inventory.md",
+    "api-contracts.md",
+    "data-models.md",
+    "project-parts.json",
+    "project-scan-report.json"
+  ],
+  "next_steps": [
+    "Review generated documentation for accuracy",
+    "Create brownfield PRD for enhancement requirements",
+    "Share with team for onboarding"
+  ]
+}

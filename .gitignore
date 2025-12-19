@@ -36,5 +36,8 @@ temp_lib/
 
 # Claude project-specific files
 
+# BMad Method artifacts
+.anyon/
+_bmad-output/
 
 .env
