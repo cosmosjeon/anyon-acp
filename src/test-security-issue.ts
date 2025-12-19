@@ -1,11 +1,10 @@
-// 테스트용 보안 이슈 파일 v2
+// 테스트용 보안 이슈 파일 v3
 export function deleteUser(userId: string) {
-  // SQL Injection 취약점 (의도적)
+  // SQL Injection 취약점
   const query = `DELETE FROM users WHERE id = ${userId}`;
-  console.log("executing:", query);
   
-  // Hardcoded secret (의도적)
-  const API_KEY = "sk-secret-key-12345";
+  // Hardcoded secret
+  const SECRET = "my-super-secret-api-key";
   
-  return { query, API_KEY };
+  return { query, SECRET };
 }
