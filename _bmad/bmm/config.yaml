@@ -5,8 +5,8 @@
 
 project_name: anyon-claude
 user_skill_level: intermediate
-planning_artifacts: "{project-root}/_bmad-output/project-planning-artifacts"
-implementation_artifacts: "{project-root}/_bmad-output/implementation-artifacts"
+audits: "{project-root}/_bmad-output/audits"
+specs: "{project-root}/_bmad-output/specs"
 project_knowledge: "{project-root}/docs"
 
 # Core Configuration Values
