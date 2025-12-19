@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Pre-push hook - runs Claude Code audit before push
+./scripts/pre-push.sh

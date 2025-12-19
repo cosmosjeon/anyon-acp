@@ -133,6 +133,25 @@
 
 ---
 
+## Feature Documentation
+
+> 앱 UI/기능별 구현 설명서
+
+| Document | Description |
+|----------|-------------|
+| [MVP Tab Overview](features/template/basic/mvp-workspace/planning/00-mvp-tab-overview.md) | MVP 탭 전체 구조 |
+| [PRD Workflow](features/template/basic/mvp-workspace/planning/01-prd-workflow.md) | PRD 워크플로우 설명 |
+| [UX Design Workflow](features/template/basic/mvp-workspace/planning/02-ux-design-workflow.md) | UX 디자인 워크플로우 |
+| [Development Workflow](features/template/basic/mvp-workspace/planning/07-development-workflow.md) | 개발 워크플로우 |
+
+### 문서 템플릿
+
+| Template | Description |
+|----------|-------------|
+| [Basic MVP Workspace](features/template/basic/mvp-workspace/planning/00-overview.md) | MVP 워크스페이스 템플릿 |
+
+---
+
 ## SDD Automation System
 
 > Spec-Driven Development automation for AI-assisted refactoring
@@ -160,28 +179,31 @@
 ## Folder Structure
 
 ```
-_bmad-output/
+sdd-docs/
+├── README.md                 # SDD 프로세스 가이드
 ├── index.md                  # 마스터 인덱스 (이 파일)
+├── CURRENT-STATUS.md         # AI 컨텍스트 브리프
 ├── sync-status.json          # 문서 동기화 상태 (CI/CD 자동 관리)
 ├── project-scan-report.json  # 워크플로우 상태
 │
-├── specs/                    # 기술 문서
+├── specs/                    # 기술 스펙 (auto-generated)
 │   ├── project-overview.md
-│   ├── source-tree-analysis.md
-│   ├── architecture-frontend.md
-│   ├── architecture-desktop.md
-│   ├── architecture-server.md
-│   ├── integration-architecture.md
+│   ├── architecture-*.md
 │   ├── component-inventory.md
 │   ├── api-contracts.md
 │   ├── data-models.md
-│   ├── development-guide.md
-│   └── project-parts.json
+│   └── ...
 │
-└── audits/                   # 코드 감사 보고서
-    ├── code-audit-report.md
-    ├── frontend-audit-report.json
-    └── server-audit-report.json
+├── audits/                   # 코드 감사 (auto-generated)
+│   ├── code-audit-report.md
+│   └── *.json
+│
+└── features/                 # 기능별 구현 설명 (manual)
+    ├── README.md
+    ├── CONTRIBUTING.md
+    └── template/basic/mvp-workspace/
+        ├── planning/         # 기획 워크플로우 문서
+        └── development/      # 개발 워크플로우 문서
 ```
 
 ---

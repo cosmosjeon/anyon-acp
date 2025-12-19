@@ -29,156 +29,167 @@ standalone: true
 const INSTRUCTIONS = `
 # Design Guide Workflow Instructions
 
-<critical>You MUST have already loaded: {project-root}/.anyon/anyon-method/workflows/startup-ui/workflow.yaml</critical>
 <critical>Communicate in Korean</critical>
+<critical>Target audience: NON-TECHNICAL FOUNDERS - 쉬운 말로, 전문 용어 피하기</critical>
 <critical>이 워크플로우는 디자인만 다룸. React, MUI 등 기술 스택은 TRD에서 처리.</critical>
+
+## 핵심 원칙
+
+1. **색상/폰트는 AI가 자동 결정** - 사용자에게 하나하나 묻지 않음
+2. **참고 서비스 분석** - 사용자가 참고 서비스를 알려주면 dembrandt로 분석
+3. **최종 결과만 확인** - 스타일 선택 후 AI가 결정한 결과 보여주고 조정
+
+## 참고 서비스 분석 방법
+
+### dembrandt CLI 사용 (URL이 주어진 경우)
+\`\`\`bash
+npx dembrandt <url> --json-only
+\`\`\`
+- 색상 팔레트, 타이포그래피, 간격 등 추출
+- JSON 결과에서 주요 색상/폰트 파싱
+
+### 잘 알려진 서비스 (내부 지식 fallback)
+| 서비스 | Primary | Secondary | 스타일 |
+|--------|---------|-----------|--------|
+| 토스 | #3182F6 | #4E5968 | 전문적, 미니멀 |
+| 당근마켓 | #FF6F0F | #FFA64D | 친근함, 따뜻함 |
+| 배민 | #2AC1BC | #35C5F0 | 친근함, 재치 |
+| 노션 | #000000 | #37352F | 미니멀 |
+| 카카오 | #FEE500 | #3C1E1E | 친근함 |
+| 네이버 | #03C75A | #00C73C | 전문적 |
+| 리니어 | #5E6AD2 | #8B5CF6 | 트렌디 |
+| 피그마 | #F24E1E | #A259FF | 트렌디 |
 
 <workflow>
 
-<step n="0" goal="Load Documents">
+<step n="0" goal="문서 로드">
 <action>Load PRD from {input_prd}</action>
 <action>Load UX Design HTML from {input_ux}</action>
 <action>Extract: project_name, service_type, platform, target_users</action>
-
-<action>Read and analyze UX HTML mockup:
-- Identify current visual style (layout, spacing, colors used)
-- Note screen structure and components
-- This will inform design recommendations
-</action>
-
-<action>Welcome:
-"안녕하세요! {{project_name}}의 디자인 가이드를 만들어볼게요.
-
-UX 목업을 확인했어요. 이제 디자인을 결정해봐요!
-
-**정할 것:**
-- 디자인 스타일 (느낌)
-- 색상 (Primary, Secondary 등)
-- 폰트"
-</action>
 </step>
 
-<step n="1" goal="Design Style">
-<ask>{{project_name}}은 어떤 느낌이 좋을까요?
+<step n="1" goal="스타일 + 참고 서비스 질문">
+<ask>
+"{{project_name}}의 디자인 가이드를 만들어볼게요!
+
+어떤 느낌이 좋을까요?
 
 1. **미니멀** - 깔끔, 여백, 심플 (예: 애플, 노션)
-2. **화려함** - 대담한 색상, 에너지 (예: 인스타그램, 스포티파이)
-3. **전문적** - 비즈니스, 신뢰감 (예: 링크드인, 세일즈포스)
+2. **화려함** - 대담한 색상, 에너지 (예: 인스타, 스포티파이)
+3. **전문적** - 비즈니스, 신뢰감 (예: 토스, 링크드인)
 4. **친근함** - 따뜻함, 부드러움 (예: 당근마켓, 슬랙)
-5. **트렌디** - 그라데이션, 유리효과 (예: 피그마, 디스코드)
-6. 기타 (직접 설명)
+5. **트렌디** - 그라데이션, 유리효과 (예: 피그마, 리니어)
 
-번호로 선택:</ask>
+그리고 **참고하고 싶은 서비스**가 있으면 같이 알려주세요!
+(예: '3번, 토스 참고했으면 좋겠어요' 또는 그냥 '4번이요')
+"
+</ask>
 
-<action>Store as {{design_style}}</action>
+<action>Parse response:
+- Extract design_style (1-5)
+- Extract reference_service (서비스명 또는 URL, 없으면 null)
+</action>
 
-<ask>참고하고 싶은 디자인이 있나요? (서비스명 또는 URL)
-없으면 "없음":</ask>
-
-<action>Store as {{design_references}}</action>
+<action>Store as {{design_style}} and {{design_references}}</action>
 </step>
 
-<step n="2" goal="Color Palette">
-<action>Explain:
-"색상을 정해볼게요.
+<step n="2" goal="참고 서비스 분석 + AI 자동 결정">
 
-**Primary Color**: 가장 많이 쓰이는 메인 색상 (버튼, 링크)
-**Secondary Color**: 보조 색상
-**Accent Color**: 특별 강조용"
+<action>If reference_service is URL:
+1. Run: npx dembrandt {{reference_url}} --json-only
+2. Parse JSON result for:
+   - colors.palette (상위 3개 색상)
+   - typography.styles (주요 폰트)
+3. Store extracted values
 </action>
 
-<action>Based on {{design_style}}, suggest colors:
-- 미니멀 → 차분한 블루, 그레이 계열
-- 화려함 → 선명한 컬러, 그라데이션
-- 전문적 → 네이비, 블루 계열
-- 친근함 → 파스텔, 따뜻한 색상
-- 트렌디 → 퍼플, 그라데이션
+<action>If reference_service is known service name:
+1. Use internal knowledge table above
+2. Get Primary, Secondary colors
+3. Determine appropriate font (Pretendard for Korean services)
 </action>
 
-<ask>Primary Color 추천:
-[디자인 스타일에 맞는 3-4개 색상 + hex code]
+<action>If no reference_service:
+1. Based on {{design_style}}, determine colors:
+   - 미니멀 → Primary: #000000, Secondary: #6B7280
+   - 화려함 → Primary: #7C3AED, Secondary: #EC4899
+   - 전문적 → Primary: #3B82F6, Secondary: #1E40AF
+   - 친근함 → Primary: #F97316, Secondary: #FBBF24
+   - 트렌디 → Primary: #8B5CF6, Secondary: #06B6D4
+2. Font: Pretendard (한글), Inter (영문)
+</action>
 
-번호로 선택하거나 직접 hex code 입력:</ask>
+<action>Auto-generate:
+- Accent Color: 보색 또는 강조색
+- Semantic Colors: Success #10B981, Error #EF4444, Warning #F59E0B, Info #3B82F6
+- Heading Font / Body Font
+</action>
 
-<action>Store as {{primary_color}}</action>
+<action>Show result to user:
+"
+{{#if design_references}}
+참고하신 '{{design_references}}' 디자인을 분석했어요.
+{{else}}
+{{design_style}} 스타일에 맞게 디자인을 결정했어요.
+{{/if}}
 
-<ask>Secondary Color는요?
-[Primary와 어울리는 3-4개 추천]</ask>
+**AI가 결정한 디자인:**
 
-<action>Store as {{secondary_color}}</action>
+| 항목 | 값 | 이유 |
+|-----|-----|-----|
+| Primary | {{primary_color}} | {{primary_reason}} |
+| Secondary | {{secondary_color}} | {{secondary_reason}} |
+| Accent | {{accent_color}} | 강조/액션용 |
+| Heading Font | {{heading_font}} | {{font_reason}} |
+| Body Font | {{body_font}} | 가독성 |
 
-<ask>Accent Color는요?
-[눈에 띄는 강조색 2-3개 추천]</ask>
+조정하고 싶은 부분 있으세요?
+(없으면 '좋아요'라고 해주세요)
+"
+</action>
 
-<action>Store as {{accent_color}}</action>
-
-<action>Auto-generate semantic colors:
-- Success: #10B981
-- Error: #EF4444
-- Warning: #F59E0B
-- Info: #3B82F6
+<action>Handle user feedback:
+- If user wants adjustment: modify the requested value and show again
+- If user says "좋아요" or similar: proceed to next step
 </action>
 </step>
 
-<step n="3" goal="Typography">
-<action>Explain:
-"폰트를 정해볼게요.
+<step n="3" goal="다크모드 질문">
+<ask>
+"다크모드 지원할까요?
 
-**Heading Font**: 제목용
-**Body Font**: 본문용
+1. 네 (다크모드 색상도 자동 생성)
+2. 아니오 (라이트 모드만)
+3. 나중에 결정
+"
+</ask>
 
-한글 서비스면 한글 폰트가 중요해요."
-</action>
-
-<ask>폰트 추천:
-
-**한글:**
-1. Pretendard - 깔끔, 모던 (무료)
-2. Spoqa Han Sans - 가독성 좋음 (무료)
-3. Noto Sans KR - 구글 (무료)
-
-**영문:**
-1. Inter - 모던
-2. Poppins - 부드러움
-
-번호로 선택하거나 직접 입력:</ask>
-
-<action>Store as {{heading_font}} and {{body_font}}</action>
-</step>
-
-<step n="4" goal="Dark Mode">
-<ask>다크모드를 지원할 건가요?
-
-1. 네 - 다크모드 색상도 정의
-2. 아니오 - 라이트 모드만
-3. 나중에 - 일단 스킵
-
-번호로 선택:</ask>
-
-<action>If yes, generate dark mode colors:
-- Background: #1A1A1A
-- Text: #F3F4F6
-- Primary: {{primary_color}} (약간 밝게)
+<action>If yes:
+- Generate dark mode colors automatically:
+  - Background: #0F0F0F
+  - Surface: #1A1A1A
+  - Text: #F3F4F6
+  - Primary: {{primary_color}} (밝기 조정)
 </action>
 
 <action>Store as {{dark_mode}}</action>
 </step>
 
-<step n="5" goal="Generate Design Guide">
-<action>Load template from {template}</action>
-<action>Fill template with collected variables</action>
+<step n="4" goal="문서 생성 + 완료">
+<action>Generate design-guide.md with all collected values</action>
 <action>Save to {default_output_file}</action>
 
 <action>Show summary:
 "
-디자인 가이드 완료!
+디자인 가이드가 완성됐어요!
 
 **저장 위치**: {default_output_file}
 
 **요약:**
-- 스타일: {{design_style}}
+- 스타일: {{design_style}} {{#if design_references}}({{design_references}} 참고){{/if}}
 - Primary: {{primary_color}}
 - Secondary: {{secondary_color}}
+- Accent: {{accent_color}}
 - 폰트: {{heading_font}} / {{body_font}}
 - 다크모드: {{dark_mode}}
 

@@ -1,0 +1,647 @@
+{
+  "auditMetadata": {
+    "auditDate": "2025-12-19",
+    "codebaseVersion": "1.0.0",
+    "fileAnalyzed": "server/index.js",
+    "totalLines": 441,
+    "auditor": "Claude Code Quality Audit"
+  },
+  "summary": {
+    "totalIssues": 47,
+    "critical": 8,
+    "high": 14,
+    "medium": 15,
+    "low": 10
+  },
+  "findings": {
+    "critical": [
+      {
+        "id": "CRIT-001",
+        "category": "Security",
+        "title": "Default JWT Secret in Production",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "31",
+        "severity": "CRITICAL",
+        "description": "JWT_SECRET defaults to 'dev-secret-key-change-in-production' which could be used in production if environment variable is not set. This allows attackers to forge authentication tokens.",
+        "impact": "Complete authentication bypass, unauthorized access to all user accounts",
+        "cwe": "CWE-798: Use of Hard-coded Credentials",
+        "suggestedFix": "Require JWT_SECRET in production: if (!process.env.JWT_SECRET && NODE_ENV === 'production') { throw new Error('JWT_SECRET must be set in production'); }"
+      },
+      {
+        "id": "CRIT-002",
+        "category": "Security",
+        "title": "Wide-Open CORS Policy",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "42",
+        "severity": "CRITICAL",
+        "description": "CORS is configured with no origin restrictions (cors() with default settings allows all origins), enabling any website to make authenticated requests to the API.",
+        "impact": "Cross-origin attacks, CSRF vulnerabilities, data theft from any malicious website",
+        "cwe": "CWE-346: Origin Validation Error",
+        "suggestedFix": "Configure CORS with specific origins: app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:3000', credentials: true }))"
+      },
+      {
+        "id": "CRIT-003",
+        "category": "Security",
+        "title": "In-Memory Data Storage",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "46-48",
+        "severity": "CRITICAL",
+        "description": "User data, sessions, and settings stored in-memory Maps. All data lost on server restart. Not suitable for production deployment.",
+        "impact": "Data loss on restart, inability to scale horizontally, no persistence",
+        "cwe": "CWE-404: Improper Resource Shutdown or Release",
+        "suggestedFix": "Implement persistent database (PostgreSQL/MongoDB): Replace Map with database models and queries"
+      },
+      {
+        "id": "CRIT-004",
+        "category": "Security",
+        "title": "No Rate Limiting",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All endpoints",
+        "severity": "CRITICAL",
+        "description": "No rate limiting on any endpoints, particularly dangerous for authentication endpoints. Allows brute force attacks, DoS, and resource exhaustion.",
+        "impact": "Brute force attacks on auth, API abuse, service degradation, increased costs",
+        "cwe": "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "suggestedFix": "Add express-rate-limit: import rateLimit from 'express-rate-limit'; const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }); app.use('/auth/', authLimiter);"
+      },
+      {
+        "id": "CRIT-005",
+        "category": "Security",
+        "title": "Development Endpoints in Production Code",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "90-117, 331-375",
+        "severity": "CRITICAL",
+        "description": "Development endpoints (/dev/create-user, /dev/users, /auth/dev/login) have no environment checks. Can be accessed in production to create unauthorized accounts.",
+        "impact": "Unauthorized account creation, user enumeration, data exposure",
+        "cwe": "CWE-489: Active Debug Code",
+        "suggestedFix": "Guard with environment check: if (NODE_ENV !== 'development') { return res.status(404).json({ error: 'Not found' }); } OR remove entirely before production deployment"
+      },
+      {
+        "id": "CRIT-006",
+        "category": "Security",
+        "title": "Missing Input Validation on OAuth Callback",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "140-290",
+        "severity": "CRITICAL",
+        "description": "OAuth callback accepts code parameter without validation. No CSRF token validation, no state parameter verification.",
+        "impact": "CSRF attacks, OAuth flow hijacking, unauthorized authentication",
+        "cwe": "CWE-352: Cross-Site Request Forgery (CSRF)",
+        "suggestedFix": "Implement state parameter validation: Generate random state on /auth/google/url, store in secure session, validate in callback"
+      },
+      {
+        "id": "CRIT-007",
+        "category": "Security",
+        "title": "Exposed Sensitive Error Details",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "286-289",
+        "severity": "CRITICAL",
+        "description": "OAuth errors logged to console and generic message sent to user, but error object logged may contain sensitive tokens or credentials.",
+        "impact": "Information leakage via server logs, potential credential exposure",
+        "cwe": "CWE-209: Generation of Error Message Containing Sensitive Information",
+        "suggestedFix": "Sanitize error logging: console.error('OAuth error:', error.message); // Don't log full error object"
+      },
+      {
+        "id": "CRIT-008",
+        "category": "Security",
+        "title": "No HTTPS Enforcement",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "424-441",
+        "severity": "CRITICAL",
+        "description": "Server runs on HTTP with no HTTPS enforcement or redirect. JWT tokens and OAuth credentials transmitted in plaintext.",
+        "impact": "Man-in-the-middle attacks, credential theft, token interception",
+        "cwe": "CWE-319: Cleartext Transmission of Sensitive Information",
+        "suggestedFix": "In production, enforce HTTPS: if (NODE_ENV === 'production') { app.use((req, res, next) => { if (!req.secure) return res.redirect('https://' + req.headers.host + req.url); next(); }); }"
+      }
+    ],
+    "high": [
+      {
+        "id": "HIGH-001",
+        "category": "Architecture",
+        "title": "Monolithic Route Handler File",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "1-441",
+        "severity": "HIGH",
+        "description": "All routes, middleware, configuration, and business logic in a single 441-line file. No separation of concerns.",
+        "impact": "Poor maintainability, difficult testing, merge conflicts, code navigation issues",
+        "cwe": "N/A - Architecture",
+        "suggestedFix": "Split into: routes/, middleware/, controllers/, services/, config/. Example structure:\n- routes/auth.js\n- routes/settings.js\n- routes/dev.js\n- middleware/authenticate.js\n- controllers/authController.js\n- services/jwtService.js\n- config/cors.js"
+      },
+      {
+        "id": "HIGH-002",
+        "category": "Security",
+        "title": "No Request Body Size Limits",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "43",
+        "severity": "HIGH",
+        "description": "express.json() configured without size limits. Allows large payload attacks causing memory exhaustion.",
+        "impact": "DoS via large JSON payloads, memory exhaustion, server crashes",
+        "cwe": "CWE-400: Uncontrolled Resource Consumption",
+        "suggestedFix": "Add size limit: app.use(express.json({ limit: '10kb' }));"
+      },
+      {
+        "id": "HIGH-003",
+        "category": "Security",
+        "title": "Missing Helmet Security Headers",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "41-43",
+        "severity": "HIGH",
+        "description": "No security headers (helmet middleware). Missing protection against clickjacking, XSS, content-type sniffing, etc.",
+        "impact": "XSS attacks, clickjacking, MIME sniffing vulnerabilities",
+        "cwe": "CWE-1021: Improper Restriction of Rendered UI Layers or Frames",
+        "suggestedFix": "Add helmet: import helmet from 'helmet'; app.use(helmet());"
+      },
+      {
+        "id": "HIGH-004",
+        "category": "Code Quality",
+        "title": "Large HTML String in Route Handler",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "194-284",
+        "severity": "HIGH",
+        "description": "90+ lines of HTML template string embedded in route handler. Violates separation of concerns, difficult to maintain.",
+        "impact": "Poor maintainability, no syntax highlighting, difficult debugging",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Move to template file: Use express view engine (EJS/Handlebars) or separate HTML file: res.sendFile(path.join(__dirname, 'templates/oauth-callback.html'))"
+      },
+      {
+        "id": "HIGH-005",
+        "category": "Security",
+        "title": "User Lookup by Email Without Index",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "165",
+        "severity": "HIGH",
+        "description": "Linear search through all users (Array.from(users.values()).find()) on every OAuth login. O(n) complexity, performance degrades with user count.",
+        "impact": "Performance degradation, potential DoS with many users, slow logins",
+        "cwe": "CWE-407: Inefficient Algorithmic Complexity",
+        "suggestedFix": "Maintain email index: const usersByEmail = new Map(); OR use database with indexed email column"
+      },
+      {
+        "id": "HIGH-006",
+        "category": "Security",
+        "title": "No Input Validation on Settings Endpoints",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "384-415",
+        "severity": "HIGH",
+        "description": "Settings endpoints accept arbitrary key-value pairs without validation. No sanitization, size limits, or type checking.",
+        "impact": "Storage bloat, injection attacks, unexpected data types causing crashes",
+        "cwe": "CWE-20: Improper Input Validation",
+        "suggestedFix": "Add validation: const allowedKeys = ['theme', 'language', 'notifications']; if (!allowedKeys.includes(key)) return res.status(400).json({ error: 'Invalid setting key' }); // Also validate value type and size"
+      },
+      {
+        "id": "HIGH-007",
+        "category": "Code Quality",
+        "title": "No Error Handling Middleware",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All endpoints",
+        "severity": "HIGH",
+        "description": "No global error handling middleware. Unhandled promise rejections in async routes crash the server or expose stack traces.",
+        "impact": "Server crashes, information leakage via stack traces, poor error consistency",
+        "cwe": "CWE-755: Improper Handling of Exceptional Conditions",
+        "suggestedFix": "Add error handler: app.use((err, req, res, next) => { console.error(err); res.status(err.status || 500).json({ error: NODE_ENV === 'production' ? 'Internal server error' : err.message }); });"
+      },
+      {
+        "id": "HIGH-008",
+        "category": "Production Readiness",
+        "title": "No Graceful Shutdown",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "424",
+        "severity": "HIGH",
+        "description": "Server starts with app.listen() but no graceful shutdown handling. Kills in-flight requests on SIGTERM.",
+        "impact": "Lost requests during deployment, data corruption, poor user experience",
+        "cwe": "N/A - Production Readiness",
+        "suggestedFix": "Add graceful shutdown:\nconst server = app.listen(PORT, ...);\nprocess.on('SIGTERM', () => {\n  server.close(() => { console.log('Graceful shutdown'); process.exit(0); });\n});"
+      },
+      {
+        "id": "HIGH-009",
+        "category": "Security",
+        "title": "JWT with Long Expiry (7 days)",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "52",
+        "severity": "HIGH",
+        "description": "JWT tokens expire in 7 days with no refresh token mechanism. Long window for token theft exploitation.",
+        "impact": "Extended exposure if token is stolen, no way to revoke access",
+        "cwe": "CWE-613: Insufficient Session Expiration",
+        "suggestedFix": "Reduce to 15min-1hr for access token, implement refresh token pattern: { expiresIn: '15m' } and separate /auth/refresh endpoint"
+      },
+      {
+        "id": "HIGH-010",
+        "category": "Security",
+        "title": "No Token Revocation Mechanism",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "56-62, 65-85",
+        "severity": "HIGH",
+        "description": "JWT tokens cannot be revoked. No blacklist or session tracking. Compromised tokens valid until expiry.",
+        "impact": "Cannot revoke access for compromised accounts, logout is client-side only",
+        "cwe": "CWE-613: Insufficient Session Expiration",
+        "suggestedFix": "Implement token blacklist in Redis or database, check on each authenticate() call. OR use session-based auth with database-backed sessions."
+      },
+      {
+        "id": "HIGH-011",
+        "category": "Code Quality",
+        "title": "Inconsistent Error Response Format",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "68, 75, 80, 144, 288, 312, 316, 388",
+        "severity": "HIGH",
+        "description": "Error responses have inconsistent formats: { error: string } vs plain text vs HTML. No standardized error structure.",
+        "impact": "Difficult client-side error handling, inconsistent UX, API usability issues",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Standardize error format: { success: false, error: { code: 'UNAUTHORIZED', message: 'User-friendly message' } }"
+      },
+      {
+        "id": "HIGH-012",
+        "category": "Production Readiness",
+        "title": "No Structured Logging",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "24, 182, 184, 287, 425-440",
+        "severity": "HIGH",
+        "description": "Using console.log with emojis and unstructured messages. Not parseable by log aggregators, no log levels.",
+        "impact": "Difficult debugging in production, no log aggregation, can't filter by severity",
+        "cwe": "N/A - Production Readiness",
+        "suggestedFix": "Use winston or pino: import winston from 'winston'; const logger = winston.createLogger({ level: 'info', format: winston.format.json() }); logger.info('User login', { userId, email });"
+      },
+      {
+        "id": "HIGH-013",
+        "category": "Security",
+        "title": "Missing OAuth State Parameter",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "127-131",
+        "severity": "HIGH",
+        "description": "OAuth URL generation missing state parameter for CSRF protection. OAuth spec requires state parameter.",
+        "impact": "CSRF attacks on OAuth flow, session fixation",
+        "cwe": "CWE-352: Cross-Site Request Forgery",
+        "suggestedFix": "Add state parameter: const state = crypto.randomBytes(16).toString('hex'); sessions.set(state, { timestamp: Date.now() }); authUrl = oauth2Client.generateAuthUrl({ state, ... }); // Verify in callback"
+      },
+      {
+        "id": "HIGH-014",
+        "category": "Code Quality",
+        "title": "Magic Numbers Without Constants",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "322, 344",
+        "severity": "HIGH",
+        "description": "Magic number '30 * 24 * 60 * 60 * 1000' (30 days in ms) repeated without constant definition.",
+        "impact": "Poor maintainability, inconsistency if changed in one place, unclear intent",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Define constant: const SUBSCRIPTION_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days"
+      }
+    ],
+    "medium": [
+      {
+        "id": "MED-001",
+        "category": "Architecture",
+        "title": "No Service Layer",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All routes",
+        "severity": "MEDIUM",
+        "description": "Business logic embedded directly in route handlers. No service/controller separation.",
+        "impact": "Difficult to test business logic, code duplication, tight coupling",
+        "cwe": "N/A - Architecture",
+        "suggestedFix": "Create services: authService.js (login, validateToken), userService.js (createUser, findUser), settingsService.js (getSettings, updateSettings)"
+      },
+      {
+        "id": "MED-002",
+        "category": "Code Quality",
+        "title": "Duplicate User Data Transformation",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "109-115, 294-299, 354-361, 367-372",
+        "severity": "MEDIUM",
+        "description": "User response mapping duplicated in 4 places with slight variations. No DRY principle.",
+        "impact": "Maintenance burden, potential inconsistencies, more code to test",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Create helper function: function mapUserResponse(user) { return { id: user.id, email: user.email, name: user.name, profilePicture: user.profilePicture }; }"
+      },
+      {
+        "id": "MED-003",
+        "category": "Security",
+        "title": "Subscription Validation Weak",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "308-328",
+        "severity": "MEDIUM",
+        "description": "Subscription update endpoint allows any authenticated user to change their own subscription. No payment verification.",
+        "impact": "Users can upgrade to PRO without payment (if this endpoint exists in production)",
+        "cwe": "CWE-863: Incorrect Authorization",
+        "suggestedFix": "This endpoint should be admin-only OR removed entirely. Real subscription updates should come from payment webhook. Add admin check or remove."
+      },
+      {
+        "id": "MED-004",
+        "category": "Production Readiness",
+        "title": "No Health Check Depth",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "419-421",
+        "severity": "MEDIUM",
+        "description": "Health check only returns static response. Doesn't check database connectivity, external service health, memory usage.",
+        "impact": "Load balancers can't detect actual service health issues",
+        "cwe": "N/A - Production Readiness",
+        "suggestedFix": "Add detailed checks: res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), database: await checkDatabase(), memory: process.memoryUsage() })"
+      },
+      {
+        "id": "MED-005",
+        "category": "Code Quality",
+        "title": "No Request ID Tracking",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All endpoints",
+        "severity": "MEDIUM",
+        "description": "No request ID middleware for tracing requests through logs.",
+        "impact": "Difficult to correlate logs across request lifecycle, hard to debug",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Add middleware: app.use((req, res, next) => { req.id = uuidv4(); res.setHeader('X-Request-ID', req.id); next(); }); // Include req.id in all logs"
+      },
+      {
+        "id": "MED-006",
+        "category": "Security",
+        "title": "Unused Sessions Map",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "47",
+        "severity": "MEDIUM",
+        "description": "sessions Map declared but never used. Dead code or incomplete feature.",
+        "impact": "Code confusion, potential bug if sessions were intended for OAuth state",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Remove if unused: Delete line 47. OR implement OAuth state management using this Map."
+      },
+      {
+        "id": "MED-007",
+        "category": "Code Quality",
+        "title": "Environment Variable Validation Missing",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "15-27, 35-39",
+        "severity": "MEDIUM",
+        "description": "No validation that required environment variables are set. Silent failures if GOOGLE_CLIENT_ID missing.",
+        "impact": "OAuth fails silently, confusing errors, difficult debugging",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Validate on startup:\nconst requiredEnvVars = NODE_ENV === 'production' ? ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'JWT_SECRET'] : [];\nrequiredEnvVars.forEach(v => { if (!process.env[v]) throw new Error(`${v} must be set`); });"
+      },
+      {
+        "id": "MED-008",
+        "category": "Production Readiness",
+        "title": "No Process Monitoring",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All",
+        "severity": "MEDIUM",
+        "description": "No unhandled rejection or uncaught exception handlers. Process crashes on unhandled errors.",
+        "impact": "Server crashes, no error reporting, difficult debugging",
+        "cwe": "CWE-755: Improper Handling of Exceptional Conditions",
+        "suggestedFix": "Add handlers:\nprocess.on('unhandledRejection', (err) => { logger.error('Unhandled rejection', err); });\nprocess.on('uncaughtException', (err) => { logger.error('Uncaught exception', err); process.exit(1); });"
+      },
+      {
+        "id": "MED-009",
+        "category": "Code Quality",
+        "title": "Hardcoded URLs",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "38, 193, 230, 240, 258",
+        "severity": "MEDIUM",
+        "description": "Hardcoded URLs and deep link schemes (anyon://). Not configurable via environment.",
+        "impact": "Difficult to change app scheme, testing issues, environment-specific configuration needed",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Move to config: const APP_SCHEME = process.env.APP_SCHEME || 'anyon'; const deepLink = `${APP_SCHEME}://auth/callback?token=${jwtToken}`;"
+      },
+      {
+        "id": "MED-010",
+        "category": "Security",
+        "title": "Password Field in User Object (Commented Out)",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "N/A - Not present but common mistake",
+        "severity": "MEDIUM",
+        "description": "If password field added later, ensure it's excluded from responses. Current code returns entire user object in places.",
+        "impact": "Potential password leakage if passwords added without response filtering",
+        "cwe": "CWE-200: Exposure of Sensitive Information",
+        "suggestedFix": "Always explicitly select fields: const { password, ...userResponse } = user; OR use DTO pattern"
+      },
+      {
+        "id": "MED-011",
+        "category": "Code Quality",
+        "title": "No API Versioning",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All routes",
+        "severity": "MEDIUM",
+        "description": "No API versioning in routes. Breaking changes will affect all clients.",
+        "impact": "Can't deprecate endpoints gracefully, breaking changes affect all users",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Add version prefix: /api/v1/settings, /api/v1/auth. Use express.Router() for version separation."
+      },
+      {
+        "id": "MED-012",
+        "category": "Production Readiness",
+        "title": "No Request Timeout",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "29, 424",
+        "severity": "MEDIUM",
+        "description": "No request timeout configured. Long-running requests can hang indefinitely.",
+        "impact": "Resource exhaustion, hanging connections, memory leaks",
+        "cwe": "CWE-400: Uncontrolled Resource Consumption",
+        "suggestedFix": "Add timeout middleware: import timeout from 'connect-timeout'; app.use(timeout('30s')); app.use((req, res, next) => { if (!req.timedout) next(); });"
+      },
+      {
+        "id": "MED-013",
+        "category": "Code Quality",
+        "title": "Overly Permissive PATCH Endpoint",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "396-405",
+        "severity": "MEDIUM",
+        "description": "PATCH /api/settings/:key accepts any key and value without schema validation.",
+        "impact": "Storage bloat, type confusion, potential injection if values rendered client-side",
+        "cwe": "CWE-20: Improper Input Validation",
+        "suggestedFix": "Define schema: const settingsSchema = { theme: (v) => ['light', 'dark'].includes(v), language: (v) => typeof v === 'string' && v.length <= 10 }; if (!settingsSchema[key]?.(value)) return res.status(400).json(...);"
+      },
+      {
+        "id": "MED-014",
+        "category": "Security",
+        "title": "Deep Link Injection Risk",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "193, 230, 240, 258",
+        "severity": "MEDIUM",
+        "description": "JWT token embedded in deep link without encoding. If token contains special characters, could break URL.",
+        "impact": "Auth failures, potential XSS if rendered in certain contexts",
+        "cwe": "CWE-116: Improper Encoding or Escaping of Output",
+        "suggestedFix": "URL encode token: const deepLink = `anyon://auth/callback?token=${encodeURIComponent(jwtToken)}`;"
+      },
+      {
+        "id": "MED-015",
+        "category": "Production Readiness",
+        "title": "No Metrics/Monitoring Endpoints",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All",
+        "severity": "MEDIUM",
+        "description": "No Prometheus metrics, performance monitoring, or observability hooks.",
+        "impact": "Can't monitor performance, detect issues, or track SLAs",
+        "cwe": "N/A - Production Readiness",
+        "suggestedFix": "Add prom-client: import promClient from 'prom-client'; app.get('/metrics', (req, res) => { res.set('Content-Type', promClient.register.contentType); res.end(promClient.register.metrics()); });"
+      }
+    ],
+    "low": [
+      {
+        "id": "LOW-001",
+        "category": "Code Quality",
+        "title": "Unused Import Warning",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "7",
+        "severity": "LOW",
+        "description": "path import used only for environment variable loading. Could be simplified.",
+        "impact": "Minor code bloat",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Keep as is (needed for __dirname) or simplify env loading logic"
+      },
+      {
+        "id": "LOW-002",
+        "category": "Code Quality",
+        "title": "Inconsistent String Quotes",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "Various",
+        "severity": "LOW",
+        "description": "Mix of single and double quotes. Should use consistent style (ESLint would catch).",
+        "impact": "Minor style inconsistency",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Run Prettier or ESLint with consistent quote rule"
+      },
+      {
+        "id": "LOW-003",
+        "category": "Code Quality",
+        "title": "No ESLint/Prettier Configuration",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/package.json",
+        "lines": "All",
+        "severity": "LOW",
+        "description": "No linting or formatting configuration in package.json.",
+        "impact": "Inconsistent code style, potential bugs not caught",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Add: \"devDependencies\": { \"eslint\": \"^8.x\", \"prettier\": \"^3.x\" } and config files"
+      },
+      {
+        "id": "LOW-004",
+        "category": "Code Quality",
+        "title": "Console Logs with Emojis",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "91, 182, 184, 287, 425",
+        "severity": "LOW",
+        "description": "Console logs use emojis which may not render correctly in all terminals/log systems.",
+        "impact": "Garbled logs in some environments",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Use plain text or structured logging: logger.info('Dev login: Creating mock user')"
+      },
+      {
+        "id": "LOW-005",
+        "category": "Documentation",
+        "title": "Missing JSDoc Comments",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "All functions",
+        "severity": "LOW",
+        "description": "No JSDoc comments on functions. Reduces code discoverability and IDE autocomplete.",
+        "impact": "Poor developer experience, harder onboarding",
+        "cwe": "N/A - Documentation",
+        "suggestedFix": "Add JSDoc: /** @param {string} userId @returns {string} JWT token */ function generateToken(userId) { ... }"
+      },
+      {
+        "id": "LOW-006",
+        "category": "Code Quality",
+        "title": "Unused Variable devMode",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "135",
+        "severity": "LOW",
+        "description": "Response includes devMode: false but comment says 'Always false'. Dead code or confusing naming.",
+        "impact": "Code confusion, potential bugs",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Remove devMode from response OR implement actual dev mode toggle"
+      },
+      {
+        "id": "LOW-007",
+        "category": "Production Readiness",
+        "title": "No .env.example File",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/",
+        "lines": "N/A",
+        "severity": "LOW",
+        "description": "No .env.example file to document required environment variables.",
+        "impact": "Difficult onboarding, setup confusion",
+        "cwe": "N/A - Documentation",
+        "suggestedFix": "Create .env.example with: PORT=4000\\nJWT_SECRET=your-secret-here\\nGOOGLE_CLIENT_ID=...\\nGOOGLE_CLIENT_SECRET=...\\nOAUTH_REDIRECT_URI=..."
+      },
+      {
+        "id": "LOW-008",
+        "category": "Code Quality",
+        "title": "Multiple .env Path Attempts",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/index.js",
+        "lines": "15-27",
+        "severity": "LOW",
+        "description": "Tries 3 different .env paths in loop. Overly complex for typical use case.",
+        "impact": "Minor complexity, harder to debug which .env is loaded",
+        "cwe": "N/A - Code Quality",
+        "suggestedFix": "Simplify to one path with clear error: dotenv.config({ path: path.join(__dirname, '../.env') }); OR use dotenv-expand for multi-env support"
+      },
+      {
+        "id": "LOW-009",
+        "category": "Testing",
+        "title": "No Test Suite",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/package.json",
+        "lines": "All",
+        "severity": "LOW",
+        "description": "No test scripts, frameworks, or test files. Zero test coverage.",
+        "impact": "Regression risks, difficult refactoring, bugs in production",
+        "cwe": "N/A - Testing",
+        "suggestedFix": "Add Jest or Mocha: \"scripts\": { \"test\": \"jest\" }, \"devDependencies\": { \"jest\": \"^29.x\", \"supertest\": \"^6.x\" }. Create tests/ directory."
+      },
+      {
+        "id": "LOW-010",
+        "category": "Dependencies",
+        "title": "Outdated Dependencies",
+        "file": "/Users/cosmos/Documents/1/anyon-claude/server/package.json",
+        "lines": "11-18",
+        "severity": "LOW",
+        "description": "Express 4.x (latest 5.x), uuid 9.x (latest 13.x). Missing security patches and features.",
+        "impact": "Potential security vulnerabilities, missing features",
+        "cwe": "CWE-1104: Use of Unmaintained Third Party Components",
+        "suggestedFix": "Run npm update. Review breaking changes for Express 5 and uuid 13 before upgrading."
+      }
+    ]
+  },
+  "recommendations": {
+    "immediate": [
+      "Fix CRITICAL security issues: JWT secret validation, CORS configuration, rate limiting",
+      "Remove or guard development endpoints with NODE_ENV checks",
+      "Add Helmet for security headers",
+      "Implement request body size limits",
+      "Add global error handling middleware"
+    ],
+    "shortTerm": [
+      "Refactor into modular structure (routes/, controllers/, middleware/, services/)",
+      "Replace in-memory storage with database (PostgreSQL recommended)",
+      "Add OAuth state parameter for CSRF protection",
+      "Implement structured logging (winston/pino)",
+      "Add graceful shutdown handling",
+      "Create comprehensive test suite"
+    ],
+    "longTerm": [
+      "Implement refresh token pattern for better security",
+      "Add comprehensive input validation (consider joi/zod)",
+      "Set up monitoring and metrics (Prometheus)",
+      "Implement API versioning",
+      "Add CI/CD with automated security scanning",
+      "Document API with OpenAPI/Swagger",
+      "Set up HTTPS with certificates for production"
+    ]
+  },
+  "securityScore": {
+    "overall": "2.5/10",
+    "breakdown": {
+      "authentication": "3/10 - JWT weak, no revocation, long expiry",
+      "authorization": "4/10 - Basic auth middleware but dev endpoints unprotected",
+      "dataProtection": "2/10 - No encryption, in-memory storage, no HTTPS",
+      "inputValidation": "2/10 - Minimal validation, no sanitization",
+      "errorHandling": "3/10 - Basic error responses, some info leakage",
+      "infrastructure": "2/10 - No rate limiting, no security headers, wide CORS"
+    }
+  },
+  "codeQualityScore": {
+    "overall": "4/10",
+    "breakdown": {
+      "maintainability": "3/10 - Monolithic file, poor separation of concerns",
+      "testability": "2/10 - No tests, tightly coupled code",
+      "readability": "5/10 - Clear naming but too much in one file",
+      "reusability": "3/10 - Duplicate code, no service layer",
+      "documentation": "4/10 - Some comments, README exists, no JSDoc"
+    }
+  },
+  "productionReadinessScore": {
+    "overall": "2/10",
+    "breakdown": {
+      "scalability": "1/10 - In-memory storage, no horizontal scaling",
+      "reliability": "2/10 - No graceful shutdown, crashes on errors",
+      "observability": "2/10 - Console logging only, no metrics",
+      "performance": "3/10 - Linear user searches, no caching",
+      "deployment": "3/10 - Simple deployment but missing health checks"
+    }
+  }
+}
