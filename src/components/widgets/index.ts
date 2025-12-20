@@ -1,27 +1,72 @@
-// Re-export all widgets from their individual files
+/**
+ * Widget Components - Organized exports for all tool widgets
+ *
+ * Split widgets are exported from their individual files.
+ * Remaining widgets are re-exported from ToolWidgets.tsx for backward compatibility.
+ *
+ * Usage:
+ *   import { TodoWidget, BashWidget } from '@/components/widgets';
+ */
+
+// ============================================
+// Split widgets (from individual files)
+// ============================================
 export { TodoWidget } from './TodoWidget';
-export { LSWidget } from './LSWidget';
+export { LSWidget, LSResultWidget } from './LSWidget';
 export { BashWidget } from './BashWidget';
 
-// TODO: Add these widgets as they are implemented
-// export { LSResultWidget } from './LSWidget';
-// export { ReadWidget } from './ReadWidget';
-// export { ReadResultWidget } from './ReadResultWidget';
-// export { GlobWidget } from './GlobWidget';
-// export { WriteWidget } from './WriteWidget';
-// export { GrepWidget } from './GrepWidget';
-// export { EditWidget } from './EditWidget';
-// export { EditResultWidget } from './EditResultWidget';
-// export { MCPWidget } from './MCPWidget';
-// export { CommandWidget } from './CommandWidget';
-// export { CommandOutputWidget } from './CommandOutputWidget';
-// export { SummaryWidget } from './SummaryWidget';
-// export { MultiEditWidget } from './MultiEditWidget';
-// export { MultiEditResultWidget } from './MultiEditResultWidget';
-// export { SystemReminderWidget } from './SystemReminderWidget';
-// export { SystemInitializedWidget } from './SystemInitializedWidget';
-// export { TaskWidget } from './TaskWidget';
-// export { WebSearchWidget } from './WebSearchWidget';
-// export { ThinkingWidget } from './ThinkingWidget';
-// export { WebFetchWidget } from './WebFetchWidget';
-// export { TodoReadWidget } from './TodoReadWidget';
+// ============================================
+// Shared utilities
+// ============================================
+export { getLanguage, getDomain, getFileIconColor } from './shared/utils';
+
+// ============================================
+// Remaining widgets (from ToolWidgets.tsx)
+// These will be gradually migrated to individual files
+// ============================================
+export {
+  // Core wrapper
+  CollapsibleToolWidget,
+
+  // File operation widgets
+  ReadWidget,
+  ReadResultWidget,
+  GlobWidget,
+  WriteWidget,
+
+  // Edit widgets
+  EditWidget,
+  EditResultWidget,
+  MultiEditWidget,
+  MultiEditResultWidget,
+
+  // Search widgets
+  GrepWidget,
+
+  // Terminal widgets
+  CommandWidget,
+  CommandOutputWidget,
+
+  // Web widgets
+  WebSearchWidget,
+  WebFetchWidget,
+  ThinkingWidget,
+
+  // System widgets
+  SystemReminderWidget,
+  SystemInitializedWidget,
+  TaskWidget,
+  BackgroundAgentsPanel,
+
+  // Session widgets
+  SkillPromptWidget,
+  SessionInfoWidget,
+  UsageStatsWidget,
+
+  // MCP widgets
+  MCPWidget,
+  SummaryWidget,
+
+  // Todo widgets (extended version)
+  TodoReadWidget,
+} from '../ToolWidgets';

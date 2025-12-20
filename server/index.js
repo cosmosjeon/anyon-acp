@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
+import rateLimit from 'express-rate-limit';
 import { createUser } from './models/userFactory.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,6 +65,27 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Rate limiting - prevent brute force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // stricter limit for sensitive endpoints
+  message: { error: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to auth routes
+app.use('/auth', authLimiter);
+app.use('/dev', strictLimiter);
 
 // Mock database (in-memory for development)
 const users = new Map();
