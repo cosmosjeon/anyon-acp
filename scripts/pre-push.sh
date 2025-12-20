@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Pre-push hook for Claude Code audit
-# 변경된 파일만 분석하고, 비개발자도 이해할 수 있는 설명 제공
-# 터미널: 인터랙티브 수정 / GUI: 명령어 안내
+# Pre-push hook for Claude Code
+# [1단계] 코드 품질 검사 - Critical 이슈 발견 시 push 차단
+# [2단계] 문서 동기화 - 변경된 코드 관련 sdd-docs/specs 업데이트
+#
+# 환경변수:
+#   SKIP_AUDIT=1  - 코드 검사 스킵
+#   SKIP_SYNC=1   - 문서 동기화만 스킵
 
 set -e
 
@@ -72,7 +76,55 @@ fi
 if [ "$PASS" = "true" ]; then
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "✅ 검사 통과! push를 진행합니다."
+    echo "✅ 코드 검사 통과!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # [2단계] 문서 동기화
+    if [ "$SKIP_SYNC" = "1" ]; then
+        echo ""
+        echo "⏭️ 문서 동기화 스킵 (SKIP_SYNC=1)"
+    else
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 문서 동기화 중..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        # 변경 영역 → 문서 매핑 프롬프트
+        SYNC_PROMPT="변경된 파일들을 분석하고 관련 문서를 업데이트하세요:
+
+변경 파일:
+$CHANGED_FILES
+
+문서 매핑 규칙:
+- src/components/ 변경 → sdd-docs/specs/component-inventory.md 업데이트
+- src/hooks/, src/stores/ 변경 → sdd-docs/specs/architecture-frontend.md 업데이트
+- src-tauri/ 변경 → sdd-docs/specs/architecture-desktop.md 업데이트
+- server/ 변경 → sdd-docs/specs/architecture-server.md 업데이트
+- 타입 변경 → sdd-docs/specs/data-models.md 업데이트
+
+작업:
+1. 변경 영역 파악
+2. 해당 문서만 업데이트 (새 컴포넌트/함수 추가, 삭제된 항목 제거)
+3. 업데이트한 파일 목록 출력
+
+마지막 줄에 반드시: SYNC_DONE"
+
+        SYNC_OUTPUT=$(claude -p "$SYNC_PROMPT" 2>&1)
+        echo "$SYNC_OUTPUT"
+
+        # 변경된 문서 스테이징
+        if git diff --name-only sdd-docs/specs/ | grep -q .; then
+            echo ""
+            echo "📄 변경된 문서를 커밋에 추가합니다..."
+            git add sdd-docs/specs/
+            git commit --amend --no-edit
+            echo "✅ 문서 업데이트 완료!"
+        fi
+    fi
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "✅ push를 진행합니다."
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     exit 0
 fi
