@@ -805,78 +805,97 @@ fn create_agent_system_command(
     cmd
 }
 
-/// Spawn agent using system binary command
-async fn spawn_agent_system(
-    app: AppHandle,
-    run_id: i64,
-    agent_id: i64,
-    agent_name: String,
-    claude_path: String,
+/// Shared state for process IO handling
+struct ProcessIoState {
+    session_id: std::sync::Arc<Mutex<String>>,
+    live_output: std::sync::Arc<Mutex<String>>,
+    first_output: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    first_error: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    start_time: std::time::Instant,
+}
+
+impl ProcessIoState {
+    fn new() -> Self {
+        Self {
+            session_id: std::sync::Arc::new(Mutex::new(String::new())),
+            live_output: std::sync::Arc::new(Mutex::new(String::new())),
+            first_output: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            first_error: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            start_time: std::time::Instant::now(),
+        }
+    }
+}
+
+/// Creates and spawns the Claude process, returning PID and IO handles
+async fn create_and_spawn_process(
+    claude_path: &str,
     args: Vec<String>,
-    project_path: String,
-    task: String,
-    execution_model: String,
-    db: State<'_, AgentDb>,
-    registry: State<'_, crate::process::ProcessRegistryState>,
-) -> Result<i64, String> {
+    project_path: &str,
+    run_id: i64,
+    db: &State<'_, AgentDb>,
+) -> Result<(tokio::process::Child, u32, std::path::PathBuf), String> {
     // Build the command
-    let mut cmd = create_agent_system_command(&claude_path, args, &project_path);
+    let mut cmd = create_agent_system_command(claude_path, args, project_path);
 
     // Spawn the process
     info!("🚀 Spawning Claude system process...");
-    let mut child = cmd.spawn().map_err(|e| {
+    let child = cmd.spawn().map_err(|e| {
         error!("❌ Failed to spawn Claude process: {}", e);
         format!("Failed to spawn Claude: {}", e)
     })?;
 
     info!("🔌 Using Stdio::null() for stdin - no input expected");
 
-    // Get the PID and register the process
+    // Get the PID
     let pid = child.id().unwrap_or(0);
     let now = chrono::Utc::now().to_rfc3339();
     info!("✅ Claude process spawned successfully with PID: {}", pid);
 
     // Update the database with PID and status
-    {
+    let db_path = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.execute(
             "UPDATE agent_runs SET status = 'running', pid = ?1, process_started_at = ?2 WHERE id = ?3",
             params![pid as i64, now, run_id],
         ).map_err(|e| e.to_string())?;
         info!("📝 Updated database with running status and PID");
-    }
 
-    // Get stdout and stderr
+        // Get db_path before dropping conn
+        let path_str = conn.path().ok_or("Failed to get database path")?;
+        std::path::PathBuf::from(path_str)
+    };
+
+    Ok((child, pid, db_path))
+}
+
+/// Sets up stdout and stderr IO handlers
+fn setup_io_handlers(
+    child: &mut tokio::process::Child,
+) -> Result<(TokioBufReader<tokio::process::ChildStdout>, TokioBufReader<tokio::process::ChildStderr>), String> {
     let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
     info!("📡 Set up stdout/stderr readers");
 
-    // Create readers
     let stdout_reader = TokioBufReader::new(stdout);
     let stderr_reader = TokioBufReader::new(stderr);
 
-    // Create variables we need for the spawned tasks
-    let app_dir = app
-        .path()
-        .app_data_dir()
-        .expect("Failed to get app data dir");
-    let db_path = app_dir.join("agents.db");
+    Ok((stdout_reader, stderr_reader))
+}
 
-    // Shared state for collecting session ID and live output
-    let session_id = std::sync::Arc::new(Mutex::new(String::new()));
-    let live_output = std::sync::Arc::new(Mutex::new(String::new()));
-    let start_time = std::time::Instant::now();
+/// Spawns the stdout reading task
+fn spawn_stdout_reader(
+    stdout_reader: TokioBufReader<tokio::process::ChildStdout>,
+    app: AppHandle,
+    run_id: i64,
+    db_path: std::path::PathBuf,
+    io_state: &ProcessIoState,
+    registry: std::sync::Arc<crate::process::ProcessRegistry>,
+) -> tokio::task::JoinHandle<()> {
+    let session_id_clone = io_state.session_id.clone();
+    let live_output_clone = io_state.live_output.clone();
+    let first_output_clone = io_state.first_output.clone();
 
-    // Spawn tasks to read stdout and stderr
-    let app_handle = app.clone();
-    let session_id_clone = session_id.clone();
-    let live_output_clone = live_output.clone();
-    let registry_clone = registry.0.clone();
-    let first_output = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let first_output_clone = first_output.clone();
-    let db_path_for_stdout = db_path.clone(); // Clone the db_path for the stdout task
-
-    let stdout_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         info!("📖 Starting to read Claude stdout...");
         let mut lines = stdout_reader.lines();
         let mut line_count = 0;
@@ -906,7 +925,7 @@ async fn spawn_agent_system(
             }
 
             // Also store in process registry for cross-session access
-            let _ = registry_clone.append_live_output(run_id, &line);
+            let _ = registry.append_live_output(run_id, &line);
 
             // Extract session ID from JSONL output
             if let Ok(json) = serde_json::from_str::<JsonValue>(&line) {
@@ -921,7 +940,7 @@ async fn spawn_agent_system(
                                 info!("🔑 Extracted session ID: {}", sid);
 
                                 // Update database immediately with session ID
-                                if let Ok(conn) = Connection::open(&db_path_for_stdout) {
+                                if let Ok(conn) = Connection::open(&db_path) {
                                     match conn.execute(
                                         "UPDATE agent_runs SET session_id = ?1 WHERE id = ?2",
                                         params![sid, run_id],
@@ -946,22 +965,28 @@ async fn spawn_agent_system(
             }
 
             // Emit the line to the frontend with run_id for isolation
-            let _ = app_handle.emit(&format!("agent-output:{}", run_id), &line);
+            let _ = app.emit(&format!("agent-output:{}", run_id), &line);
             // Also emit to the generic event for backward compatibility
-            let _ = app_handle.emit("agent-output", &line);
+            let _ = app.emit("agent-output", &line);
         }
 
         info!(
             "📖 Finished reading Claude stdout. Total lines: {}",
             line_count
         );
-    });
+    })
+}
 
-    let app_handle_stderr = app.clone();
-    let first_error = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let first_error_clone = first_error.clone();
+/// Spawns the stderr reading task
+fn spawn_stderr_reader(
+    stderr_reader: TokioBufReader<tokio::process::ChildStderr>,
+    app: AppHandle,
+    run_id: i64,
+    io_state: &ProcessIoState,
+) -> tokio::task::JoinHandle<()> {
+    let first_error_clone = io_state.first_error.clone();
 
-    let stderr_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         info!("📖 Starting to read Claude stderr...");
         let mut lines = stderr_reader.lines();
         let mut error_count = 0;
@@ -977,9 +1002,9 @@ async fn spawn_agent_system(
 
             error!("stderr[{}]: {}", error_count, line);
             // Emit error lines to the frontend with run_id for isolation
-            let _ = app_handle_stderr.emit(&format!("agent-error:{}", run_id), &line);
+            let _ = app.emit(&format!("agent-error:{}", run_id), &line);
             // Also emit to the generic event for backward compatibility
-            let _ = app_handle_stderr.emit("agent-error", &line);
+            let _ = app.emit("agent-error", &line);
         }
 
         if error_count > 0 {
@@ -990,34 +1015,26 @@ async fn spawn_agent_system(
         } else {
             info!("📖 Finished reading Claude stderr. No errors.");
         }
-    });
+    })
+}
 
-    // Register the process in the registry for live output tracking (after stdout/stderr setup)
-    registry
-        .0
-        .register_process(
-            run_id,
-            agent_id,
-            agent_name,
-            pid,
-            project_path.clone(),
-            task.clone(),
-            execution_model.clone(),
-            child,
-        )
-        .map_err(|e| format!("Failed to register process: {}", e))?;
-    info!("📋 Registered process in registry");
-
-    let db_path_for_monitor = db_path.clone(); // Clone for the monitor task
-
-    // Monitor process status and wait for completion
+/// Spawns the process monitoring task
+fn spawn_process_monitor(
+    app: AppHandle,
+    run_id: i64,
+    pid: u32,
+    db_path: std::path::PathBuf,
+    io_state: ProcessIoState,
+    stdout_task: tokio::task::JoinHandle<()>,
+    stderr_task: tokio::task::JoinHandle<()>,
+) {
     tokio::spawn(async move {
         info!("🕐 Starting process monitoring...");
 
         // Wait for first output with timeout
         for i in 0..300 {
             // 30 seconds (300 * 100ms)
-            if first_output.load(std::sync::atomic::Ordering::Relaxed) {
+            if io_state.first_output.load(std::sync::atomic::Ordering::Relaxed) {
                 info!(
                     "✅ Output detected after {}ms, continuing normal execution",
                     i * 100
@@ -1060,7 +1077,7 @@ async fn spawn_agent_system(
                 }
 
                 // Update database
-                if let Ok(conn) = Connection::open(&db_path_for_monitor) {
+                if let Ok(conn) = Connection::open(&db_path) {
                     let _ = conn.execute(
                         "UPDATE agent_runs SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?1",
                         params![run_id],
@@ -1080,11 +1097,11 @@ async fn spawn_agent_system(
         let _ = stdout_task.await;
         let _ = stderr_task.await;
 
-        let duration_ms = start_time.elapsed().as_millis() as i64;
+        let duration_ms = io_state.start_time.elapsed().as_millis() as i64;
         info!("⏱️ Process execution took {} ms", duration_ms);
 
         // Get the session ID that was extracted
-        let extracted_session_id = if let Ok(sid) = session_id.lock() {
+        let extracted_session_id = if let Ok(sid) = io_state.session_id.lock() {
             sid.clone()
         } else {
             String::new()
@@ -1094,7 +1111,7 @@ async fn spawn_agent_system(
         info!("✅ Claude process execution monitoring complete");
 
         // Update the run record with session ID and mark as completed - open a new connection
-        if let Ok(conn) = Connection::open(&db_path_for_monitor) {
+        if let Ok(conn) = Connection::open(&db_path) {
             info!(
                 "🔄 Updating database with extracted session ID: {}",
                 extracted_session_id
@@ -1126,6 +1143,81 @@ async fn spawn_agent_system(
         let _ = app.emit("agent-complete", true);
         let _ = app.emit(&format!("agent-complete:{}", run_id), true);
     });
+}
+
+/// Spawn agent using system binary command
+async fn spawn_agent_system(
+    app: AppHandle,
+    run_id: i64,
+    agent_id: i64,
+    agent_name: String,
+    claude_path: String,
+    args: Vec<String>,
+    project_path: String,
+    task: String,
+    execution_model: String,
+    db: State<'_, AgentDb>,
+    registry: State<'_, crate::process::ProcessRegistryState>,
+) -> Result<i64, String> {
+    // Create and spawn the process
+    let (mut child, pid, db_path) = create_and_spawn_process(
+        &claude_path,
+        args,
+        &project_path,
+        run_id,
+        &db,
+    ).await?;
+
+    // Set up IO handlers
+    let (stdout_reader, stderr_reader) = setup_io_handlers(&mut child)?;
+
+    // Create shared IO state
+    let io_state = ProcessIoState::new();
+
+    // Spawn stdout reader task
+    let stdout_task = spawn_stdout_reader(
+        stdout_reader,
+        app.clone(),
+        run_id,
+        db_path.clone(),
+        &io_state,
+        registry.0.clone(),
+    );
+
+    // Spawn stderr reader task
+    let stderr_task = spawn_stderr_reader(
+        stderr_reader,
+        app.clone(),
+        run_id,
+        &io_state,
+    );
+
+    // Register the process in the registry for live output tracking (after stdout/stderr setup)
+    registry
+        .0
+        .register_process(
+            run_id,
+            agent_id,
+            agent_name,
+            pid,
+            project_path.clone(),
+            task.clone(),
+            execution_model.clone(),
+            child,
+        )
+        .map_err(|e| format!("Failed to register process: {}", e))?;
+    info!("📋 Registered process in registry");
+
+    // Spawn process monitor task
+    spawn_process_monitor(
+        app,
+        run_id,
+        pid,
+        db_path,
+        io_state,
+        stdout_task,
+        stderr_task,
+    );
 
     Ok(run_id)
 }

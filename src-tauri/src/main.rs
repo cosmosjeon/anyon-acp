@@ -63,324 +63,353 @@ use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 #[cfg(target_os = "windows")]
 use window_vibrancy::apply_mica;
 
-fn main() {
-    // Initialize logger
+/// Initialize logging system
+fn init_logging() {
     env_logger::init();
+}
 
-    // Set IME environment variables for Linux
-    // This must be done before any GTK initialization
-    #[cfg(target_os = "linux")]
+/// Setup IME (Input Method Editor) for Linux
+#[cfg(target_os = "linux")]
+fn setup_linux_ime() {
+    // Try multiple IME backends for better compatibility
+    // Priority: fcitx5 > fcitx > ibus > xim
+    let ime_module = if std::process::Command::new("which")
+        .arg("fcitx5")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
     {
-        // Try multiple IME backends for better compatibility
-        // Priority: fcitx5 > fcitx > ibus > xim
-        let ime_module = if std::process::Command::new("which")
-            .arg("fcitx5")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            "fcitx5"
-        } else if std::process::Command::new("which")
-            .arg("fcitx")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            "fcitx"
-        } else if std::process::Command::new("which")
-            .arg("ibus")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            "ibus"
-        } else {
-            "xim" // fallback to X Input Method
-        };
+        "fcitx5"
+    } else if std::process::Command::new("which")
+        .arg("fcitx")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        "fcitx"
+    } else if std::process::Command::new("which")
+        .arg("ibus")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        "ibus"
+    } else {
+        "xim" // fallback to X Input Method
+    };
 
-        log::info!("Using IME module: {}", ime_module);
+    log::info!("Using IME module: {}", ime_module);
 
-        std::env::set_var("GTK_IM_MODULE", ime_module);
-        std::env::set_var("QT_IM_MODULE", ime_module);
-        std::env::set_var("XMODIFIERS", format!("@im={}", ime_module));
+    std::env::set_var("GTK_IM_MODULE", ime_module);
+    std::env::set_var("QT_IM_MODULE", ime_module);
+    std::env::set_var("XMODIFIERS", format!("@im={}", ime_module));
 
-        if ime_module == "ibus" {
-            std::env::set_var("IBUS_ENABLE_SYNC_MODE", "1");
-            std::env::set_var("IBUS_USE_PORTAL", "0");
-        }
-
-        std::env::set_var("GDK_BACKEND", "x11");
-        log::info!("IME environment variables set for Linux with {}", ime_module);
+    if ime_module == "ibus" {
+        std::env::set_var("IBUS_ENABLE_SYNC_MODE", "1");
+        std::env::set_var("IBUS_USE_PORTAL", "0");
     }
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            eprintln!("🔄 [SINGLE-INSTANCE] Triggered with args: {:?}", args);
-            log::info!("🔄 Single instance triggered with args: {:?}", args);
+    std::env::set_var("GDK_BACKEND", "x11");
+    log::info!("IME environment variables set for Linux with {}", ime_module);
+}
 
-            // Forward Deep Link URLs to existing instance
-            for arg in args {
-                if arg.starts_with("anyon://") {
-                    eprintln!("📥 [SINGLE-INSTANCE] Received deep link: {}", arg);
-                    log::info!("📥 Received deep link via single-instance: {}", arg);
+#[cfg(not(target_os = "linux"))]
+fn setup_linux_ime() {
+    // No-op on non-Linux platforms
+}
 
-                    // Emit the deep link event to the frontend
-                    let urls = vec![arg.clone()];
-                    if let Err(e) = app.emit("plugin:deep-link://urls", urls) {
-                        eprintln!("❌ [SINGLE-INSTANCE] Failed to emit deep link event: {}", e);
-                        log::error!("Failed to emit deep link event: {}", e);
-                    } else {
-                        eprintln!("✅ [SINGLE-INSTANCE] Emitted deep link event successfully");
-                        log::info!("✅ Emitted deep link event successfully");
-                    }
+/// Initialize Tauri plugins
+fn init_tauri_plugins() -> impl Fn(tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+    |builder| {
+        builder
+            .plugin(tauri_plugin_dialog::init())
+            .plugin(tauri_plugin_shell::init())
+            .plugin(tauri_plugin_http::init())
+            .plugin(tauri_plugin_deep_link::init())
+            .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+                eprintln!("🔄 [SINGLE-INSTANCE] Triggered with args: {:?}", args);
+                log::info!("🔄 Single instance triggered with args: {:?}", args);
 
-                    // Focus the main window
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.set_focus();
-                        let _ = window.unminimize();
-                    }
-                }
-            }
-        }))
-        .setup(|app| {
-            use tauri_plugin_deep_link::DeepLinkExt;
+                // Forward Deep Link URLs to existing instance
+                for arg in args {
+                    if arg.starts_with("anyon://") {
+                        eprintln!("📥 [SINGLE-INSTANCE] Received deep link: {}", arg);
+                        log::info!("📥 Received deep link via single-instance: {}", arg);
 
-            // Deep Link runtime registration - ALWAYS attempt for debugging
-            eprintln!("🔧 [SETUP] Starting Deep Link registration...");
-            log::info!("🔧 [SETUP] Starting Deep Link registration...");
-
-            match app.deep_link().register_all() {
-                Ok(_) => {
-                    eprintln!("✅ [SETUP] Deep link protocols registered successfully");
-                    log::info!("✅ Deep link protocols registered successfully");
-                },
-                Err(e) => {
-                    eprintln!("⚠️ [SETUP] Failed to register deep link protocols: {}", e);
-                    log::warn!("⚠️ Failed to register deep link protocols: {}", e);
-                }
-            }
-
-            // Initialize agents database
-            let conn = init_database(&app.handle()).expect("Failed to initialize agents database");
-
-            // Load and apply proxy settings from the database
-            {
-                let db = AgentDb(Mutex::new(conn));
-                let proxy_settings = match db.0.lock() {
-                    Ok(conn) => {
-                        // Directly query proxy settings from the database
-                        let mut settings = commands::proxy::ProxySettings::default();
-
-                        let keys = vec![
-                            ("proxy_enabled", "enabled"),
-                            ("proxy_http", "http_proxy"),
-                            ("proxy_https", "https_proxy"),
-                            ("proxy_no", "no_proxy"),
-                            ("proxy_all", "all_proxy"),
-                        ];
-
-                        for (db_key, field) in keys {
-                            if let Ok(value) = conn.query_row(
-                                "SELECT value FROM app_settings WHERE key = ?1",
-                                rusqlite::params![db_key],
-                                |row| row.get::<_, String>(0),
-                            ) {
-                                match field {
-                                    "enabled" => settings.enabled = value == "true",
-                                    "http_proxy" => {
-                                        settings.http_proxy = Some(value).filter(|s| !s.is_empty())
-                                    }
-                                    "https_proxy" => {
-                                        settings.https_proxy = Some(value).filter(|s| !s.is_empty())
-                                    }
-                                    "no_proxy" => {
-                                        settings.no_proxy = Some(value).filter(|s| !s.is_empty())
-                                    }
-                                    "all_proxy" => {
-                                        settings.all_proxy = Some(value).filter(|s| !s.is_empty())
-                                    }
-                                    _ => {}
-                                }
-                            }
+                        // Emit the deep link event to the frontend
+                        let urls = vec![arg.clone()];
+                        if let Err(e) = app.emit("plugin:deep-link://urls", urls) {
+                            eprintln!("❌ [SINGLE-INSTANCE] Failed to emit deep link event: {}", e);
+                            log::error!("Failed to emit deep link event: {}", e);
+                        } else {
+                            eprintln!("✅ [SINGLE-INSTANCE] Emitted deep link event successfully");
+                            log::info!("✅ Emitted deep link event successfully");
                         }
 
-                        log::info!("Loaded proxy settings: enabled={}", settings.enabled);
-                        settings
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to lock database for proxy settings: {}", e);
-                        commands::proxy::ProxySettings::default()
-                    }
-                };
-
-                // Apply the proxy settings
-                apply_proxy_settings(&proxy_settings);
-            }
-
-            // Re-open the connection for the app to manage
-            let conn = init_database(&app.handle()).expect("Failed to initialize agents database");
-
-            // Initialize dev_workflow table
-            commands::dev_workflow::init_dev_workflow_db(&conn)
-                .expect("Failed to initialize dev_workflow database");
-
-            app.manage(AgentDb(Mutex::new(conn)));
-
-            // Initialize checkpoint state
-            let checkpoint_state = CheckpointState::new();
-
-            // Set the Claude directory path
-            if let Ok(claude_dir) = dirs::home_dir()
-                .ok_or_else(|| "Could not find home directory")
-                .and_then(|home| {
-                    let claude_path = home.join(".claude");
-                    claude_path
-                        .canonicalize()
-                        .map_err(|_| "Could not find ~/.claude directory")
-                })
-            {
-                let state_clone = checkpoint_state.clone();
-                tauri::async_runtime::spawn(async move {
-                    state_clone.set_claude_dir(claude_dir).await;
-                });
-            }
-
-            app.manage(checkpoint_state);
-
-            // Initialize process registry
-            app.manage(ProcessRegistryState::default());
-
-            // Initialize Claude process state
-            app.manage(ClaudeProcessState::default());
-
-            // Start auth server in background
-            let jwt_secret = match std::env::var("JWT_SECRET") {
-                Ok(secret) => secret,
-                Err(_) => {
-                    if std::env::var("NODE_ENV").unwrap_or_default() == "production" {
-                        panic!("JWT_SECRET must be set in production environment");
-                    }
-                    eprintln!("⚠️ WARNING: Using development JWT secret. Do NOT use in production!");
-                    "dev-secret-key-UNSAFE-DO-NOT-USE-IN-PRODUCTION".to_string()
-                }
-            };
-            let node_env = std::env::var("NODE_ENV")
-                .unwrap_or_else(|_| "development".to_string());
-
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = auth_server::start_auth_server(4000, jwt_secret, node_env).await {
-                    log::error!("Failed to start auth server: {}", e);
-                }
-            });
-
-            // Apply window vibrancy with rounded corners on macOS
-            #[cfg(target_os = "macos")]
-            {
-                let window = app.get_webview_window("main").unwrap();
-
-                // Try different vibrancy materials that support rounded corners
-                let materials = [
-                    NSVisualEffectMaterial::UnderWindowBackground,
-                    NSVisualEffectMaterial::WindowBackground,
-                    NSVisualEffectMaterial::Popover,
-                    NSVisualEffectMaterial::Menu,
-                    NSVisualEffectMaterial::Sidebar,
-                ];
-
-                let mut applied = false;
-                for material in materials.iter() {
-                    if apply_vibrancy(&window, *material, None, Some(12.0)).is_ok() {
-                        applied = true;
-                        break;
+                        // Focus the main window
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.set_focus();
+                            let _ = window.unminimize();
+                        }
                     }
                 }
+            }))
+    }
+}
 
-                if !applied {
-                    // Fallback without rounded corners
-                    apply_vibrancy(
-                        &window,
-                        NSVisualEffectMaterial::WindowBackground,
-                        None,
-                        None,
-                    )
-                    .expect("Failed to apply any window vibrancy");
-                }
+/// Setup deep link registration
+fn setup_deep_links(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri_plugin_deep_link::DeepLinkExt;
+
+    eprintln!("🔧 [SETUP] Starting Deep Link registration...");
+    log::info!("🔧 [SETUP] Starting Deep Link registration...");
+
+    match app.deep_link().register_all() {
+        Ok(_) => {
+            eprintln!("✅ [SETUP] Deep link protocols registered successfully");
+            log::info!("✅ Deep link protocols registered successfully");
+        }
+        Err(e) => {
+            eprintln!("⚠️ [SETUP] Failed to register deep link protocols: {}", e);
+            log::warn!("⚠️ Failed to register deep link protocols: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// Load proxy settings from database
+fn load_proxy_settings_from_db(
+    conn: &rusqlite::Connection,
+) -> commands::proxy::ProxySettings {
+    let mut settings = commands::proxy::ProxySettings::default();
+
+    let keys = vec![
+        ("proxy_enabled", "enabled"),
+        ("proxy_http", "http_proxy"),
+        ("proxy_https", "https_proxy"),
+        ("proxy_no", "no_proxy"),
+        ("proxy_all", "all_proxy"),
+    ];
+
+    for (db_key, field) in keys {
+        if let Ok(value) = conn.query_row(
+            "SELECT value FROM app_settings WHERE key = ?1",
+            rusqlite::params![db_key],
+            |row| row.get::<_, String>(0),
+        ) {
+            match field {
+                "enabled" => settings.enabled = value == "true",
+                "http_proxy" => settings.http_proxy = Some(value).filter(|s| !s.is_empty()),
+                "https_proxy" => settings.https_proxy = Some(value).filter(|s| !s.is_empty()),
+                "no_proxy" => settings.no_proxy = Some(value).filter(|s| !s.is_empty()),
+                "all_proxy" => settings.all_proxy = Some(value).filter(|s| !s.is_empty()),
+                _ => {}
             }
+        }
+    }
 
-            // Apply Mica effect on Windows 11 (fails silently on older versions)
-            #[cfg(target_os = "windows")]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    // Apply Mica effect - this only works on Windows 11
-                    // On Windows 10 or older, this will fail silently
-                    let _ = apply_mica(&window, None);
-                }
-            }
+    log::info!("Loaded proxy settings: enabled={}", settings.enabled);
+    settings
+}
 
-            Ok(())
+/// Setup proxy settings from database
+fn setup_proxy_settings(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let conn = init_database(app)?;
+    let proxy_settings = load_proxy_settings_from_db(&conn);
+    apply_proxy_settings(&proxy_settings);
+    Ok(())
+}
+
+/// Setup database and initialize tables
+fn setup_database(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let conn = init_database(&app.handle())?;
+
+    // Initialize dev_workflow table
+    commands::dev_workflow::init_dev_workflow_db(&conn)?;
+
+    app.manage(AgentDb(Mutex::new(conn)));
+    Ok(())
+}
+
+/// Setup checkpoint system
+fn setup_checkpoint_system(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let checkpoint_state = CheckpointState::new();
+
+    // Set the Claude directory path
+    if let Ok(claude_dir) = dirs::home_dir()
+        .ok_or_else(|| "Could not find home directory")
+        .and_then(|home| {
+            let claude_path = home.join(".claude");
+            claude_path
+                .canonicalize()
+                .map_err(|_| "Could not find ~/.claude directory")
         })
-        .invoke_handler(tauri::generate_handler![
-            // Claude & Project Management
-            list_projects,
-            create_project,
-            get_project_sessions,
-            get_home_directory,
-            get_claude_settings,
-            open_new_session,
-            get_system_prompt,
-            check_claude_version,
-            save_system_prompt,
-            save_claude_settings,
-            find_claude_md_files,
-            read_claude_md_file,
-            save_claude_md_file,
-            load_session_history,
-            execute_claude_code,
-            continue_claude_code,
-            resume_claude_code,
-            cancel_claude_execution,
-            list_running_claude_sessions,
-            get_claude_session_output,
-            list_directory_contents,
-            search_files,
-            read_file_content,
-            check_file_exists,
-            list_anyon_docs,
-            get_recently_modified_files,
-            get_hooks_config,
-            update_hooks_config,
-            validate_hook_command,
-            // Anyon Agents
-            check_anyon_installed,
-            run_npx_anyon_agents,
-            // Git Integration
-            check_is_git_repo,
-            init_git_repo,
-            git_add_all,
-            git_commit,
-            git_set_remote,
-            git_push,
-            git_status,
-            git_current_branch,
-            // Checkpoint Management
-            create_checkpoint,
-            restore_checkpoint,
-            list_checkpoints,
-            fork_from_checkpoint,
-            get_session_timeline,
-            update_checkpoint_settings,
-            get_checkpoint_diff,
-            track_checkpoint_message,
-            track_session_messages,
-            check_auto_checkpoint,
-            cleanup_old_checkpoints,
-            get_checkpoint_settings,
-            clear_checkpoint_manager,
-            get_checkpoint_state_stats,
+    {
+        let state_clone = checkpoint_state.clone();
+        tauri::async_runtime::spawn(async move {
+            state_clone.set_claude_dir(claude_dir).await;
+        });
+    }
+
+    app.manage(checkpoint_state);
+    Ok(())
+}
+
+/// Setup process registries
+fn setup_process_registries(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    app.manage(ProcessRegistryState::default());
+    app.manage(ClaudeProcessState::default());
+    Ok(())
+}
+
+/// Setup auth server
+fn setup_auth_server() -> Result<(), Box<dyn std::error::Error>> {
+    let jwt_secret = match std::env::var("JWT_SECRET") {
+        Ok(secret) => secret,
+        Err(_) => {
+            if std::env::var("NODE_ENV").unwrap_or_default() == "production" {
+                panic!("JWT_SECRET must be set in production environment");
+            }
+            eprintln!("⚠️ WARNING: Using development JWT secret. Do NOT use in production!");
+            "dev-secret-key-UNSAFE-DO-NOT-USE-IN-PRODUCTION".to_string()
+        }
+    };
+    let node_env = std::env::var("NODE_ENV").unwrap_or_else(|_| "development".to_string());
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = auth_server::start_auth_server(4000, jwt_secret, node_env).await {
+            log::error!("Failed to start auth server: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
+/// Setup window effects (vibrancy, mica)
+fn setup_window_effects(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // Apply window vibrancy with rounded corners on macOS
+    #[cfg(target_os = "macos")]
+    {
+        let window = app.get_webview_window("main").unwrap();
+
+        // Try different vibrancy materials that support rounded corners
+        let materials = [
+            NSVisualEffectMaterial::UnderWindowBackground,
+            NSVisualEffectMaterial::WindowBackground,
+            NSVisualEffectMaterial::Popover,
+            NSVisualEffectMaterial::Menu,
+            NSVisualEffectMaterial::Sidebar,
+        ];
+
+        let mut applied = false;
+        for material in materials.iter() {
+            if apply_vibrancy(&window, *material, None, Some(12.0)).is_ok() {
+                applied = true;
+                break;
+            }
+        }
+
+        if !applied {
+            // Fallback without rounded corners
+            apply_vibrancy(
+                &window,
+                NSVisualEffectMaterial::WindowBackground,
+                None,
+                None,
+            )
+            .expect("Failed to apply any window vibrancy");
+        }
+    }
+
+    // Apply Mica effect on Windows 11 (fails silently on older versions)
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            // Apply Mica effect - this only works on Windows 11
+            // On Windows 10 or older, this will fail silently
+            let _ = apply_mica(&window, None);
+        }
+    }
+
+    Ok(())
+}
+
+/// Setup application state and services
+fn setup_application(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    setup_deep_links(app)?;
+    setup_proxy_settings(&app.handle())?;
+    setup_database(app)?;
+    setup_checkpoint_system(app)?;
+    setup_process_registries(app)?;
+    setup_auth_server()?;
+    setup_window_effects(app)?;
+    Ok(())
+}
+
+/// Create command handlers macro expansion
+macro_rules! create_handlers {
+    () => {
+        tauri::generate_handler![
+            // Claude & Project Management - Projects
+            commands::claude::projects::get_home_directory,
+            commands::claude::projects::list_projects,
+            commands::claude::projects::create_project,
+            commands::claude::projects::get_project_sessions,
+            // Claude & Project Management - Sessions
+            commands::claude::sessions::open_new_session,
+            commands::claude::sessions::load_session_history,
+            commands::claude::sessions::get_session_timeline,
+            commands::claude::sessions::track_session_messages,
+            // Claude & Project Management - Execution
+            commands::claude::execution::execute_claude_code,
+            commands::claude::execution::continue_claude_code,
+            commands::claude::execution::resume_claude_code,
+            commands::claude::execution::cancel_claude_execution,
+            commands::claude::execution::list_running_claude_sessions,
+            commands::claude::execution::get_claude_session_output,
+            // Claude & Project Management - Filesystem
+            commands::claude::filesystem::list_directory_contents,
+            commands::claude::filesystem::search_files,
+            commands::claude::filesystem::read_file_content,
+            commands::claude::filesystem::check_file_exists,
+            commands::claude::filesystem::list_anyon_docs,
+            // Claude & Project Management - Checkpoints
+            commands::claude::checkpoints::create_checkpoint,
+            commands::claude::checkpoints::restore_checkpoint,
+            commands::claude::checkpoints::list_checkpoints,
+            commands::claude::checkpoints::fork_from_checkpoint,
+            commands::claude::checkpoints::update_checkpoint_settings,
+            commands::claude::checkpoints::get_checkpoint_diff,
+            commands::claude::checkpoints::track_checkpoint_message,
+            commands::claude::checkpoints::check_auto_checkpoint,
+            commands::claude::checkpoints::cleanup_old_checkpoints,
+            commands::claude::checkpoints::get_checkpoint_settings,
+            commands::claude::checkpoints::clear_checkpoint_manager,
+            commands::claude::checkpoints::get_checkpoint_state_stats,
+            // Claude & Project Management - Settings
+            commands::claude::settings::get_claude_settings,
+            commands::claude::settings::save_claude_settings,
+            commands::claude::settings::get_system_prompt,
+            commands::claude::settings::save_system_prompt,
+            commands::claude::settings::check_claude_version,
+            commands::claude::settings::find_claude_md_files,
+            commands::claude::settings::read_claude_md_file,
+            commands::claude::settings::save_claude_md_file,
+            commands::claude::settings::get_recently_modified_files,
+            commands::claude::settings::get_hooks_config,
+            commands::claude::settings::update_hooks_config,
+            commands::claude::settings::validate_hook_command,
+            commands::claude::settings::check_anyon_installed,
+            commands::claude::settings::run_npx_anyon_agents,
+            commands::claude::settings::check_is_git_repo,
+            commands::claude::settings::init_git_repo,
+            commands::claude::settings::git_add_all,
+            commands::claude::settings::git_commit,
+            commands::claude::settings::git_set_remote,
+            commands::claude::settings::git_push,
+            commands::claude::settings::git_status,
+            commands::claude::settings::git_current_branch,
             // Agent Management
             list_agents,
             create_agent,
@@ -462,7 +491,19 @@ fn main() {
             claude_auth_delete_api_key,
             claude_auth_validate_api_key,
             claude_auth_logout,
-        ])
+        ]
+    };
+}
+
+fn main() {
+    init_logging();
+    setup_linux_ime();
+
+    let plugins = init_tauri_plugins();
+
+    plugins(tauri::Builder::default())
+        .setup(setup_application)
+        .invoke_handler(create_handlers!())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

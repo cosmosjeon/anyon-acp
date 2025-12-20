@@ -1132,9 +1132,11 @@ export const api = {
 
   /**
    * Lists files and directories in a given path
+   * @param directoryPath - The path to list
+   * @param projectRoot - Optional. If provided, validates that directoryPath is within this root (security)
    */
-  async listDirectoryContents(directoryPath: string): Promise<FileEntry[]> {
-    return apiCall("list_directory_contents", { directoryPath });
+  async listDirectoryContents(directoryPath: string, projectRoot?: string): Promise<FileEntry[]> {
+    return apiCall("list_directory_contents", { directoryPath, projectRoot });
   },
 
   /**
