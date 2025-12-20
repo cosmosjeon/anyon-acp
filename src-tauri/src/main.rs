@@ -258,8 +258,16 @@ fn main() {
             app.manage(ClaudeProcessState::default());
 
             // Start auth server in background
-            let jwt_secret = std::env::var("JWT_SECRET")
-                .unwrap_or_else(|_| "dev-secret-key-change-in-production".to_string());
+            let jwt_secret = match std::env::var("JWT_SECRET") {
+                Ok(secret) => secret,
+                Err(_) => {
+                    if std::env::var("NODE_ENV").unwrap_or_default() == "production" {
+                        panic!("JWT_SECRET must be set in production environment");
+                    }
+                    eprintln!("⚠️ WARNING: Using development JWT secret. Do NOT use in production!");
+                    "dev-secret-key-UNSAFE-DO-NOT-USE-IN-PRODUCTION".to_string()
+                }
+            };
             let node_env = std::env::var("NODE_ENV")
                 .unwrap_or_else(|_| "development".to_string());
 

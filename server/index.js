@@ -28,8 +28,18 @@ for (const envPath of envPaths) {
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Secure JWT_SECRET handling with production safety check
+const JWT_SECRET = process.env.JWT_SECRET;
+if (NODE_ENV === 'production' && !JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable must be set in production');
+    process.exit(1);
+}
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || (() => {
+    console.warn('⚠️ WARNING: Using development JWT secret. Do NOT use in production!');
+    return 'dev-secret-key-UNSAFE-DO-NOT-USE-IN-PRODUCTION';
+})();
 
 // Google OAuth Client
 const oauth2Client = new OAuth2Client(
@@ -49,13 +59,13 @@ const userSettings = new Map(); // userId -> settings object
 
 // Helper: Generate JWT token
 function generateToken(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, EFFECTIVE_JWT_SECRET, { expiresIn: '7d' });
 }
 
 // Helper: Verify JWT token
 function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, EFFECTIVE_JWT_SECRET);
   } catch (error) {
     return null;
   }

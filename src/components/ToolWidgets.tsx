@@ -61,6 +61,7 @@ import { createPortal } from "react-dom";
 import * as Diff from 'diff';
 import { Card, CardContent } from "@/components/ui/card";
 import { detectLinks, makeLinksClickable } from "@/lib/linkDetector";
+import { extractResultContent } from "@/lib/extractResultContent";
 import ReactMarkdown from "react-markdown";
 import { open } from "@tauri-apps/plugin-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -180,20 +181,7 @@ export const TodoWidget: React.FC<{ todos: any[]; result?: any }> = ({ todos, re
 export const LSWidget: React.FC<{ path: string; result?: any }> = ({ path, result }) => {
   // If we have a result, show it using the LSResultWidget
   if (result) {
-    let resultContent = '';
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
+    const resultContent = extractResultContent(result);
     
     return (
       <div className="space-y-2">
@@ -403,20 +391,7 @@ export const LSResultWidget: React.FC<{ content: string }> = ({ content }) => {
 export const ReadWidget: React.FC<{ filePath: string; result?: any }> = ({ filePath, result }) => {
   // If we have a result, show it using the ReadResultWidget
   if (result) {
-    let resultContent = '';
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
+    const resultContent = extractResultContent(result);
     
     return (
       <div className="space-y-2">
@@ -626,25 +601,8 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
  */
 export const GlobWidget: React.FC<{ pattern: string; result?: any }> = ({ pattern, result }) => {
   // Extract result content if available
-  let resultContent = '';
-  let isError = false;
-  
-  if (result) {
-    isError = result.is_error || false;
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
-  }
+  const resultContent = extractResultContent(result);
+  const isError = result?.is_error || false;
   
   return (
     <div className="space-y-2">
@@ -686,25 +644,8 @@ export const BashWidget: React.FC<{
   result?: any;
 }> = ({ command, description, result }) => {
   // Extract result content if available
-  let resultContent = '';
-  let isError = false;
-  
-  if (result) {
-    isError = result.is_error || false;
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
-  }
+  const resultContent = extractResultContent(result);
+  const isError = result?.is_error || false;
   
   return (
     <div className="rounded-lg border bg-background overflow-hidden">
@@ -928,27 +869,10 @@ export const GrepWidget: React.FC<{
   result?: any;
 }> = ({ pattern, include, path, exclude, result }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  
+
   // Extract result content if available
-  let resultContent = '';
-  let isError = false;
-  
-  if (result) {
-    isError = result.is_error || false;
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
-  }
+  const resultContent = extractResultContent(result);
+  const isError = result?.is_error || false;
   
   // Parse grep results to extract file paths and matches
   const parseGrepResults = (content: string) => {
@@ -2512,22 +2436,9 @@ export const WebSearchWidget: React.FC<{
   } = { sections: [], noResults: false };
   
   if (result) {
-    let resultContent = '';
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
-    
-    searchResults.noResults = resultContent.toLowerCase().includes('no links found') || 
+    const resultContent = extractResultContent(result);
+
+    searchResults.noResults = resultContent.toLowerCase().includes('no links found') ||
                                resultContent.toLowerCase().includes('no results');
     searchResults.sections = parseSearchResult(resultContent);
   }
@@ -2715,22 +2626,10 @@ export const WebFetchWidget: React.FC<{
   let hasError = false;
   
   if (result) {
-    if (typeof result.content === 'string') {
-      fetchedContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        fetchedContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        fetchedContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        fetchedContent = JSON.stringify(result.content, null, 2);
-      }
-    }
-    
+    fetchedContent = extractResultContent(result);
+
     // Check if there's an error
-    hasError = result.is_error || 
+    hasError = result.is_error ||
                fetchedContent.toLowerCase().includes('error') ||
                fetchedContent.toLowerCase().includes('failed');
   }
