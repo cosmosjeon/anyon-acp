@@ -1,0 +1,68 @@
+{
+  "timestamp": "2025-12-20T18:05:00.000Z",
+  "selectedPriority": "ALL",
+  "summary": {
+    "total": 11,
+    "success": 10,
+    "partial": 1,
+    "failed": 0,
+    "skipped": 9
+  },
+  "areas": {
+    "frontend": {
+      "success": 6,
+      "failed": 0,
+      "verification": "pass",
+      "details": "17 tests passed, any types reduced 129 -> 2"
+    },
+    "desktop": {
+      "success": 1,
+      "failed": 0,
+      "verification": "pass",
+      "details": "cargo check passed, ~116 lines deduplication"
+    },
+    "server": {
+      "success": 3,
+      "partial": 1,
+      "failed": 0,
+      "verification": "pass",
+      "details": "node --check passed, CORS secured, HTML extracted"
+    }
+  },
+  "processedIssues": [
+    { "id": "fe-dead-001", "status": "success", "details": "File already deleted" },
+    { "id": "fe-dead-002", "status": "success", "details": "File already deleted" },
+    { "id": "fe-dead-003", "status": "success", "details": "File already deleted" },
+    { "id": "fe-dead-004", "status": "success", "details": "File already deleted" },
+    { "id": "fe-dup-001", "status": "success", "details": "Utility already exists in extractResultContent.ts" },
+    { "id": "fe-type-001", "status": "success", "details": "Created widgets.ts with 15+ interfaces, reduced any from 129 to 2" },
+    { "id": "desktop-dup-001", "status": "success", "details": "Extracted create_tokio_command_with_env to claude_binary.rs" },
+    { "id": "server-bloater-001", "status": "success", "details": "Extracted OAuth HTML to server/views/oauth-callback.html" },
+    { "id": "server-sec-001", "status": "success", "details": "CORS whitelist applied" },
+    { "id": "server-sec-003", "status": "partial", "details": "Middleware created, requires npm install express-rate-limit" },
+    { "id": "server-dup-001", "status": "success", "details": "Created userFactory.js, replaced 3 duplications" }
+  ],
+  "skippedIssues": [
+    { "id": "fe-bloater-001", "reason": "split_file requires manual workflow" },
+    { "id": "fe-bloater-002", "reason": "refactor_function requires manual work" },
+    { "id": "fe-bloater-003", "reason": "split_file requires manual workflow" },
+    { "id": "desktop-bloater-001", "reason": "refactor_function requires manual work" },
+    { "id": "desktop-bloater-002", "reason": "split_file requires manual workflow" },
+    { "id": "desktop-bloater-003", "reason": "refactor_function requires manual work" },
+    { "id": "server-bloater-002", "reason": "split_file requires manual workflow" },
+    { "id": "server-sec-002", "reason": "refactor_function requires manual work (SQLite migration)" }
+  ],
+  "changedFiles": [
+    "server/index.js",
+    "src-tauri/src/claude_binary.rs",
+    "src-tauri/src/commands/agents.rs",
+    "src-tauri/src/commands/claude.rs",
+    "src/components/ToolWidgets.tsx",
+    "src/lib/extractResultContent.ts",
+    "src/lib/extractResultContent.test.ts",
+    "src/types/widgets.ts",
+    "server/views/oauth-callback.html",
+    "server/models/userFactory.js",
+    "server/middleware/rateLimit.js"
+  ]
+}

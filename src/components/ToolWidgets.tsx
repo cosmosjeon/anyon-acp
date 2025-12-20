@@ -62,6 +62,19 @@ import * as Diff from 'diff';
 import { Card, CardContent } from "@/components/ui/card";
 import { detectLinks, makeLinksClickable } from "@/lib/linkDetector";
 import { extractResultContent } from "@/lib/extractResultContent";
+import type {
+  TodoItem,
+  ToolResult,
+  TodoWidgetProps,
+  FilePathWidgetProps,
+  PatternWidgetProps,
+  ContentWidgetProps,
+  BashWidgetProps,
+  EditWidgetProps,
+  GrepWidgetProps,
+  MCPWidgetProps,
+  MultiEditWidgetProps,
+} from "@/types/widgets";
 import ReactMarkdown from "react-markdown";
 import { open } from "@tauri-apps/plugin-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -121,7 +134,7 @@ export const CollapsibleToolWidget: React.FC<{
 /**
  * Widget for TodoWrite tool - displays a beautiful TODO list
  */
-export const TodoWidget: React.FC<{ todos: any[]; result?: any }> = ({ todos, result: _result }) => {
+export const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, result: _result }) => {
   const statusIcons = {
     completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
     in_progress: <Clock className="h-4 w-4 text-blue-500 animate-pulse" />,
@@ -178,7 +191,7 @@ export const TodoWidget: React.FC<{ todos: any[]; result?: any }> = ({ todos, re
 /**
  * Widget for LS (List Directory) tool
  */
-export const LSWidget: React.FC<{ path: string; result?: any }> = ({ path, result }) => {
+export const LSWidget: React.FC<{ path: string; result?: ToolResult }> = ({ path, result }) => {
   // If we have a result, show it using the LSResultWidget
   if (result) {
     const resultContent = extractResultContent(result);
@@ -388,7 +401,7 @@ export const LSResultWidget: React.FC<{ content: string }> = ({ content }) => {
 /**
  * Widget for Read tool
  */
-export const ReadWidget: React.FC<{ filePath: string; result?: any }> = ({ filePath, result }) => {
+export const ReadWidget: React.FC<FilePathWidgetProps> = ({ filePath, result }) => {
   // If we have a result, show it using the ReadResultWidget
   if (result) {
     const resultContent = extractResultContent(result);
@@ -427,7 +440,7 @@ export const ReadWidget: React.FC<{ filePath: string; result?: any }> = ({ fileP
 /**
  * Widget for Read tool result - shows file content with line numbers
  */
-export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> = ({ content, filePath }) => {
+export const ReadResultWidget: React.FC<ContentWidgetProps> = ({ content, filePath }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { theme } = useTheme();
   const syntaxTheme = getClaudeSyntaxTheme(theme);
@@ -599,7 +612,7 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
 /**
  * Widget for Glob tool
  */
-export const GlobWidget: React.FC<{ pattern: string; result?: any }> = ({ pattern, result }) => {
+export const GlobWidget: React.FC<PatternWidgetProps> = ({ pattern, result }) => {
   // Extract result content if available
   const resultContent = extractResultContent(result);
   const isError = result?.is_error || false;
@@ -638,11 +651,7 @@ export const GlobWidget: React.FC<{ pattern: string; result?: any }> = ({ patter
 /**
  * Widget for Bash tool
  */
-export const BashWidget: React.FC<{ 
-  command: string; 
-  description?: string;
-  result?: any;
-}> = ({ command, description, result }) => {
+export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, result }) => {
   // Extract result content if available
   const resultContent = extractResultContent(result);
   const isError = result?.is_error || false;
@@ -690,7 +699,7 @@ export const BashWidget: React.FC<{
 /**
  * Widget for Write tool
  */
-export const WriteWidget: React.FC<{ filePath: string; content: string; result?: any }> = ({ filePath, content, result: _result }) => {
+export const WriteWidget: React.FC<{ filePath: string; content: string; result?: ToolResult }> = ({ filePath, content, result: _result }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const { theme } = useTheme();
   const syntaxTheme = getClaudeSyntaxTheme(theme);
@@ -861,13 +870,7 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
 /**
  * Widget for Grep tool
  */
-export const GrepWidget: React.FC<{ 
-  pattern: string; 
-  include?: string; 
-  path?: string;
-  exclude?: string;
-  result?: any;
-}> = ({ pattern, include, path, exclude, result }) => {
+export const GrepWidget: React.FC<GrepWidgetProps> = ({ pattern, include, path, exclude, result }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Extract result content if available
@@ -1097,12 +1100,7 @@ const getLanguage = (path: string) => {
 /**
  * Widget for Edit tool - shows the edit operation
  */
-export const EditWidget: React.FC<{ 
-  file_path: string; 
-  old_string: string; 
-  new_string: string;
-  result?: any;
-}> = ({ file_path, old_string, new_string, result: _result }) => {
+export const EditWidget: React.FC<EditWidgetProps> = ({ file_path, old_string, new_string, result: _result }) => {
   const { theme } = useTheme();
   const syntaxTheme = getClaudeSyntaxTheme(theme);
 
@@ -1263,11 +1261,7 @@ export const EditResultWidget: React.FC<{ content: string }> = ({ content }) => 
 /**
  * Widget for MCP (Model Context Protocol) tools
  */
-export const MCPWidget: React.FC<{ 
-  toolName: string; 
-  input?: any;
-  result?: any;
-}> = ({ toolName, input, result: _result }) => {
+export const MCPWidget: React.FC<MCPWidgetProps> = ({ toolName, input, result: _result }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { theme } = useTheme();
   const syntaxTheme = getClaudeSyntaxTheme(theme);
@@ -1297,7 +1291,7 @@ export const MCPWidget: React.FC<{
       .join(' ');
   };
   
-  const hasInput = input && Object.keys(input).length > 0;
+  const hasInput: boolean = !!(input && typeof input === 'object' && Object.keys(input as Record<string, unknown>).length > 0);
   const inputString = hasInput ? JSON.stringify(input, null, 2) : '';
   const isLargeInput = inputString.length > 200;
   
@@ -1567,11 +1561,7 @@ export const SummaryWidget: React.FC<{
 /**
  * Widget for displaying MultiEdit tool usage
  */
-export const MultiEditWidget: React.FC<{
-  file_path: string;
-  edits: Array<{ old_string: string; new_string: string }>;
-  result?: any;
-}> = ({ file_path, edits, result: _result }) => {
+export const MultiEditWidget: React.FC<MultiEditWidgetProps> = ({ file_path, edits, result: _result }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const language = getLanguage(file_path);
   const { theme } = useTheme();
@@ -1983,7 +1973,7 @@ export const SystemInitializedWidget: React.FC<{
 export const TaskWidget: React.FC<{
   description?: string;
   prompt?: string;
-  result?: any;
+  result?: ToolResult;
   agentId?: string;
   subagentType?: string;
   isAsync?: boolean;
@@ -2092,13 +2082,11 @@ export const TaskWidget: React.FC<{
             <span>View Result</span>
           </button>
 
-          {isResultExpanded && (
+          {isResultExpanded && result && (
             <div className="rounded-lg border bg-muted/30 p-3 max-h-64 overflow-y-auto">
               <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
                 {typeof result.content === 'string'
                   ? result.content.slice(0, 1000) + (result.content.length > 1000 ? '...' : '')
-                  : typeof result === 'string'
-                  ? result.slice(0, 1000) + (result.length > 1000 ? '...' : '')
                   : JSON.stringify(result, null, 2).slice(0, 1000)}
               </pre>
             </div>
@@ -2368,9 +2356,9 @@ export const UsageStatsWidget: React.FC<{
 /**
  * Widget for WebSearch tool - displays web search query and results
  */
-export const WebSearchWidget: React.FC<{ 
-  query: string; 
-  result?: any;
+export const WebSearchWidget: React.FC<{
+  query: string;
+  result?: ToolResult;
 }> = ({ query, result }) => {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   
@@ -2612,10 +2600,10 @@ export const ThinkingWidget: React.FC<{
 /**
  * Widget for WebFetch tool - displays URL fetching with optional prompts
  */
-export const WebFetchWidget: React.FC<{ 
+export const WebFetchWidget: React.FC<{
   url: string;
   prompt?: string;
-  result?: any;
+  result?: ToolResult;
 }> = ({ url, prompt, result }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFullContent, setShowFullContent] = useState(false);
@@ -2784,9 +2772,9 @@ export const WebFetchWidget: React.FC<{
 /**
  * Widget for TodoRead tool - displays todos with advanced viewing capabilities
  */
-export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todos: inputTodos, result }) => {
+export const TodoReadWidget: React.FC<{ todos?: TodoItem[]; result?: ToolResult }> = ({ todos: inputTodos, result }) => {
   // Extract todos from result if not directly provided
-  let todos: any[] = inputTodos || [];
+  let todos: TodoItem[] = inputTodos || [];
   if (!todos.length && result) {
     if (typeof result === 'object' && Array.isArray(result.todos)) {
       todos = result.todos;
@@ -2906,7 +2894,7 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
         todosInStatus.forEach(todo => {
           const checkbox = todo.status === "completed" ? "[x]" : "[ ]";
           markdown += `- ${checkbox} ${todo.content}${todo.id ? ` (${todo.id})` : ""}\n`;
-          if (todo.dependencies?.length > 0) {
+          if (todo.dependencies && todo.dependencies.length > 0) {
             markdown += `  - Dependencies: ${todo.dependencies.join(", ")}\n`;
           }
         });
@@ -3087,10 +3075,10 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
             </div>
             <div className="space-y-2">
               {todos.map(todo => (
-                <TodoCard 
-                  key={todo.id || todos.indexOf(todo)} 
-                  todo={todo} 
-                  isExpanded={expandedTodos.has(todo.id)}
+                <TodoCard
+                  key={todo.id || todos.indexOf(todo)}
+                  todo={todo}
+                  isExpanded={expandedTodos.has(todo.id || '')}
                 />
               ))}
               {todos.length === 0 && (
@@ -3115,12 +3103,12 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
       if (rendered.has(todo.id)) return null;
       rendered.add(todo.id);
       
-      const dependents = todos.filter(t => 
-        t.dependencies?.includes(todo.id) && !rendered.has(t.id)
+      const dependents = todos.filter(t =>
+        t.dependencies?.includes(todo.id || '') && !rendered.has(t.id || '')
       );
-      
+
       return (
-        <div key={todo.id} className="relative">
+        <div key={todo.id || ''} className="relative">
           {level > 0 && (
             <div className="absolute left-6 top-0 w-px h-6 bg-border" />
           )}
@@ -3135,9 +3123,9 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
               )}
             </div>
             <div className="flex-1 pb-6">
-              <TodoCard 
-                todo={todo} 
-                isExpanded={expandedTodos.has(todo.id)}
+              <TodoCard
+                todo={todo}
+                isExpanded={expandedTodos.has(todo.id || '')}
               />
             </div>
           </div>
@@ -3149,7 +3137,7 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
     return (
       <div className="space-y-4">
         {rootTodos.map(todo => renderTodoWithDependents(todo))}
-        {todos.filter(t => !rendered.has(t.id)).map(todo => renderTodoWithDependents(todo))}
+        {todos.filter(t => !rendered.has(t.id || '')).map(todo => renderTodoWithDependents(todo))}
       </div>
     );
   };
@@ -3251,10 +3239,10 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
           <div className="space-y-2">
             <AnimatePresence mode="popLayout">
               {filteredTodos.map(todo => (
-                <TodoCard 
-                  key={todo.id || filteredTodos.indexOf(todo)} 
-                  todo={todo} 
-                  isExpanded={expandedTodos.has(todo.id)}
+                <TodoCard
+                  key={todo.id || filteredTodos.indexOf(todo)}
+                  todo={todo}
+                  isExpanded={expandedTodos.has(todo.id || '')}
                 />
               ))}
             </AnimatePresence>

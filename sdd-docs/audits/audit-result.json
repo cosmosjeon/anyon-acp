@@ -1,0 +1,373 @@
+{
+  "timestamp": "2025-12-20T16:30:00.000Z",
+  "summary": {
+    "critical": 17,
+    "warning": 55,
+    "info": 103,
+    "total": 175,
+    "pass": false,
+    "grade": "C"
+  },
+  "areas": {
+    "frontend": {
+      "critical": 8,
+      "warning": 29,
+      "info": 88,
+      "grade": "C-",
+      "lines": 61568,
+      "files": 197
+    },
+    "desktop": {
+      "critical": 4,
+      "warning": 18,
+      "info": 12,
+      "grade": "B",
+      "lines": 11726,
+      "files": 25
+    },
+    "server": {
+      "critical": 5,
+      "warning": 8,
+      "info": 3,
+      "grade": "D",
+      "lines": 451,
+      "files": 1
+    }
+  },
+  "issues": [
+    {
+      "id": "fe-bloater-001",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "bloater",
+      "title": "ToolWidgets.tsx God Object",
+      "file": "src/components/ToolWidgets.tsx",
+      "line": 1,
+      "action": "split_file",
+      "description": "3,386줄, 28개 위젯 컴포넌트가 단일 파일에 집중. SRP 심각 위반.",
+      "fix": {
+        "type": "refactor",
+        "target": "src/components/ToolWidgets.tsx",
+        "replacement": "src/components/widgets/ 디렉토리로 분할"
+      }
+    },
+    {
+      "id": "fe-bloater-002",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "bloater",
+      "title": "ClaudeCodeSession.tsx Extreme Complexity",
+      "file": "src/components/ClaudeCodeSession.tsx",
+      "line": 1,
+      "action": "refactor_function",
+      "description": "2,074줄, 27개 useState, 400+ 줄 handleSendPrompt 함수",
+      "fix": {
+        "type": "refactor",
+        "target": "src/components/ClaudeCodeSession.tsx",
+        "replacement": "Custom hooks 추출 및 컴포넌트 분리"
+      }
+    },
+    {
+      "id": "fe-bloater-003",
+      "priority": "P1",
+      "area": "frontend",
+      "type": "bloater",
+      "title": "api.ts No Modularization",
+      "file": "src/lib/api.ts",
+      "line": 1,
+      "action": "split_file",
+      "description": "2,496줄, 127개 console.error, 모듈 분리 없음",
+      "fix": {
+        "type": "refactor",
+        "target": "src/lib/api.ts",
+        "replacement": "src/lib/api/ 디렉토리로 기능별 분할"
+      }
+    },
+    {
+      "id": "fe-dead-001",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "dead_code",
+      "title": "Orphaned Refactoring File",
+      "file": "src/components/ClaudeCodeSession.refactored.tsx",
+      "line": null,
+      "action": "delete_file",
+      "description": "사용되지 않는 리팩토링 파일",
+      "fix": {
+        "type": "delete",
+        "target": "src/components/ClaudeCodeSession.refactored.tsx",
+        "replacement": null
+      }
+    },
+    {
+      "id": "fe-dead-002",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "dead_code",
+      "title": "Orphaned Optimized File",
+      "file": "src/components/SessionList.optimized.tsx",
+      "line": null,
+      "action": "delete_file",
+      "description": "사용되지 않는 최적화 파일",
+      "fix": {
+        "type": "delete",
+        "target": "src/components/SessionList.optimized.tsx",
+        "replacement": null
+      }
+    },
+    {
+      "id": "fe-dead-003",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "dead_code",
+      "title": "Orphaned Optimized File",
+      "file": "src/components/FilePicker.optimized.tsx",
+      "line": null,
+      "action": "delete_file",
+      "description": "사용되지 않는 최적화 파일",
+      "fix": {
+        "type": "delete",
+        "target": "src/components/FilePicker.optimized.tsx",
+        "replacement": null
+      }
+    },
+    {
+      "id": "fe-dead-004",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "dead_code",
+      "title": "Orphaned New File",
+      "file": "src/components/ToolWidgets.new.tsx",
+      "line": null,
+      "action": "delete_file",
+      "description": "사용되지 않는 새 파일",
+      "fix": {
+        "type": "delete",
+        "target": "src/components/ToolWidgets.new.tsx",
+        "replacement": null
+      }
+    },
+    {
+      "id": "fe-dup-001",
+      "priority": "P0",
+      "area": "frontend",
+      "type": "duplication",
+      "title": "Widget Content Extraction Duplicated",
+      "file": "src/components/ToolWidgets.tsx",
+      "line": 180,
+      "action": "extract_utility",
+      "description": "콘텐츠 추출 로직이 10+ 위젯에서 반복됨",
+      "fix": {
+        "type": "create",
+        "target": "src/lib/widgetUtils.ts",
+        "replacement": "extractResultContent() 공통 함수 생성"
+      }
+    },
+    {
+      "id": "fe-type-001",
+      "priority": "P1",
+      "area": "frontend",
+      "type": "type_safety",
+      "title": "Excessive any Type Usage",
+      "file": "src/components/ToolWidgets.tsx",
+      "line": null,
+      "action": "add_type",
+      "description": "129개 any 타입 사용, 타입 안전성 저하",
+      "fix": {
+        "type": "create",
+        "target": "src/types/widgets.ts",
+        "replacement": "ToolResult, ContentObject, TodoItem 인터페이스 정의"
+      }
+    },
+    {
+      "id": "desktop-bloater-001",
+      "priority": "P0",
+      "area": "desktop",
+      "type": "bloater",
+      "title": "main.rs main() 402 lines",
+      "file": "src-tauri/src/main.rs",
+      "line": 66,
+      "action": "refactor_function",
+      "description": "main() 함수가 402줄로 극도로 김",
+      "fix": {
+        "type": "refactor",
+        "target": "src-tauri/src/main.rs",
+        "replacement": "setup_app(), setup_plugins() 등으로 분할"
+      }
+    },
+    {
+      "id": "desktop-bloater-002",
+      "priority": "P0",
+      "area": "desktop",
+      "type": "bloater",
+      "title": "claude.rs 2,955 lines",
+      "file": "src-tauri/src/commands/claude.rs",
+      "line": 1,
+      "action": "split_file",
+      "description": "단일 파일이 2,955줄로 너무 큼",
+      "fix": {
+        "type": "refactor",
+        "target": "src-tauri/src/commands/claude.rs",
+        "replacement": "claude/projects.rs, claude/sessions.rs 등으로 분할"
+      }
+    },
+    {
+      "id": "desktop-bloater-003",
+      "priority": "P1",
+      "area": "desktop",
+      "type": "bloater",
+      "title": "create_checkpoint() 114 lines",
+      "file": "src-tauri/src/checkpoint/manager.rs",
+      "line": 188,
+      "action": "refactor_function",
+      "description": "create_checkpoint 함수가 114줄로 복잡",
+      "fix": {
+        "type": "refactor",
+        "target": "src-tauri/src/checkpoint/manager.rs",
+        "replacement": "extract_metadata(), create_file_snapshots() 등으로 분할"
+      }
+    },
+    {
+      "id": "desktop-dup-001",
+      "priority": "P1",
+      "area": "desktop",
+      "type": "duplication",
+      "title": "create_command_with_env() Duplicated",
+      "file": "src-tauri/src/commands/claude.rs",
+      "line": 239,
+      "action": "extract_utility",
+      "description": "create_command_with_env() 함수가 두 파일에서 66줄씩 중복",
+      "fix": {
+        "type": "refactor",
+        "target": "src-tauri/src/claude_binary.rs",
+        "replacement": "공통 모듈로 이동하여 재사용"
+      }
+    },
+    {
+      "id": "server-bloater-001",
+      "priority": "P0",
+      "area": "server",
+      "type": "bloater",
+      "title": "Embedded HTML in JavaScript",
+      "file": "server/index.js",
+      "line": 204,
+      "action": "extract_utility",
+      "description": "OAuth 콜백에 90줄 HTML 직접 삽입 (AI 코드 스멜)",
+      "fix": {
+        "type": "create",
+        "target": "server/views/oauth-callback.html",
+        "replacement": "HTML을 별도 파일로 분리"
+      }
+    },
+    {
+      "id": "server-sec-001",
+      "priority": "P0",
+      "area": "server",
+      "type": "security",
+      "title": "Permissive CORS",
+      "file": "server/index.js",
+      "line": 52,
+      "action": "replace_pattern",
+      "description": "모든 origin 허용 - CSRF 및 데이터 유출 위험",
+      "fix": {
+        "type": "replace",
+        "target": "app.use(cors())",
+        "replacement": "app.use(cors({ origin: allowedOrigins, credentials: true }))"
+      }
+    },
+    {
+      "id": "server-sec-002",
+      "priority": "P0",
+      "area": "server",
+      "type": "security",
+      "title": "In-Memory Database",
+      "file": "server/index.js",
+      "line": 56,
+      "action": "refactor_function",
+      "description": "서버 재시작 시 모든 데이터 손실",
+      "fix": {
+        "type": "refactor",
+        "target": "server/index.js",
+        "replacement": "SQLite 또는 PostgreSQL 사용"
+      }
+    },
+    {
+      "id": "server-sec-003",
+      "priority": "P1",
+      "area": "server",
+      "type": "security",
+      "title": "No Rate Limiting",
+      "file": "server/index.js",
+      "line": null,
+      "action": "add_type",
+      "description": "모든 엔드포인트에 rate limiting 없음",
+      "fix": {
+        "type": "create",
+        "target": "server/middleware/rateLimit.js",
+        "replacement": "express-rate-limit 미들웨어 추가"
+      }
+    },
+    {
+      "id": "server-bloater-002",
+      "priority": "P0",
+      "area": "server",
+      "type": "bloater",
+      "title": "Monolithic File Structure",
+      "file": "server/index.js",
+      "line": 1,
+      "action": "split_file",
+      "description": "451줄 단일 파일 - 모듈 분리 필요",
+      "fix": {
+        "type": "refactor",
+        "target": "server/index.js",
+        "replacement": "routes/, services/, middleware/ 디렉토리로 분할"
+      }
+    },
+    {
+      "id": "server-dup-001",
+      "priority": "P1",
+      "area": "server",
+      "type": "duplication",
+      "title": "User Object Construction Duplicated",
+      "file": "server/index.js",
+      "line": 103,
+      "action": "extract_utility",
+      "description": "User object 생성이 3곳에서 반복됨",
+      "fix": {
+        "type": "create",
+        "target": "server/models/userFactory.js",
+        "replacement": "createUser() 팩토리 함수 생성"
+      }
+    }
+  ],
+  "recommendations": {
+    "P0": [
+      "Frontend: 4개 dead code 파일 즉시 삭제",
+      "Frontend: Widget content 추출 유틸리티 생성",
+      "Server: 임베디드 HTML을 별도 파일로 분리",
+      "Server: CORS 화이트리스트 설정",
+      "Desktop: main.rs main() 함수 리팩토링 시작"
+    ],
+    "P1": [
+      "Frontend: ToolWidgets.tsx 28개 파일로 분할",
+      "Frontend: api.ts 기능별 모듈화",
+      "Desktop: claude.rs 4개 모듈로 분할",
+      "Server: 모듈화 구조로 리팩토링",
+      "Server: Rate limiting 미들웨어 추가",
+      "Server: SQLite 데이터 영속성 추가"
+    ],
+    "P2": [
+      "Frontend: any 타입을 proper 타입으로 교체",
+      "Frontend: Zustand 상태 관리 도입",
+      "Desktop: 에러 처리 패턴 일관성 확보",
+      "All: 테스트 커버리지 30% 달성 목표"
+    ]
+  },
+  "metadata": {
+    "workflow": "BMAD Code Audit v1.0",
+    "agents": ["Frontend Auditor", "Desktop Auditor", "Server Auditor"],
+    "parallelExecution": true,
+    "totalLines": 73745,
+    "totalFiles": 223
+  }
+}

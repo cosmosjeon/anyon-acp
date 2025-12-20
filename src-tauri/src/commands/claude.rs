@@ -237,70 +237,7 @@ fn extract_first_user_message(jsonl_path: &PathBuf) -> (Option<String>, Option<S
 /// Helper function to create a tokio Command with proper environment variables
 /// This ensures commands like Claude can find Node.js and other dependencies
 fn create_command_with_env(program: &str) -> Command {
-    // Convert std::process::Command to tokio::process::Command
-    let _std_cmd = crate::claude_binary::create_command_with_env(program);
-
-    // Create a new tokio Command from the program path
-    let mut tokio_cmd = Command::new(program);
-
-    // Copy over all environment variables
-    for (key, value) in std::env::vars() {
-        if key == "PATH"
-            || key == "HOME"
-            || key == "USER"
-            || key == "SHELL"
-            || key == "LANG"
-            || key == "LC_ALL"
-            || key.starts_with("LC_")
-            || key == "NODE_PATH"
-            || key == "NVM_DIR"
-            || key == "NVM_BIN"
-            || key == "HOMEBREW_PREFIX"
-            || key == "HOMEBREW_CELLAR"
-        {
-            log::debug!("Inheriting env var: {}={}", key, value);
-            tokio_cmd.env(&key, &value);
-        }
-    }
-
-    // Add NVM support if the program is in an NVM directory
-    if program.contains("/.nvm/versions/node/") {
-        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let node_bin_str = node_bin_dir.to_string_lossy();
-            if !current_path.contains(&node_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", node_bin_str, current_path);
-                tokio_cmd.env("PATH", new_path);
-            }
-        }
-    }
-
-    // Add Homebrew support if the program is in a Homebrew directory
-    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
-        if let Some(program_dir) = std::path::Path::new(program).parent() {
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let homebrew_bin_str = program_dir.to_string_lossy();
-            if !current_path.contains(&homebrew_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", homebrew_bin_str, current_path);
-                log::debug!(
-                    "Adding Homebrew bin directory to PATH: {}",
-                    homebrew_bin_str
-                );
-                tokio_cmd.env("PATH", new_path);
-            }
-        }
-    }
-
-    // Windows: Hide console window when spawning child process
-    // This prevents a separate terminal window from appearing when Claude CLI is executed
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        tokio_cmd.creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS);
-    }
-
-    tokio_cmd
+    crate::claude_binary::create_tokio_command_with_env(program)
 }
 
 /// Creates a system binary command with the given arguments

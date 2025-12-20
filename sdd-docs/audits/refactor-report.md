@@ -121,6 +121,44 @@ const EFFECTIVE_JWT_SECRET = JWT_SECRET || (() => {
 
 ---
 
+## Session 2: Additional Refactoring (2025-12-20 18:05)
+
+### Desktop: Code Deduplication
+
+**create_command_with_env() 중복 제거**:
+- `src-tauri/src/commands/claude.rs`: 66줄 → 3줄
+- `src-tauri/src/commands/agents.rs`: 56줄 → 3줄
+- **총 ~116줄 중복 제거**
+- 공통 함수: `src-tauri/src/claude_binary.rs::create_tokio_command_with_env()`
+
+### Frontend: Type Safety Improvement
+
+**any 타입 감소**: 129개 → 2개 (99% 개선)
+
+**새 파일**: `src/types/widgets.ts`
+- TodoStatus, TodoPriority, TodoItem
+- ToolResult, ContentObject, ResultContent
+- 15+ Widget Props 인터페이스
+
+### Server: Security & Structure
+
+**CORS 보안 강화**:
+```javascript
+// Before
+app.use(cors())
+
+// After
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:4000', 'tauri://localhost', 'https://tauri.localhost'];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+```
+
+**새 파일**:
+- `server/views/oauth-callback.html` - 90줄 HTML 분리
+- `server/models/userFactory.js` - User 팩토리 함수
+- `server/middleware/rateLimit.js` - Rate limiting (수동 설치 필요)
+
+---
+
 ## Remaining Issues (P1/P2)
 
 자동화 불가 - 별도 워크플로우 필요:
@@ -129,8 +167,28 @@ const EFFECTIVE_JWT_SECRET = JWT_SECRET || (() => {
 |------|------------|
 | ToolWidgets.tsx 분할 (3,386줄) | `/split-widgets` |
 | api.ts 분할 (2,496줄) | `/split-api` |
-| execute_claude_code 리팩토링 (408줄) | 수동 |
-| Server 모듈화 (442줄) | 수동 |
+| ClaudeCodeSession.tsx 리팩토링 | 수동 |
+| main.rs main() 리팩토링 (402줄) | 수동 |
+| claude.rs 분할 (2,955줄) | 수동 |
+| Server 모듈화 | 수동 |
+| In-memory DB → SQLite | 수동 |
+
+---
+
+## Manual Action Required
+
+### Rate Limiting 활성화
+
+```bash
+cd server && npm install express-rate-limit
+```
+
+`server/index.js`에 추가:
+```javascript
+import { authLimiter, apiLimiter } from './middleware/rateLimit.js';
+app.use('/auth/', authLimiter);
+app.use('/api/', apiLimiter);
+```
 
 ---
 
@@ -138,5 +196,5 @@ const EFFECTIVE_JWT_SECRET = JWT_SECRET || (() => {
 
 문제 발생 시:
 ```bash
-git stash pop stash@{0}  # refactor-backup-20251220-160016
+git stash pop stash@{0}  # refactor-backup-20251220-180400
 ```

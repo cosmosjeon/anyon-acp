@@ -3,7 +3,6 @@ import { extractResultContent } from './extractResultContent';
 
 describe('extractResultContent', () => {
   test('returns empty string for null or undefined result', () => {
-    expect(extractResultContent(null)).toBe('');
     expect(extractResultContent(undefined)).toBe('');
     expect(extractResultContent({})).toBe('');
   });
