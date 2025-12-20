@@ -17,15 +17,6 @@ import {
   ChevronUp,
   X,
   Wrench,
-  FileText as FileTextIcon,
-  Palette,
-  Paintbrush,
-  Settings,
-  Boxes,
-  Database,
-  LayoutList,
-  Rocket,
-  CheckCircle,
   Loader2,
   AlertCircle
 } from "lucide-react";
@@ -58,7 +49,6 @@ import type { ClaudeStreamMessage } from "./AgentExecution";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
 import { SessionPersistenceService, type TabType } from "@/services/sessionPersistence";
-import { type PromptIconType } from "@/lib/promptDisplay";
 import {
   validatePromptInput,
   createQueuedPrompt,
@@ -72,22 +62,6 @@ import {
   updateSessionFirstMessage,
   type QueuedPrompt,
 } from "./claude-session/promptHandlers";
-
-// Icon mapping for workflow prompts
-const WorkflowIcon: React.FC<{ icon: PromptIconType | null; className?: string }> = ({ icon, className = "h-4 w-4" }) => {
-  switch (icon) {
-    case 'file-text': return <FileTextIcon className={className} />;
-    case 'palette': return <Palette className={className} />;
-    case 'paintbrush': return <Paintbrush className={className} />;
-    case 'settings': return <Settings className={className} />;
-    case 'boxes': return <Boxes className={className} />;
-    case 'database': return <Database className={className} />;
-    case 'layout-list': return <LayoutList className={className} />;
-    case 'rocket': return <Rocket className={className} />;
-    case 'check-circle': return <CheckCircle className={className} />;
-    default: return null;
-  }
-};
 
 interface ClaudeCodeSessionProps {
   /**
@@ -667,20 +641,26 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     sendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus" = "sonnet") => {
       handleSendPrompt(prompt, model);
     },
-    startNewSession: (initialPrompt: string) => {
+    startNewSession: (backendPrompt: string, userMessage?: string) => {
       // Clear current session and start a new one
       setMessages([]);
       setRawJsonlOutput([]);
       setError(null);
       setIsFirstPrompt(true);
       setTotalTokens(0);
-      // Send the initial prompt (slash command will be processed by Claude Code directly)
-      handleSendPrompt(initialPrompt, "sonnet");
+
+      // Add display message to UI if provided (for workflow prompts)
+      if (userMessage) {
+        addUserMessageToUI({ prompt: userMessage, setMessages });
+      }
+
+      // Send the backend prompt (full workflow prompt) to Claude
+      handleSendPrompt(backendPrompt, "sonnet", undefined, userMessage ? true : false);
     },
     isLoading,
   }), [isLoading]);
 
-  const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode) => {
+  const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode, skipAddUserMessage?: boolean) => {
     logger.log('handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
 
     // 1. Validate input
@@ -774,9 +754,10 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         });
       }
 
-      // 6. Add user message to UI - use displayMessage instead of full prompt
-      const displayMessage = userDisplayMessage || prompt;
-      addUserMessageToUI({ prompt: displayMessage, setMessages });
+      // 6. Add user message to UI (skip if already added by startNewSession)
+      if (!skipAddUserMessage) {
+        addUserMessageToUI({ prompt, setMessages });
+      }
 
       // 7. Update first message if needed
       updateSessionFirstMessage({
@@ -1127,7 +1108,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         
         // Track session engagement
         const sessionDuration = sessionStartTime.current ? Date.now() - sessionStartTime.current : 0;
-        const messageCount = messages.filter(m => m.user_message).length;
+        const messageCount = messages.filter(m => m.type === 'user').length;
         const toolsUsed = new Set<string>();
         messages.forEach(msg => {
           if (msg.type === 'assistant' && msg.message?.content) {
@@ -1377,9 +1358,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                             {queuedPrompt.model === "opus" ? "Opus" : "Sonnet"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm line-clamp-2 break-words">
-                          {queuedPrompt.icon && <WorkflowIcon icon={queuedPrompt.icon} className="h-3.5 w-3.5 flex-shrink-0 text-primary" />}
-                          <span>{queuedPrompt.displayText || queuedPrompt.prompt}</span>
+                        <div className="text-sm line-clamp-2 break-words">
+                          <span>{queuedPrompt.prompt.length > 100 ? queuedPrompt.prompt.slice(0, 100) + '...' : queuedPrompt.prompt}</span>
                         </div>
                       </div>
                       <motion.div

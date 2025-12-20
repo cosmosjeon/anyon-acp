@@ -15,7 +15,7 @@ import { PlanningDocViewer } from './PlanningDocViewer';
 
 interface PlanningDocsPanelProps {
   projectPath: string | undefined;
-  onStartNewWorkflow: (workflowPrompt: string) => void;
+  onStartNewWorkflow: (workflowPrompt: string, displayText?: string) => void;
   isSessionLoading?: boolean;
 }
 
@@ -79,7 +79,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
     // 내재화된 prompt가 있으면 사용, 없으면 슬래시 커맨드 사용
     const workflowPrompt = getWorkflowPrompt(step);
     if (workflowPrompt) {
-      onStartNewWorkflow(workflowPrompt);
+      onStartNewWorkflow(workflowPrompt, step.displayText);
     } else {
       console.warn('[PlanningDocsPanel] No workflow prompt for step:', step.id);
     }

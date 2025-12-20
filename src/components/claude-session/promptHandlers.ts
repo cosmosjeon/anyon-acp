@@ -4,7 +4,6 @@
  */
 
 import type { ClaudeStreamMessage } from "../AgentExecution";
-import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
 import { SessionPersistenceService, type TabType } from "@/services/sessionPersistence";
 import type { Session } from "@/lib/api";
 import { listen as tauriListen } from "@tauri-apps/api/event";
@@ -48,8 +47,6 @@ export function validatePromptInput(
 export interface QueuedPrompt {
   id: string;
   prompt: string;
-  displayText?: string;
-  icon?: PromptIconType | null;
   model: "haiku" | "sonnet" | "opus";
 }
 
@@ -57,12 +54,9 @@ export function createQueuedPrompt(
   prompt: string,
   model: "haiku" | "sonnet" | "opus"
 ): QueuedPrompt {
-  const displayInfo = isAnyonWorkflowCommand(prompt) ? getPromptDisplayInfo(prompt) : null;
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     prompt,
-    displayText: displayInfo?.text,
-    icon: displayInfo?.icon,
     model
   };
 }
@@ -680,9 +674,18 @@ export async function executePromptCommand(options: CommandExecutionOptions): Pr
   // Pass executionMode to use --permission-mode plan when plan mode is selected
   if (options.effectiveSession && !options.isFirstPrompt) {
     console.log('[ClaudeCodeSession] Resuming session:', options.effectiveSession.id, 'executionMode:', options.executionMode);
-    options.trackEvent.sessionResumed(options.effectiveSession.id);
-    options.trackEvent.modelSelected(options.model);
-    await options.api.resumeClaudeCode(options.projectPath, options.effectiveSession.id, options.prompt, options.model, options.executionMode);
+    try {
+      options.trackEvent.sessionResumed(options.effectiveSession.id);
+      options.trackEvent.modelSelected(options.model);
+      await options.api.resumeClaudeCode(options.projectPath, options.effectiveSession.id, options.prompt, options.model, options.executionMode);
+    } catch (err) {
+      // If resume fails (e.g., session not found), fall back to new session
+      console.warn('[ClaudeCodeSession] Resume failed, starting new session:', err);
+      options.setIsFirstPrompt(false);
+      options.trackEvent.sessionCreated(options.model, 'prompt_input');
+      options.trackEvent.modelSelected(options.model);
+      await options.api.executeClaudeCode(options.projectPath, options.prompt, options.model, options.executionMode);
+    }
   } else {
     console.log('[ClaudeCodeSession] Starting new session, executionMode:', options.executionMode);
     options.setIsFirstPrompt(false);

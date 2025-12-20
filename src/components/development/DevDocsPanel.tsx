@@ -11,7 +11,7 @@ const DEV_COMPLETE_FILE = 'anyon-docs/dev-plan/DEVELOPMENT_COMPLETE.md';
 interface DevDocsPanelProps {
   projectPath: string | undefined;
   isPlanningComplete: boolean;
-  onStartNewSession?: (prompt: string) => void;
+  onStartNewSession?: (prompt: string, displayText?: string) => void;
   isSessionLoading?: boolean;
 }
 
@@ -98,7 +98,7 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
             // Check again in case stop was pressed during the delay
             if (!isStoppedRef.current) {
               setCurrentRunningStep(nextStep.id);
-              onStartNewSession?.(nextStep.prompt);
+              onStartNewSession?.(nextStep.prompt, nextStep.displayText);
             }
           }, 500);
         }
@@ -109,12 +109,12 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
   }, [isSessionLoading, currentRunningStep, onStartNewSession, projectPath]);
 
   // Start a step (clicking any step starts and continues from there)
-  const handleStart = (stepId: string, prompt: string) => {
+  const handleStart = (stepId: string, prompt: string, displayText?: string) => {
     isStoppedRef.current = false;
     setIsStopped(false);
     setIsDevComplete(false);
     setCurrentRunningStep(stepId);
-    onStartNewSession?.(prompt);
+    onStartNewSession?.(prompt, displayText);
   };
 
   // Stop - prevents next step from running
@@ -197,7 +197,7 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
             return (
               <React.Fragment key={step.id}>
                 <button
-                  onClick={() => handleStart(step.id, step.prompt)}
+                  onClick={() => handleStart(step.id, step.prompt, step.displayText)}
                   disabled={!onStartNewSession || isRunningWorkflow}
                   className={cn(
                     'flex flex-col items-center gap-1.5 px-4 py-3 rounded-lg transition-all',
