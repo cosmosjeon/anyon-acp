@@ -24,7 +24,6 @@ const envPaths = [
 for (const envPath of envPaths) {
   const result = dotenv.config({ path: envPath });
   if (!result.error) {
-    console.log(`Loaded .env from: ${envPath}`);
     break;
   }
 }
@@ -139,7 +138,6 @@ function authenticate(req, res, next) {
 
 // Dev Login endpoint - simplified version
 app.post('/auth/dev/login', (req, res) => {
-  console.log('🔧 Dev Login: Creating mock user');
   const user = createUser({
     email: 'dev@example.com',
     name: 'Dev User',
@@ -219,9 +217,6 @@ app.get('/auth/google/callback', async (req, res) => {
         planType: 'FREE',
       });
       users.set(user.id, user);
-      console.log('✅ New user created:', email);
-    } else {
-      console.log('✅ Existing user logged in:', email);
     }
 
     // Generate JWT token

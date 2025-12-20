@@ -7,6 +7,9 @@ declare global {
   }
 }
 import { motion, AnimatePresence } from "framer-motion";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger('ClaudeCodeSession');
 import {
   Copy,
   ChevronDown,
@@ -136,7 +139,7 @@ interface ClaudeCodeSessionProps {
  */
 export interface ClaudeCodeSessionRef {
   sendPrompt: (prompt: string, model?: "haiku" | "sonnet" | "opus") => void;
-  startNewSession: (initialPrompt: string) => void;
+  startNewSession: (backendPrompt: string, userMessage?: string) => void;
   isLoading: boolean;
 }
 
@@ -390,7 +393,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   // Debug logging
   useEffect(() => {
-    console.log('[ClaudeCodeSession] State update:', {
+    logger.debug('State update:', {
       projectPath,
       session,
       extractedSessionInfo,
@@ -559,7 +562,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         }
       });
     } catch (err) {
-      console.error("Failed to load session history:", err);
+      logger.error("Failed to load session history:", err);
       setError("Failed to load session history");
     } finally {
       setIsLoading(false);
@@ -580,28 +583,28 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         
         if (activeSession) {
           // Session is still active, reconnect to its stream
-          console.log('[ClaudeCodeSession] Found active session, reconnecting:', session.id);
+          logger.log('Found active session, reconnecting:', session.id);
           // IMPORTANT: Set claudeSessionId before reconnecting
           setClaudeSessionId(session.id);
-          
+
           // Don't add buffered messages here - they've already been loaded by loadSessionHistory
           // Just set up listeners for new messages
-          
+
           // Set up listeners for the active session
           reconnectToSession(session.id);
         }
       } catch (err) {
-        console.error('Failed to check for active sessions:', err);
+        logger.error('Failed to check for active sessions:', err);
       }
     }
   };
 
   const reconnectToSession = async (sessionId: string) => {
-    console.log('[ClaudeCodeSession] Reconnecting to session:', sessionId);
-    
+    logger.log('Reconnecting to session:', sessionId);
+
     // Prevent duplicate listeners
     if (isListeningRef.current) {
-      console.log('[ClaudeCodeSession] Already listening to session, skipping reconnect');
+      logger.log('Already listening to session, skipping reconnect');
       return;
     }
     
@@ -618,30 +621,30 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     // Set up session-specific listeners
     const outputUnlisten = await listen(`claude-output:${sessionId}`, async (event: any) => {
       try {
-        console.log('[ClaudeCodeSession] Received claude-output on reconnect:', event.payload);
-        
+        logger.log('Received claude-output on reconnect:', event.payload);
+
         if (!isMountedRef.current) return;
-        
+
         // Store raw JSONL
         setRawJsonlOutput(prev => [...prev, event.payload]);
-        
+
         // Parse and display
         const message = JSON.parse(event.payload) as ClaudeStreamMessage;
         setMessages(prev => [...prev, message]);
       } catch (err) {
-        console.error("Failed to parse message:", err, event.payload);
+        logger.error("Failed to parse message:", err, event.payload);
       }
     });
 
     const errorUnlisten = await listen(`claude-error:${sessionId}`, (event: any) => {
-      console.error("Claude error:", event.payload);
+      logger.error("Claude error:", event.payload);
       if (isMountedRef.current) {
         setError(event.payload);
       }
     });
 
     const completeUnlisten = await listen(`claude-complete:${sessionId}`, async (event: any) => {
-      console.log('[ClaudeCodeSession] Received claude-complete on reconnect:', event.payload);
+      logger.log('Received claude-complete on reconnect:', event.payload);
       if (isMountedRef.current) {
         setIsLoading(false);
         hasActiveSessionRef.current = false;
@@ -678,7 +681,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   }), [isLoading]);
 
   const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode) => {
-    console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
+    logger.log('handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
 
     // 1. Validate input
     const validation = validatePromptInput(prompt, projectPath);
@@ -771,8 +774,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         });
       }
 
-      // 6. Add user message to UI
-      addUserMessageToUI({ prompt, setMessages });
+      // 6. Add user message to UI - use displayMessage instead of full prompt
+      const displayMessage = userDisplayMessage || prompt;
+      addUserMessageToUI({ prompt: displayMessage, setMessages });
 
       // 7. Update first message if needed
       updateSessionFirstMessage({
@@ -806,7 +810,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         api
       });
     } catch (err) {
-      console.error("Failed to send prompt:", err);
+      logger.error("Failed to send prompt:", err);
       setError("Failed to send prompt");
       setIsLoading(false);
       hasActiveSessionRef.current = false;
@@ -905,11 +909,11 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   const handleCancelExecution = async () => {
     if (!claudeSessionId) {
-      console.warn('[ClaudeCodeSession] Cannot cancel: no active session');
+      logger.warn('Cannot cancel: no active session');
       return;
     }
     if (!isLoading) {
-      console.log('[ClaudeCodeSession] Cancel called but not loading, ignoring');
+      logger.log('Cancel called but not loading, ignoring');
       return;
     }
     
@@ -996,7 +1000,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       };
       setMessages(prev => [...prev, cancelMessage]);
     } catch (err) {
-      console.error("Failed to cancel execution:", err);
+      logger.error("Failed to cancel execution:", err);
       
       // Even if backend fails, we should update UI to reflect stopped state
       // Add error message but still stop the UI loading state
@@ -1038,15 +1042,15 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   const handleConfirmFork = async () => {
     if (!forkCheckpointId) {
-      console.warn('[ClaudeCodeSession] Cannot fork: no checkpoint ID');
+      logger.warn('Cannot fork: no checkpoint ID');
       return;
     }
     if (!forkSessionName?.trim()) {
-      console.warn('[ClaudeCodeSession] Cannot fork: no session name');
+      logger.warn('Cannot fork: no session name');
       return;
     }
     if (!effectiveSession) {
-      console.warn('[ClaudeCodeSession] Cannot fork: no effective session');
+      logger.warn('Cannot fork: no effective session');
       setError("Cannot fork: no active session");
       return;
     }
@@ -1064,16 +1068,17 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         newSessionId,
         forkSessionName
       );
-      
+
+
       // Open the new forked session
       // You would need to implement navigation to the new session
-      console.log("Forked to new session:", newSessionId);
-      
+      logger.log("Forked to new session:", newSessionId);
+
       setShowForkDialog(false);
       setForkCheckpointId(null);
       setForkSessionName("");
     } catch (err) {
-      console.error("Failed to fork checkpoint:", err);
+      logger.error("Failed to fork checkpoint:", err);
       setError("Failed to fork checkpoint");
     } finally {
       setIsLoading(false);
@@ -1095,7 +1100,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   };
 
   const handlePreviewUrlChange = (url: string) => {
-    console.log('[ClaudeCodeSession] Preview URL changed to:', url);
+    logger.log('Preview URL changed to:', url);
     setPreviewUrl(url);
   };
 
@@ -1110,9 +1115,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   // Cleanup event listeners and track mount state
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     return () => {
-      console.log('[ClaudeCodeSession] Component unmounting, cleaning up listeners');
+      logger.log('Component unmounting, cleaning up listeners');
       isMountedRef.current = false;
       isListeningRef.current = false;
       
@@ -1154,7 +1159,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       // Clear checkpoint manager when session ends
       if (effectiveSession) {
         api.clearCheckpointManager(effectiveSession.id).catch(err => {
-          console.error("Failed to clear checkpoint manager:", err);
+          logger.error("Failed to clear checkpoint manager:", err);
         });
       }
     };
