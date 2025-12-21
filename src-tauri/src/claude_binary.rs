@@ -617,40 +617,104 @@ fn compare_versions(a: &str, b: &str) -> Ordering {
     Ordering::Equal
 }
 
-/// Helper function to create a Command with proper environment variables
-/// This ensures commands like Claude can find Node.js and other dependencies
-pub fn create_command_with_env(program: &str) -> Command {
-    let mut cmd = Command::new(program);
+// ============================================================================
+// Environment Configuration Helpers
+// ============================================================================
 
-    info!("Creating command for: {}", program);
+/// Environment variables to inherit exactly as-is
+const ENV_VARS_EXACT: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "LANG",
+    "LC_ALL",
+    "NODE_PATH",
+    "NVM_DIR",
+    "NVM_BIN",
+    "HOMEBREW_PREFIX",
+    "HOMEBREW_CELLAR",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+];
 
-    // Inherit essential environment variables from parent process
-    for (key, value) in std::env::vars() {
-        // Pass through PATH and other essential environment variables
-        if key == "PATH"
-            || key == "HOME"
-            || key == "USER"
-            || key == "SHELL"
-            || key == "LANG"
-            || key == "LC_ALL"
-            || key.starts_with("LC_")
-            || key == "NODE_PATH"
-            || key == "NVM_DIR"
-            || key == "NVM_BIN"
-            || key == "HOMEBREW_PREFIX"
-            || key == "HOMEBREW_CELLAR"
-            // Add proxy environment variables (only uppercase)
-            || key == "HTTP_PROXY"
-            || key == "HTTPS_PROXY"
-            || key == "NO_PROXY"
-            || key == "ALL_PROXY"
-        {
-            debug!("Inheriting env var: {}={}", key, value);
-            cmd.env(&key, &value);
+/// Determines if an environment variable should be inherited
+fn should_inherit_env_var(key: &str) -> bool {
+    ENV_VARS_EXACT.contains(&key) || key.starts_with("LC_")
+}
+
+/// Returns the path separator for the current platform
+fn get_path_separator() -> &'static str {
+    if cfg!(windows) {
+        ";"
+    } else {
+        ":"
+    }
+}
+
+/// Collects environment variables to inherit from the parent process
+fn get_inherited_env_vars() -> Vec<(String, String)> {
+    std::env::vars()
+        .filter(|(key, _)| should_inherit_env_var(key))
+        .collect()
+}
+
+/// Computes a modified PATH if the program is in a special directory (NVM or Homebrew)
+fn compute_modified_path(program: &str, current_path: &str) -> Option<String> {
+    // Check for NVM directory
+    if program.contains("/.nvm/versions/node/") {
+        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
+            let node_bin_str = node_bin_dir.to_string_lossy();
+            if !current_path.contains(&node_bin_str.as_ref()) {
+                debug!("Adding NVM bin directory to PATH: {}", node_bin_str);
+                return Some(format!(
+                    "{}{}{}",
+                    node_bin_str,
+                    get_path_separator(),
+                    current_path
+                ));
+            }
         }
     }
 
-    // Log proxy-related environment variables for debugging
+    // Check for Homebrew directory
+    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
+        if let Some(program_dir) = std::path::Path::new(program).parent() {
+            let homebrew_bin_str = program_dir.to_string_lossy();
+            if !current_path.contains(&homebrew_bin_str.as_ref()) {
+                debug!(
+                    "Adding Homebrew bin directory to PATH: {}",
+                    homebrew_bin_str
+                );
+                return Some(format!(
+                    "{}{}{}",
+                    homebrew_bin_str,
+                    get_path_separator(),
+                    current_path
+                ));
+            }
+        }
+    }
+
+    None
+}
+
+/// Configuration for command environment setup
+struct CommandEnvConfig {
+    env_vars: Vec<(String, String)>,
+    modified_path: Option<String>,
+}
+
+/// Prepares environment configuration for a command
+fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
+    info!("Preparing environment config for: {}", program);
+
+    // Collect inherited environment variables
+    let env_vars = get_inherited_env_vars();
+
+    // Log proxy settings for debugging
     info!("Command will use proxy settings:");
     if let Ok(http_proxy) = std::env::var("HTTP_PROXY") {
         info!("  HTTP_PROXY={}", http_proxy);
@@ -659,35 +723,35 @@ pub fn create_command_with_env(program: &str) -> Command {
         info!("  HTTPS_PROXY={}", https_proxy);
     }
 
-    // Add NVM support if the program is in an NVM directory
-    if program.contains("/.nvm/versions/node/") {
-        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
-            // Ensure the Node.js bin directory is in PATH
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let node_bin_str = node_bin_dir.to_string_lossy();
-            if !current_path.contains(&node_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", node_bin_str, current_path);
-                debug!("Adding NVM bin directory to PATH: {}", node_bin_str);
-                cmd.env("PATH", new_path);
-            }
-        }
+    // Compute modified PATH if needed
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    let modified_path = compute_modified_path(program, &current_path);
+
+    CommandEnvConfig {
+        env_vars,
+        modified_path,
+    }
+}
+
+// ============================================================================
+// Command Creation Functions
+// ============================================================================
+
+/// Helper function to create a Command with proper environment variables
+/// This ensures commands like Claude can find Node.js and other dependencies
+pub fn create_command_with_env(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    let config = prepare_command_env_config(program);
+
+    // Set inherited environment variables
+    for (key, value) in config.env_vars {
+        debug!("Inheriting env var: {}={}", key, value);
+        cmd.env(&key, &value);
     }
 
-    // Add Homebrew support if the program is in a Homebrew directory
-    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
-        if let Some(program_dir) = std::path::Path::new(program).parent() {
-            // Ensure the Homebrew bin directory is in PATH
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let homebrew_bin_str = program_dir.to_string_lossy();
-            if !current_path.contains(&homebrew_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", homebrew_bin_str, current_path);
-                debug!(
-                    "Adding Homebrew bin directory to PATH: {}",
-                    homebrew_bin_str
-                );
-                cmd.env("PATH", new_path);
-            }
-        }
+    // Apply modified PATH if needed
+    if let Some(new_path) = config.modified_path {
+        cmd.env("PATH", new_path);
     }
 
     cmd
@@ -697,73 +761,17 @@ pub fn create_command_with_env(program: &str) -> Command {
 /// This is the async version of create_command_with_env for use with tokio
 pub fn create_tokio_command_with_env(program: &str) -> TokioCommand {
     let mut cmd = TokioCommand::new(program);
+    let config = prepare_command_env_config(program);
 
-    info!("Creating tokio command for: {}", program);
-
-    // Inherit essential environment variables from parent process
-    for (key, value) in std::env::vars() {
-        // Pass through PATH and other essential environment variables
-        if key == "PATH"
-            || key == "HOME"
-            || key == "USER"
-            || key == "SHELL"
-            || key == "LANG"
-            || key == "LC_ALL"
-            || key.starts_with("LC_")
-            || key == "NODE_PATH"
-            || key == "NVM_DIR"
-            || key == "NVM_BIN"
-            || key == "HOMEBREW_PREFIX"
-            || key == "HOMEBREW_CELLAR"
-            // Add proxy environment variables (only uppercase)
-            || key == "HTTP_PROXY"
-            || key == "HTTPS_PROXY"
-            || key == "NO_PROXY"
-            || key == "ALL_PROXY"
-        {
-            debug!("Inheriting env var: {}={}", key, value);
-            cmd.env(&key, &value);
-        }
+    // Set inherited environment variables
+    for (key, value) in config.env_vars {
+        debug!("Inheriting env var: {}={}", key, value);
+        cmd.env(&key, &value);
     }
 
-    // Log proxy-related environment variables for debugging
-    info!("Command will use proxy settings:");
-    if let Ok(http_proxy) = std::env::var("HTTP_PROXY") {
-        info!("  HTTP_PROXY={}", http_proxy);
-    }
-    if let Ok(https_proxy) = std::env::var("HTTPS_PROXY") {
-        info!("  HTTPS_PROXY={}", https_proxy);
-    }
-
-    // Add NVM support if the program is in an NVM directory
-    if program.contains("/.nvm/versions/node/") {
-        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
-            // Ensure the Node.js bin directory is in PATH
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let node_bin_str = node_bin_dir.to_string_lossy();
-            if !current_path.contains(&node_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", node_bin_str, current_path);
-                debug!("Adding NVM bin directory to PATH: {}", node_bin_str);
-                cmd.env("PATH", new_path);
-            }
-        }
-    }
-
-    // Add Homebrew support if the program is in a Homebrew directory
-    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
-        if let Some(program_dir) = std::path::Path::new(program).parent() {
-            // Ensure the Homebrew bin directory is in PATH
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let homebrew_bin_str = program_dir.to_string_lossy();
-            if !current_path.contains(&homebrew_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", homebrew_bin_str, current_path);
-                debug!(
-                    "Adding Homebrew bin directory to PATH: {}",
-                    homebrew_bin_str
-                );
-                cmd.env("PATH", new_path);
-            }
-        }
+    // Apply modified PATH if needed
+    if let Some(new_path) = config.modified_path {
+        cmd.env("PATH", new_path);
     }
 
     // Windows: Hide console window when spawning child process
