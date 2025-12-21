@@ -11,7 +11,7 @@
 | **Async Runtime** | Tokio |
 | **HTTP Framework** | Axum |
 | **Database** | SQLite (rusqlite) |
-| **Commands** | 120+ IPC endpoints |
+| **Commands** | 173 IPC endpoints |
 
 ---
 
@@ -48,7 +48,7 @@
 │  - Tauri Builder                                             │
 │  - Plugin Registration                                       │
 │  - State Management                                          │
-│  - Command Handler (120+ commands)                           │
+│  - Command Handler (173 commands)                            │
 └─────────────────────────────────────────────────────────────┘
                                │
          ┌─────────────────────┼─────────────────────┐
@@ -98,19 +98,106 @@
 
 ## Command Modules
 
-### agents/ (모듈 분할)
+### agents/ (Modular Architecture)
 
-**Purpose**: Agent lifecycle management
+**Purpose**: Agent lifecycle management - complete system for creating, executing, and managing AI agents
+
+**Module Split History**: Originally a single `agents.rs` file (~2070 LOC), refactored into 6 focused modules for better maintainability.
 
 **Module Structure**:
 ```
 src-tauri/src/commands/agents/
-├── mod.rs           (~100 LOC)  - Re-exports
-├── types.rs         (~120 LOC)  - Agent, AgentRun, AgentRunMetrics, AgentDb
-├── database.rs      (~380 LOC)  - init_database(), CRUD operations
-├── execution.rs     (~550 LOC)  - execute_agent(), process spawn
-├── session.rs       (~400 LOC)  - session management, streaming
-└── import_export.rs (~520 LOC)  - Import/export, GitHub integration
+├── mod.rs           (~69 LOC)   - Re-exports
+├── types.rs         (~173 LOC)  - Data structures
+├── database.rs      (~630 LOC)  - Database operations
+├── execution.rs     (~500 LOC)  - Agent execution
+├── session.rs       (~500 LOC)  - Session management
+└── import_export.rs (~270 LOC)  - Import/export
+```
+
+**Type Definitions** (types.rs):
+```rust
+// Core types
+Agent {                          // Agent configuration
+    id: Option<i64>,
+    name: String,
+    icon: String,
+    system_prompt: String,
+    default_task: Option<String>,
+    model: String,
+    enable_file_read: bool,
+    enable_file_write: bool,
+    enable_network: bool,
+    hooks: Option<String>,       // JSON hooks config
+    created_at: String,
+    updated_at: String,
+}
+
+AgentRun {                       // Execution run record
+    id: Option<i64>,
+    agent_id: i64,
+    agent_name: String,
+    agent_icon: String,
+    task: String,
+    model: String,
+    project_path: String,
+    session_id: String,          // UUID from Claude Code
+    status: String,              // pending/running/completed/failed/cancelled
+    pid: Option<u32>,
+    process_started_at: Option<String>,
+    created_at: String,
+    completed_at: Option<String>,
+}
+
+AgentRunMetrics {                // Runtime metrics from JSONL
+    duration_ms: Option<i64>,
+    total_tokens: Option<i64>,
+    cost_usd: Option<f64>,
+    message_count: Option<i64>,
+}
+
+AgentRunWithMetrics {            // Combined for frontend
+    run: AgentRun,               // Flattened via serde
+    metrics: Option<AgentRunMetrics>,
+    output: Option<String>,      // Real-time JSONL
+}
+
+// Import/Export types
+AgentExport {                    // Export wrapper
+    version: u32,
+    exported_at: String,
+    agent: AgentData,
+}
+
+AgentData {                      // Portable agent data
+    name: String,
+    icon: String,
+    system_prompt: String,
+    default_task: Option<String>,
+    model: String,
+    hooks: Option<String>,
+}
+
+// GitHub integration
+GitHubAgentFile {                // GitHub API file
+    name: String,
+    path: String,
+    download_url: String,
+    size: i64,
+    sha: String,
+}
+
+GitHubApiResponse {              // GitHub API response
+    name: String,
+    path: String,
+    sha: String,
+    size: i64,
+    download_url: Option<String>,
+    file_type: String,           // "file" or "dir"
+}
+
+// State management
+AgentDb(Mutex<Connection>)       // Thread-safe SQLite
 ```
 
 **Database Tables**:
@@ -118,19 +205,51 @@ src-tauri/src/commands/agents/
 - `agent_runs` - Execution history
 - `app_settings` - Settings storage
 
-**Key Commands**:
+**Key Commands** (30 total):
+
+**Database Operations** (database.rs):
 | Command | Description |
 |---------|-------------|
 | `list_agents` | Get all agents |
 | `create_agent` | Create new agent |
 | `update_agent` | Modify agent |
 | `delete_agent` | Remove agent |
-| `execute_agent` | Run agent (spawn Claude) |
+| `get_agent` | Get single agent |
 | `list_agent_runs` | Get run history |
-| `get_agent_run_with_real_time_metrics` | Get run with metrics |
+| `get_agent_run` | Get single run |
+| `cleanup_finished_processes` | Clean up completed runs |
+| `get_claude_binary_path` | Get Claude binary path |
+| `set_claude_binary_path` | Set Claude binary path |
+| `list_claude_installations` | List available Claude binaries |
+
+**Execution** (execution.rs):
+| Command | Description |
+|---------|-------------|
+| `execute_agent` | Run agent (spawn Claude) |
+
+**Session Management** (session.rs):
+| Command | Description |
+|---------|-------------|
+| `get_agent_run_with_real_time_metrics` | Get run with live metrics |
+| `list_agent_runs_with_metrics` | List runs with metrics |
+| `list_running_sessions` | Get active sessions |
 | `kill_agent_session` | Stop running agent |
-| `export_agent` / `import_agent` | Portability |
-| `fetch_github_agents` | Import from GitHub |
+| `get_session_status` | Get session status |
+| `get_live_session_output` | Get live output |
+| `get_session_output` | Get session output |
+| `stream_session_output` | Stream output |
+| `load_agent_session_history` | Load session history |
+
+**Import/Export** (import_export.rs):
+| Command | Description |
+|---------|-------------|
+| `export_agent` | Export agent to JSON |
+| `export_agent_to_file` | Export agent to file |
+| `import_agent` | Import agent from JSON |
+| `import_agent_from_file` | Import agent from file |
+| `fetch_github_agents` | List GitHub agents |
+| `fetch_github_agent_content` | Get GitHub agent content |
+| `import_agent_from_github` | Import from GitHub |
 
 ### claude.rs (~3000 LOC)
 

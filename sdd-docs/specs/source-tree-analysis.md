@@ -37,7 +37,7 @@ anyon-claude/                         # Project Root
 │                            ↕                                 │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │                    Frontend (React)                     │ │
-│  │  - 81 Components                                        │ │
+│  │  - 140 Components (21 UI + 29 Widgets + 90 Feature)    │ │
 │  │  - 5 Zustand Stores                                     │ │
 │  │  - 17 Custom Hooks                                      │ │
 │  └─────────────────────────────────────────────────────────┘ │
@@ -64,14 +64,60 @@ anyon-claude/
 │   ├── router.tsx                    # Route definitions (Hash-based)
 │   ├── index.css                     # Global styles
 │   │
-│   ├── 📁 components/                # React Components (81 total)
+│   ├── 📁 components/                # React Components (140 total)
 │   │   ├── 📁 ui/                    # Radix UI primitives (21)
+│   │   │   ├── badge.tsx
 │   │   │   ├── button.tsx
+│   │   │   ├── card.tsx
 │   │   │   ├── dialog.tsx
 │   │   │   ├── dropdown-menu.tsx
+│   │   │   ├── input.tsx
+│   │   │   ├── label.tsx
+│   │   │   ├── pagination.tsx
+│   │   │   ├── panel-header.tsx
+│   │   │   ├── popover.tsx
+│   │   │   ├── radio-group.tsx
+│   │   │   ├── scroll-area.tsx
+│   │   │   ├── select.tsx
+│   │   │   ├── selection-card.tsx
+│   │   │   ├── split-pane.tsx
+│   │   │   ├── switch.tsx
 │   │   │   ├── tabs.tsx
+│   │   │   ├── textarea.tsx
 │   │   │   ├── toast.tsx
-│   │   │   └── ... (16 more)
+│   │   │   ├── tooltip.tsx
+│   │   │   └── tooltip-modern.tsx
+│   │   │
+│   │   ├── 📁 widgets/               # Interactive inline widgets (29)
+│   │   │   ├── BackgroundAgentsPanel.tsx
+│   │   │   ├── BashWidget.tsx
+│   │   │   ├── CommandOutputWidget.tsx
+│   │   │   ├── CommandWidget.tsx
+│   │   │   ├── EditResultWidget.tsx
+│   │   │   ├── EditWidget.tsx
+│   │   │   ├── GlobWidget.tsx
+│   │   │   ├── GrepWidget.tsx
+│   │   │   ├── LSResultWidget.tsx
+│   │   │   ├── LSWidget.tsx
+│   │   │   ├── MCPWidget.tsx
+│   │   │   ├── MultiEditResultWidget.tsx
+│   │   │   ├── MultiEditWidget.tsx
+│   │   │   ├── ReadResultWidget.tsx
+│   │   │   ├── ReadWidget.tsx
+│   │   │   ├── SessionInfoWidget.tsx
+│   │   │   ├── SkillPromptWidget.tsx
+│   │   │   ├── SummaryWidget.tsx
+│   │   │   ├── SystemInitializedWidget.tsx
+│   │   │   ├── SystemReminderWidget.tsx
+│   │   │   ├── TaskWidget.tsx
+│   │   │   ├── ThinkingWidget.tsx
+│   │   │   ├── TodoReadWidget.tsx
+│   │   │   ├── TodoWidget.tsx
+│   │   │   ├── UsageStatsWidget.tsx
+│   │   │   ├── WebFetchWidget.tsx
+│   │   │   ├── WebSearchWidget.tsx
+│   │   │   ├── WriteWidget.tsx
+│   │   │   └── shared.tsx
 │   │   │
 │   │   ├── 📁 claude-code-session/   # Chat session components
 │   │   │   ├── MessageList.tsx
@@ -94,11 +140,6 @@ anyon-claude/
 │   │   ├── 📁 development/           # Dev workflow
 │   │   │   └── DevDocsPanel.tsx
 │   │   │
-│   │   ├── 📁 widgets/               # Inline widgets
-│   │   │   ├── BashWidget.tsx
-│   │   │   ├── LSWidget.tsx
-│   │   │   └── TodoWidget.tsx
-│   │   │
 │   │   ├── AppLayout.tsx             # ⭐ Main 3-panel layout
 │   │   ├── AppSidebar.tsx            # Left sidebar navigation
 │   │   ├── Topbar.tsx                # Top bar with window controls
@@ -120,13 +161,24 @@ anyon-claude/
 │   │   └── languageStore.ts          # i18n preferences
 │   │
 │   ├── 📁 hooks/                     # Custom React Hooks (17)
+│   │   ├── index.ts                  # Hook exports
 │   │   ├── useAnalytics.ts           # Event tracking
-│   │   ├── useTabState.ts            # Tab management
+│   │   ├── useApiCall.ts             # API wrapper
+│   │   ├── useComponentSelectorShortcut.ts  # Component shortcuts
+│   │   ├── useDebounce.ts            # Debouncing
 │   │   ├── useDevServer.ts           # Dev server control
+│   │   ├── useDevWorkflow.ts         # PM workflow
+│   │   ├── useEventListeners.ts      # Global event listeners
+│   │   ├── useLoadingState.ts        # Loading state
+│   │   ├── usePagination.ts          # Pagination
+│   │   ├── usePerformanceMonitor.ts  # Performance monitoring
+│   │   ├── usePlanningDocs.ts        # Planning docs
+│   │   ├── usePreviewMessages.ts     # Preview iframe
+│   │   ├── useTabState.ts            # Tab management
+│   │   ├── useTheme.ts               # Theme context
 │   │   ├── useTranslation.ts         # i18n
 │   │   ├── useUpdater.ts             # App updates
-│   │   ├── useDebounce.ts            # Debouncing
-│   │   └── ... (11 more)
+│   │   └── useWorkflowPreview.ts     # Preview detection
 │   │
 │   ├── 📁 contexts/                  # React Contexts
 │   │   ├── TabContext.tsx            # Tab state provider
@@ -250,8 +302,9 @@ anyon-claude/
 
 | Directory | Purpose | Key Files |
 |-----------|---------|-----------|
-| `components/` | React UI components | 81 components, organized by feature |
-| `components/ui/` | Radix UI primitives | Reusable button, dialog, tabs, etc. |
+| `components/` | React UI components | 140 components, organized by feature |
+| `components/ui/` | Radix UI primitives | 21 reusable components (button, dialog, tabs, etc.) |
+| `components/widgets/` | Interactive inline widgets | 29 widgets for tool execution visualization |
 | `stores/` | Zustand state | authStore, sessionStore, agentStore, previewStore |
 | `hooks/` | Custom hooks | 17 hooks for analytics, tabs, dev server, etc. |
 | `lib/` | Utilities | api.ts (main API client), analytics/ |

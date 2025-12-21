@@ -30,12 +30,13 @@ The platform supports Google OAuth authentication, multi-project management, and
 | Category | Technology | Version |
 |----------|------------|---------|
 | Framework | React | 18.3.1 |
-| Language | TypeScript | 5.6.2 |
+| Language | TypeScript | ~5.6.2 |
 | Build Tool | Vite | 6.0.3 |
 | Styling | Tailwind CSS | 4.1.8 |
 | State | Zustand | 5.0.6 |
 | Routing | React Router | 7.10.1 |
 | UI Library | Radix UI | Various |
+| Tauri API | @tauri-apps/api | 2.9.1 |
 
 ### Desktop Backend (src-tauri/)
 
@@ -54,6 +55,7 @@ The platform supports Google OAuth authentication, multi-project management, and
 |----------|------------|---------|
 | Runtime | Node.js | 18+ |
 | Framework | Express | 4.18.2 |
+| Database | better-sqlite3 | 11.8.1 |
 | Auth | google-auth-library | 10.5.0 |
 | Tokens | jsonwebtoken | 9.0.2 |
 
@@ -69,14 +71,14 @@ The platform supports Google OAuth authentication, multi-project management, and
 ├────────────────────────────────────────────────────┤
 │  ┌──────────────────────────────────────────────┐  │
 │  │           Frontend (React + TS)               │  │
-│  │  - 81 Components                              │  │
+│  │  - 140 Components                             │  │
 │  │  - 5 Zustand Stores                           │  │
-│  │  - 17 Custom Hooks                            │  │
+│  │  - 18 Custom Hooks                            │  │
 │  └──────────────────────────────────────────────┘  │
 │                        ↕ IPC                        │
 │  ┌──────────────────────────────────────────────┐  │
 │  │           Desktop Backend (Rust)              │  │
-│  │  - 120+ Tauri Commands                        │  │
+│  │  - 173 Tauri Commands                         │  │
 │  │  - SQLite Database                            │  │
 │  │  - Process Registry                           │  │
 │  └──────────────────────────────────────────────┘  │
@@ -97,15 +99,19 @@ The platform supports Google OAuth authentication, multi-project management, and
 ```
 anyon-claude/
 ├── src/                    # React Frontend
-│   ├── components/         # 81 React components
-│   ├── stores/             # Zustand state stores
-│   ├── hooks/              # Custom React hooks
+│   ├── components/         # 140 React components
+│   ├── stores/             # 5 Zustand stores
+│   ├── hooks/              # 18 Custom hooks
 │   ├── lib/                # Utilities & API adapter
 │   └── styles/             # Tailwind configuration
 │
 ├── src-tauri/              # Tauri Desktop Backend
 │   ├── src/
-│   │   ├── commands/       # 120+ IPC commands
+│   │   ├── commands/       # 173 IPC commands
+│   │   │   ├── agents/     # 30 commands (6 modules)
+│   │   │   ├── claude.rs   # ~3000 LOC
+│   │   │   ├── mcp.rs      # ~726 LOC
+│   │   │   └── ...         # 8 more modules
 │   │   ├── checkpoint/     # Session checkpointing
 │   │   ├── process/        # Process management
 │   │   └── main.rs         # Application entry
@@ -114,7 +120,7 @@ anyon-claude/
 ├── server/                 # Node.js Auth Server
 │   └── index.js            # Express application
 │
-└── _bmad-output/           # Generated documentation
+└── sdd-docs/               # Software Design Docs
 ```
 
 ---

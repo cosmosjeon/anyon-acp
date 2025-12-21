@@ -8,8 +8,8 @@
 
 | Software | Version | Purpose |
 |----------|---------|---------|
-| **Node.js** | 18+ | Frontend runtime, auth server |
-| **npm/bun** | Latest | Package management |
+| **Node.js** | 20+ | Frontend runtime, auth server |
+| **Bun** | 1.3+ | Package management, test runner |
 | **Rust** | 1.70+ | Tauri backend |
 | **Cargo** | Latest | Rust package manager |
 
@@ -17,7 +17,7 @@
 
 | Software | Purpose |
 |----------|---------|
-| **Bun** | Faster alternative to npm |
+| **npm** | Alternative to Bun for package management |
 | **Docker** | Container builds |
 
 ---
@@ -34,15 +34,15 @@ cd anyon-claude
 ### 2. Install Dependencies
 
 ```bash
-# Frontend dependencies
-npm install
-
-# Or with Bun (faster)
+# Frontend dependencies (using Bun - recommended)
 bun install
+
+# Or with npm
+npm install
 
 # Auth server dependencies
 cd server
-npm install
+bun install  # or npm install
 cd ..
 ```
 
@@ -88,19 +88,17 @@ cargo install tauri-cli
 ### Full Stack Development
 
 ```bash
-# Start all services (frontend + backend + Tauri)
+# Start frontend + backend (without Tauri)
 npm run dev
+
+# Or with Bun + Tauri (full development mode)
+bun run dev:bun
 ```
 
 This runs:
 - **Frontend**: Vite dev server on `http://localhost:1420`
 - **Backend**: Auth server on `http://localhost:4000`
-
-### With Bun (Faster)
-
-```bash
-bun run dev:bun
-```
+- **Tauri**: Desktop app (dev:bun only)
 
 ### Individual Services
 
@@ -113,8 +111,20 @@ npm run dev:backend
 # or
 cd server && npm start
 
-# Tauri dev mode
+# Tauri dev mode (with Bun config)
 npm run tauri:dev
+# or
+bun run tauri:bun
+```
+
+### Clean Development
+
+```bash
+# Clean cache and start dev
+npm run dev:clean
+
+# Clean cache and start with Bun
+bun run dev:bun:clean
 ```
 
 ---
@@ -151,17 +161,24 @@ Output:
 - Windows: `src-tauri/target/release/bundle/msi/`
 - Linux: `src-tauri/target/release/bundle/deb/`
 
-### Executables Build
+### Claude Executables Build
+
+Build Claude Code executables for different platforms:
 
 ```bash
-# All platforms
+# All platforms (version 1.0.41)
 npm run build:executables
+
+# Current platform only
+npm run build:executables:current
 
 # Specific platform
 npm run build:executables:macos
 npm run build:executables:windows
 npm run build:executables:linux
 ```
+
+Note: Version is configured in package.json scripts (currently 1.0.41)
 
 ---
 
@@ -177,11 +194,15 @@ npm run check
 ### Frontend Tests
 
 ```bash
-# Run tests
-npm test
+# Run tests with Bun
+bun test
 
 # Watch mode
-npm test -- --watch
+bun test --watch
+
+# Or with npm
+npm test
+npm run test:watch
 ```
 
 ### Rust Tests
@@ -191,21 +212,38 @@ cd src-tauri
 cargo test
 ```
 
+### Test Strategy
+
+See `CLAUDE.md` for detailed testing guidelines:
+- **Test on Bug**: Write tests when fixing bugs (TDD)
+- **Complex Functions**: Tests recommended
+- **UI Components**: Manual testing preferred
+
 ---
 
 ## Key Development Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Full stack development |
+| `npm run dev` | Frontend + Backend (no Tauri) |
+| `bun run dev:bun` | Full stack with Tauri (recommended) |
 | `npm run dev:frontend` | Vite dev server only |
 | `npm run dev:backend` | Auth server only |
-| `npm run dev:bun` | Development with Bun |
+| `npm run dev:clean` | Clean cache and start dev |
+| `npm run tauri:dev` | Tauri dev mode with Bun config |
 | `npm run build` | Production frontend build |
-| `npm run tauri` | Tauri CLI commands |
+| `npm run build:bun` | Build with Bun |
+| `npm run build:executables` | Build Claude executables (all platforms) |
+| `npm run build:executables:macos` | Build macOS executables only |
+| `npm run build:executables:windows` | Build Windows executables only |
+| `npm run build:executables:linux` | Build Linux executables only |
+| `npm run build:dmg` | Build macOS DMG bundle |
 | `npm run check` | TypeScript + Rust type check |
+| `bun test` | Run tests |
+| `bun test --watch` | Run tests in watch mode |
 | `npm run clean:cache` | Clear build caches |
 | `npm run kill:servers` | Kill all dev servers |
+| `npm run tauri` | Tauri CLI commands |
 
 ---
 
@@ -310,6 +348,17 @@ app.get('/api/my-endpoint', authenticate, (req, res) => {
 });
 ```
 
+### Server Development Scripts
+
+```bash
+# Start server (from server directory)
+cd server
+npm start        # or: node index.js
+
+# Watch mode (auto-restart on changes)
+npm run dev      # or: node --watch index.js
+```
+
 ---
 
 ## Troubleshooting
@@ -342,10 +391,11 @@ npm run tauri build
 ```bash
 # Clean and reinstall
 rm -rf node_modules
-npm install
+bun install  # or npm install
 
-# Clear Vite cache
+# Clear Vite cache and other build artifacts
 npm run clean:cache
+# This removes: node_modules/.vite, dist, .parcel-cache
 ```
 
 ### Rust Compilation Errors

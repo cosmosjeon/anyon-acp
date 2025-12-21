@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "description": "Tracks documentation freshness using git commit hashes",
-  "last_full_sync_commit": "49f60f1",
+  "last_full_sync_commit": "b8108ee",
   "documents": {
     "auto_generated": {
       "specs/component-inventory.md": {
@@ -11,7 +11,7 @@
           "src/hooks/**/*.ts",
           "src/stores/**/*.ts"
         ],
-        "last_synced_commit": "49f60f1",
+        "last_synced_commit": "b8108ee",
         "regenerate_on": [
           "component_add",
           "component_remove",
@@ -24,7 +24,7 @@
           "src-tauri/src/commands/**/*.rs",
           "server/*.js"
         ],
-        "last_synced_commit": "49f60f1",
+        "last_synced_commit": "b8108ee",
         "regenerate_on": [
           "api_change",
           "endpoint_add",
@@ -39,7 +39,7 @@
           "src/types/**/*.ts",
           "server/db/**/*.js"
         ],
-        "last_synced_commit": "49f60f1",
+        "last_synced_commit": "b8108ee",
         "regenerate_on": [
           "schema_change",
           "type_change"
@@ -50,7 +50,7 @@
         "source_patterns": [
           "*"
         ],
-        "last_synced_commit": "49f60f1",
+        "last_synced_commit": "b8108ee",
         "regenerate_on": [
           "directory_structure_change"
         ]
@@ -64,7 +64,7 @@
           "src/router/**/*",
           "src/stores/**/*"
         ],
-        "last_reviewed_commit": "49f60f1",
+        "last_reviewed_commit": "b8108ee",
         "drift_indicators": []
       },
       "specs/architecture-desktop.md": {
@@ -75,7 +75,7 @@
           "src-tauri/Cargo.toml",
           "src-tauri/src/commands/agents/**/*.rs"
         ],
-        "last_reviewed_commit": "49f60f1",
+        "last_reviewed_commit": "b8108ee",
         "drift_indicators": []
       },
       "specs/architecture-server.md": {
@@ -85,7 +85,7 @@
           "server/package.json",
           "server/db/**/*.js"
         ],
-        "last_reviewed_commit": "49f60f1",
+        "last_reviewed_commit": "b8108ee",
         "drift_indicators": []
       },
       "specs/integration-architecture.md": {
@@ -95,7 +95,7 @@
           "src/services/**/*",
           "src-tauri/src/commands/mod.rs"
         ],
-        "last_reviewed_commit": "49f60f1",
+        "last_reviewed_commit": "b8108ee",
         "drift_indicators": []
       }
     },
@@ -110,7 +110,7 @@
           "description",
           "goals"
         ],
-        "last_synced_commit": "49f60f1"
+        "last_synced_commit": "b8108ee"
       },
       "specs/development-guide.md": {
         "type": "hybrid",
@@ -122,14 +122,14 @@
           "workflow",
           "conventions"
         ],
-        "last_synced_commit": "49f60f1"
+        "last_synced_commit": "b8108ee"
       }
     }
   },
   "audit_tracking": {
     "audits/code-audit-report.md": {
       "total_issues": 520,
-      "last_updated_commit": "49f60f1"
+      "last_updated_commit": "b8108ee"
     }
   },
   "drift_check_command": "git diff {last_commit}..HEAD -- {patterns}",

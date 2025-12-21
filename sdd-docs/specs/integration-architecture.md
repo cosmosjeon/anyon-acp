@@ -54,6 +54,10 @@ ANYON is a multi-part application with three main components that communicate th
 | **Projects** | `list_projects`, `create_project`, `get_project_sessions` | Project management |
 | **Claude** | `execute_claude_code`, `continue_claude_code`, `cancel_claude_execution` | Chat execution |
 | **Agents** | `list_agents`, `create_agent`, `execute_agent`, `kill_agent_session` | Agent CRUD + execution |
+| **Dev Server** | `start_dev_server`, `stop_dev_server`, `get_dev_server_info`, `detect_package_manager` | Preview server management |
+| **Dev Workflow** | `start_dev_workflow`, `stop_dev_workflow`, `get_dev_workflow_status` | PM workflow automation |
+| **Slash Commands** | `slash_commands_list`, `slash_command_get`, `slash_command_save`, `slash_command_delete` | Custom command management |
+| **Proxy** | `get_proxy_settings`, `save_proxy_settings` | HTTP proxy configuration |
 | **MCP** | `mcp_list`, `mcp_add`, `mcp_remove`, `mcp_test_connection` | Server management |
 | **Storage** | `storage_list_tables`, `storage_execute_sql` | Database operations |
 | **Auth** | `claude_auth_check`, `claude_auth_save_api_key` | Authentication |
@@ -65,6 +69,7 @@ ANYON is a multi-part application with three main components that communicate th
 | `agent-output:{run_id}` | Backend → Frontend | Streaming agent output |
 | `agent-error:{run_id}` | Backend → Frontend | Agent error messages |
 | `claude-output:{session_id}` | Backend → Frontend | Claude Code output |
+| `dev-server-output` | Backend → Frontend | Dev server logs & port detection |
 | `checkpoint-created` | Backend → Frontend | Checkpoint notifications |
 
 #### API Adapter Pattern
@@ -177,6 +182,36 @@ Events: Emits claude-output:{session_id}
 Frontend: Updates UI in real-time
 ```
 
+#### Dev Server with Proxy
+
+```
+Frontend: invoke('start_dev_server', { projectPath, projectId })
+    ↓
+Tauri: Detects package manager (bun/pnpm/yarn/npm)
+    ↓
+Spawn: Runs dev server with calculated port (based on projectId hash)
+    ↓
+Port Detection: Regex parses stdout for port number
+    ↓
+Proxy Server: Starts on port + 10000, injects element selector script
+    ↓
+HTML Injection: Intercepts HTML responses, adds <script> tag
+    ↓
+Events: Emits dev-server-output with proxy_url
+    ↓
+Frontend: Displays preview with injected selector functionality
+```
+
+**Port Strategy:**
+- Fixed Port: `32100 + (hash(projectId) % 10000)` ensures consistent ports per project
+- Proxy Port: `detected_port + 10000` for script injection
+- Fallback: Dynamic port detection from stdout if projectId not provided
+
+**Script Injection:**
+- Target: HTML responses (Content-Type: text/html)
+- Location: Injected after `<head>` tag
+- Functionality: Element selector, overlay renderer, keyboard shortcuts (Shift+Cmd/Ctrl+C)
+
 #### Process Registry
 
 ```rust
@@ -264,19 +299,82 @@ impl ProcessRegistry {
 └──────────┘             └────────────┘               └────────────┘
 ```
 
+### Dev Workflow Auto-Routing Flow
+
+```
+┌──────────────┐   start_dev_workflow    ┌──────────────┐
+│   Frontend   │ ─────────────────────→  │ dev_workflow │
+└──────────────┘                          │    .rs       │
+                                          └──────┬───────┘
+                                                 │
+                                                 │ Execute pm-orchestrator
+                                                 ▼
+                                          ┌──────────────┐
+                                          │ Claude CLI   │
+                                          │ (orchestrate)│
+                                          └──────┬───────┘
+                                                 │
+                                                 │ on_claude_complete hook
+                                                 ▼
+                                          ┌──────────────┐
+                                          │ Auto-routing │
+                                          │   Logic      │
+                                          └──────┬───────┘
+                                                 │
+                         ┌───────────────────────┼────────────────────┐
+                         │                       │                    │
+                   pm-orchestrator         pm-executor          pm-reviewer
+                         ↓                       ↓                    ↓
+                   pm-executor            pm-reviewer    ┌──────────────────┐
+                                               ↓         │ Check completion │
+                                          pm-executor    │ markers in       │
+                                               ↓         │ execution-       │
+                                          (cycle up to   │ progress.md      │
+                                           100 times)    └──────────────────┘
+                                               ↓
+                                          ✅ Complete or ❌ Max cycles
+```
+
+**Auto-routing Rules:**
+1. `pm-orchestrator` → `pm-executor`
+2. `pm-executor` → `pm-reviewer`
+3. `pm-reviewer` → `pm-executor` (if not complete) OR `completed` (if all epics done)
+
+**Completion Detection:**
+- Checks `anyon-docs/execution-progress.md` for markers:
+  - "프로젝트 구현 완료"
+  - "모든 Epic 완료"
+  - "All Epics Completed"
+  - "Project Implementation Complete"
+
+**State Management:**
+- Stored in `dev_sessions` table
+- Max cycles: 100 (prevents infinite loops)
+- Status: idle → running → completed/error
+
 ---
 
 ## Shared Resources
 
 ### Database (SQLite)
 
+**Desktop App Database:**
+
 | Table | Part | Description |
 |-------|------|-------------|
 | `agents` | Desktop | Agent definitions |
 | `agent_runs` | Desktop | Execution history |
 | `app_settings` | Desktop | Application settings |
+| `dev_sessions` | Desktop | Dev workflow state |
 | `checkpoints` | Desktop | Checkpoint metadata |
 | `checkpoint_files` | Desktop | File snapshots |
+
+**Auth Server Database:**
+
+| Table | Part | Description |
+|-------|------|-------------|
+| `users` | Auth Server | User accounts |
+| `user_settings` | Auth Server | User preferences |
 
 ### File System
 

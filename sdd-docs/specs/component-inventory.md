@@ -7,8 +7,10 @@
 | Category | Count |
 |----------|-------|
 | **React Components** | 140 |
+| **UI Components** | 21 |
+| **Widget Components** | 29 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 18 |
+| **Custom Hooks** | 17 |
 | **Context Providers** | 3 |
 
 > Last synced: 2025-12-21
@@ -80,26 +82,71 @@
 
 ## UI Components (Radix-based)
 
-Located in `src/components/ui/`:
+Located in `src/components/ui/` (21 components):
 
 | Component | Base | Purpose |
 |-----------|------|---------|
+| `Badge` | Custom | Status badges |
 | `Button` | Radix Slot | Action buttons |
+| `Card` | Custom | Content cards |
 | `Dialog` | Radix Dialog | Modal dialogs |
 | `DropdownMenu` | Radix Dropdown | Context menus |
+| `Input` | Native | Text inputs |
+| `Label` | Radix Label | Form labels |
+| `Pagination` | Radix/Custom | Page navigation |
+| `PanelHeader` | Custom | Panel headers |
+| `Popover` | Radix Popover | Popovers |
+| `RadioGroup` | Radix Radio | Radio selections |
+| `ScrollArea` | Radix ScrollArea | Scrollable containers |
 | `Select` | Radix Select | Dropdowns |
+| `SelectionCard` | Custom | Selectable cards |
+| `SplitPane` | Custom | Resizable panes |
 | `Switch` | Radix Switch | Toggles |
 | `Tabs` | Radix Tabs | Tab containers |
+| `Textarea` | Native | Multi-line inputs |
 | `Toast` | Radix Toast | Notifications |
 | `Tooltip` | Radix Tooltip | Hover hints |
-| `Popover` | Radix Popover | Popovers |
-| `ScrollArea` | Radix ScrollArea | Scrollable containers |
-| `Label` | Radix Label | Form labels |
-| `Input` | Native | Text inputs |
-| `Textarea` | Native | Multi-line inputs |
-| `Badge` | Custom | Status badges |
-| `Card` | Custom | Content cards |
-| `Separator` | Radix Separator | Visual dividers |
+| `TooltipModern` | Radix Tooltip | Modern tooltip variant |
+
+---
+
+## Widget Components
+
+Located in `src/components/widgets/` (29 components):
+
+Interactive widgets displayed inline in chat messages to visualize tool executions and results.
+
+| Widget | Purpose |
+|--------|---------|
+| `BackgroundAgentsPanel` | Background agent status display |
+| `BashWidget` | Bash command execution display |
+| `CommandOutputWidget` | Command execution output |
+| `CommandWidget` | Slash command display |
+| `EditResultWidget` | File edit result display |
+| `EditWidget` | File edit operation display |
+| `GlobWidget` | Glob pattern search display |
+| `GrepWidget` | Grep search results display |
+| `LSResultWidget` | Directory listing results |
+| `LSWidget` | Directory listing display |
+| `MCPWidget` | MCP server interaction display |
+| `MultiEditResultWidget` | Multiple file edits results |
+| `MultiEditWidget` | Multiple file edits display |
+| `ReadResultWidget` | File read results |
+| `ReadWidget` | File read operation display |
+| `SessionInfoWidget` | Session information display |
+| `SkillPromptWidget` | Skill prompt display |
+| `SummaryWidget` | Session summary display |
+| `SystemInitializedWidget` | System initialization status |
+| `SystemReminderWidget` | System reminder messages |
+| `TaskWidget` | Task execution display |
+| `ThinkingWidget` | AI thinking process display |
+| `TodoReadWidget` | Todo list reader display |
+| `TodoWidget` | Todo list display |
+| `UsageStatsWidget` | Token usage statistics |
+| `WebFetchWidget` | Web fetch operation display |
+| `WebSearchWidget` | Web search results display |
+| `WriteWidget` | File write operation display |
+| `shared` | Shared widget utilities |
 
 ---
 
@@ -248,22 +295,26 @@ interface OutputCacheValue {
 
 ## Custom Hooks
 
+Located in `src/hooks/` (17 hooks):
+
 ### Core Hooks
 
 | Hook | File | Purpose |
 |------|------|---------|
-| `useTabState` | `src/hooks/useTabState.ts` | Tab management |
 | `useAnalytics` | `src/hooks/useAnalytics.ts` | PostHog tracking |
-| `useTranslation` | `src/hooks/useTranslation.ts` | i18n (ko/en) |
+| `useTabState` | `src/hooks/useTabState.ts` | Tab management |
 | `useTheme` | `src/hooks/useTheme.ts` | Theme context |
+| `useTranslation` | `src/hooks/useTranslation.ts` | i18n (ko/en) |
 | `useUpdater` | `src/hooks/useUpdater.ts` | App updates |
 
 ### Feature Hooks
 
 | Hook | File | Purpose |
 |------|------|---------|
+| `useComponentSelectorShortcut` | `src/hooks/useComponentSelectorShortcut.ts` | Component selector shortcuts |
 | `useDevServer` | `src/hooks/useDevServer.ts` | Dev server lifecycle |
 | `useDevWorkflow` | `src/hooks/useDevWorkflow.ts` | PM workflow |
+| `useEventListeners` | `src/hooks/useEventListeners.ts` | Global event listeners |
 | `usePlanningDocs` | `src/hooks/usePlanningDocs.ts` | Planning docs |
 | `usePreviewMessages` | `src/hooks/usePreviewMessages.ts` | Preview iframe |
 | `useWorkflowPreview` | `src/hooks/useWorkflowPreview.ts` | Preview detection |
@@ -272,11 +323,11 @@ interface OutputCacheValue {
 
 | Hook | File | Purpose |
 |------|------|---------|
+| `useApiCall` | `src/hooks/useApiCall.ts` | API wrapper |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Value debouncing |
-| `useDebouncedCallback` | `src/hooks/useDebouncedCallback.ts` | Callback debouncing |
 | `useLoadingState` | `src/hooks/useLoadingState.ts` | Loading state |
 | `usePagination` | `src/hooks/usePagination.ts` | Pagination |
-| `useApiCall` | `src/hooks/useApiCall.ts` | API wrapper |
+| `usePerformanceMonitor` | `src/hooks/usePerformanceMonitor.ts` | Performance monitoring |
 
 ---
 
@@ -296,6 +347,15 @@ App
     └── TabContent
         ├── ClaudeCodeSession
         │   ├── MessageList
+        │   │   └── StreamMessage
+        │   │       └── ToolWidgets (29 widget types)
+        │   │           ├── BashWidget
+        │   │           ├── ReadWidget
+        │   │           ├── WriteWidget
+        │   │           ├── EditWidget
+        │   │           ├── GrepWidget
+        │   │           ├── TodoWidget
+        │   │           └── ... (23 more)
         │   └── ChatInput
         ├── AgentExecution
         │   ├── AgentCard
@@ -341,10 +401,12 @@ App
 
 | Size Range | Count | Examples |
 |------------|-------|----------|
-| < 100 LOC | 45 | UI primitives, cards |
-| 100-300 LOC | 25 | Forms, lists |
-| 300-500 LOC | 8 | Feature components |
-| > 500 LOC | 3 | ClaudeCodeSession, EnhancedPreviewPanel |
+| < 100 LOC | ~75 | UI primitives, widgets, cards |
+| 100-300 LOC | ~45 | Forms, lists, feature widgets |
+| 300-500 LOC | ~15 | Feature components, complex widgets |
+| > 500 LOC | ~5 | ClaudeCodeSession, EnhancedPreviewPanel, complex features |
+
+**Note**: Distribution is approximate based on 140 total components.
 
 ---
 
