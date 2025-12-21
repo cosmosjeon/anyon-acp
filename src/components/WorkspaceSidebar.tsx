@@ -13,7 +13,7 @@ import {
   Sun,
   Moon,
   Loader2,
-} from 'lucide-react';
+} from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
@@ -455,7 +455,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               <motion.button
                 onClick={onSettingsClick}
                 whileTap={{ scale: 0.95 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors text-xs"
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors text-xs',
+                  'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                )}
               >
                 <Settings className="w-4 h-4 flex-shrink-0" />
                 <span>설정</span>

@@ -6,14 +6,14 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 140 |
+| **React Components** | 145 |
 | **UI Components** | 21 |
 | **Widget Components** | 29 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 17 |
+| **Custom Hooks** | 21 |
 | **Context Providers** | 3 |
 
-> Last synced: 2025-12-21
+> Last synced: 2025-12-22
 
 ---
 
@@ -49,9 +49,13 @@
 | Component | Lines | Purpose |
 |-----------|-------|---------|
 | `ClaudeCodeSession` | ~1000 | Main chat interface |
+| `ClaudeCodeSession.refactored` | ~800 | Refactored chat interface |
 | `MessageList` | ~200 | Message display |
 | `ChatInput` | ~150 | Prompt input |
 | `SessionHistory` | ~180 | History browser |
+| `StreamingText` | ~100 | Streaming text animation |
+| `PromptQueue` | ~150 | Queue management for prompts |
+| `useClaudeMessages` | ~200 | Custom hook for messages |
 
 ### Preview
 
@@ -328,6 +332,18 @@ Located in `src/hooks/` (17 hooks):
 | `useLoadingState` | `src/hooks/useLoadingState.ts` | Loading state |
 | `usePagination` | `src/hooks/usePagination.ts` | Pagination |
 | `usePerformanceMonitor` | `src/hooks/usePerformanceMonitor.ts` | Performance monitoring |
+
+### Additional Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `MinimalSidebar` | `src/components/MinimalSidebar.tsx` | Minimal sidebar variant |
+| `WorkspaceSidebar` | `src/components/WorkspaceSidebar.tsx` | Workspace navigation sidebar |
+| `VideoLoader` | `src/components/VideoLoader.tsx` | Video loading component |
+| `FilePicker.optimized` | `src/components/FilePicker.optimized.tsx` | Optimized file picker |
+| `SessionList.optimized` | `src/components/SessionList.optimized.tsx` | Optimized session list |
+| `ToolWidgets.new` | `src/components/ToolWidgets.new.tsx` | New tool widgets implementation |
+| `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
 
 ---
 

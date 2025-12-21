@@ -444,7 +444,7 @@ interface LanguageState {
 
 ## Custom Hooks
 
-Total: 18 custom hooks for state management, performance, and feature integration.
+Total: 21 custom hooks for state management, performance, and feature integration.
 
 ### Core Hooks
 
@@ -486,6 +486,18 @@ Total: 18 custom hooks for state management, performance, and feature integratio
 | `useAsyncPerformanceTracker` | Async operation tracking | `{ trackAsync() }` | Track promise timing |
 | `useComponentSelectorShortcut` | Component selector shortcut | `void` | Keyboard shortcut (Cmd/Ctrl+Shift+C) |
 | `useEventListeners` | Window event management | `void` | Global event setup |
+
+### API Layer Hooks
+
+| Hook | Purpose | Returns | Usage |
+|------|---------|---------|-------|
+| `useApiCall` | Generic API call wrapper | `{ data, isLoading, error, call(), reset() }` | API call with state |
+
+### Workflow Hooks
+
+| Hook | File | Purpose |
+|------|------|---------|
+| `promptHandlers` | `src/components/claude-session/promptHandlers.ts` | Prompt handling utilities |
 
 ### Utility Hooks
 
@@ -698,7 +710,7 @@ src/
 |----------|-------|---------|
 | **Components** | 100+ | Layout, pages, features, widgets, UI |
 | **Widgets** | 29 | Tool execution displays (~3400 lines) |
-| **Custom Hooks** | 18 | Core, analytics, feature, utility |
+| **Custom Hooks** | 21 | Core, analytics, feature, utility |
 | **Zustand Stores** | 5 | Auth, session, agent, preview, language |
 | **Context Providers** | 3 | Tab, theme, output cache |
 | **UI Components** | 23 | Radix-based primitives |

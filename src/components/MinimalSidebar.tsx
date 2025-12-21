@@ -8,7 +8,7 @@ import {
   ChevronDown,
   Sun,
   Moon,
-} from 'lucide-react';
+} from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
