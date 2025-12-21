@@ -78,8 +78,8 @@
 │                    Command Modules                           │
 │                                                              │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
-│  │  agents.rs  │ │  claude.rs  │ │   mcp.rs    │            │
-│  │  (2000 LOC) │ │  (3000 LOC) │ │  (726 LOC)  │            │
+│  │  agents/    │ │  claude.rs  │ │   mcp.rs    │            │
+│  │  (6 files)  │ │  (3000 LOC) │ │  (726 LOC)  │            │
 │  └─────────────┘ └─────────────┘ └─────────────┘            │
 │                                                              │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
@@ -98,9 +98,20 @@
 
 ## Command Modules
 
-### agents.rs (~2000 LOC)
+### agents/ (모듈 분할)
 
 **Purpose**: Agent lifecycle management
+
+**Module Structure**:
+```
+src-tauri/src/commands/agents/
+├── mod.rs           (~100 LOC)  - Re-exports
+├── types.rs         (~120 LOC)  - Agent, AgentRun, AgentRunMetrics, AgentDb
+├── database.rs      (~380 LOC)  - init_database(), CRUD operations
+├── execution.rs     (~550 LOC)  - execute_agent(), process spawn
+├── session.rs       (~400 LOC)  - session management, streaming
+└── import_export.rs (~520 LOC)  - Import/export, GitHub integration
+```
 
 **Database Tables**:
 - `agents` - Agent definitions

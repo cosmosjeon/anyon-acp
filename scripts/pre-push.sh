@@ -166,8 +166,8 @@ EOF
 )
 
 # Claude 실행
-echo "Claude에 감사 요청 중..."
-AUDIT_OUTPUT=$(claude -p "$AUDIT_PROMPT" 2>&1 || echo '{"summary":{"critical":0,"warning":0,"info":0,"pass":true},"issues":[]}')
+echo "Claude에 감사 요청 중... (타임아웃: 5분)"
+AUDIT_OUTPUT=$(timeout 300 claude -p "$AUDIT_PROMPT" 2>&1 || echo '{"summary":{"critical":0,"warning":0,"info":0,"pass":true},"issues":[]}')
 
 # JSON 추출 (마크다운 코드블록 제거)
 AUDIT_JSON=$(echo "$AUDIT_OUTPUT" | sed -n '/^{/,/^}/p' | head -1)
@@ -369,8 +369,8 @@ $CHANGED_FILES
 
 마지막 줄에 반드시: SYNC_DONE"
 
-    echo "Claude에 문서 동기화 요청 중..."
-    SYNC_OUTPUT=$(claude -p "$SYNC_PROMPT" 2>&1 || echo "SYNC_FAILED")
+    echo "Claude에 문서 동기화 요청 중... (타임아웃: 120초)"
+    SYNC_OUTPUT=$(timeout 120 claude -p "$SYNC_PROMPT" 2>&1 || echo "SYNC_TIMEOUT")
 
     # 변경된 문서 스테이징
     if git diff --name-only sdd-docs/specs/ 2>/dev/null | grep -q .; then

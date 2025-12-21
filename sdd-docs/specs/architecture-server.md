@@ -10,7 +10,7 @@
 | **Framework** | Express 4.18.2 |
 | **Type** | ES Module |
 | **Port** | 4000 |
-| **Storage** | In-memory (development) |
+| **Database** | SQLite (better-sqlite3) |
 
 ---
 
@@ -19,6 +19,7 @@
 | Category | Technology | Version | Purpose |
 |----------|------------|---------|---------|
 | **Framework** | Express | 4.18.2 | HTTP server |
+| **Database** | better-sqlite3 | 11.8.1 | SQLite bindings |
 | **Auth** | google-auth-library | 10.5.0 | Google OAuth |
 | | jsonwebtoken | 9.0.2 | JWT tokens |
 | **Utilities** | cors | 2.8.5 | CORS middleware |
@@ -151,15 +152,80 @@ function authenticate(req, res, next) {
 
 ## Storage
 
-### In-Memory Maps
+### SQLite Database
 
-```javascript
-const users = new Map();        // userId -> User
-const sessions = new Map();      // sessionId -> Session
-const userSettings = new Map();  // userId -> Settings
+```
+server/
+├── db/
+│   ├── index.js                 # DB 연결 및 초기화
+│   ├── schema.js                # 스키마 정의
+│   └── repositories/
+│       ├── userRepository.js    # User CRUD
+│       └── settingsRepository.js # Settings CRUD
+└── data/
+    └── anyon.db                 # SQLite 파일
 ```
 
-> **Note**: Development only. Production should use persistent database.
+### Database Schema
+
+```sql
+-- 사용자 테이블
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  profile_picture TEXT,
+  google_id TEXT UNIQUE,
+  plan_type TEXT DEFAULT 'FREE' CHECK(plan_type IN ('FREE', 'PRO')),
+  subscription_status TEXT DEFAULT 'ACTIVE',
+  current_period_end TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 사용자 설정 (Key-Value)
+CREATE TABLE user_settings (
+  user_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (user_id, key),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+### Repository Pattern
+
+```javascript
+// userRepository.js
+export function findById(id) { ... }
+export function findByEmail(email) { ... }
+export function findByGoogleId(googleId) { ... }
+export function create(userData) { ... }
+export function update(id, updates) { ... }
+export function findAll() { ... }
+
+// settingsRepository.js
+export function getAll(userId) { ... }
+export function get(userId, key) { ... }
+export function set(userId, key, value) { ... }
+export function delete(userId, key) { ... }
+export function replaceAll(userId, settings) { ... }
+```
+
+### Graceful Shutdown
+
+```javascript
+const shutdown = (signal) => {
+  console.log(`${signal} received, shutting down...`);
+  db.close();
+  process.exit(0);
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+```
+
+> **Note**: Data persists across server restarts. WAL mode enabled for performance.
 
 ---
 
@@ -309,7 +375,7 @@ npm start
 - [ ] Change `JWT_SECRET` to strong random key
 - [ ] Configure proper Google OAuth credentials
 - [ ] Remove `/dev/*` endpoints
-- [ ] Replace in-memory storage with database
+- [x] ~~Replace in-memory storage with database~~ (SQLite 구현 완료)
 - [ ] Add rate limiting
 - [ ] Enable HTTPS/TLS
 - [ ] Restrict CORS origins
