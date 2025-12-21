@@ -16,7 +16,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-AUDIT_RESULT="$PROJECT_ROOT/sdd-docs/audits/audit-result.json"
+AUDIT_RESULT="$PROJECT_ROOT/sdd-docs/audits/pre-push-result.json"
 TEMP_AUDIT="$PROJECT_ROOT/.audit-temp.json"
 
 # ============================================================

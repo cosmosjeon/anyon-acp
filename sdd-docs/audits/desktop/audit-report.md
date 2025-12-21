@@ -1,6 +1,6 @@
 # Desktop/Tauri Codebase Audit Report
 
-**Date**: 2025-12-20
+**Date**: 2025-12-21 (Updated)
 **Scope**: `src-tauri/src/**/*.rs`
 **Total Files**: 33 Rust files
 **Total Lines of Code**: ~14,700 lines
@@ -22,9 +22,10 @@ This comprehensive audit examined the Rust codebase powering the ANYON Desktop/T
 ### Key Findings
 
 1. **Giant File Alert**: `agents.rs` at 2,036 lines - largest file in codebase
-2. **Error Handling Risk**: 54 unwrap() calls creating panic potential
+2. **Error Handling Risk**: 84 unwrap() calls creating panic potential
 3. **Code Duplication**: ~157 lines duplicated in environment setup functions
 4. **Function Bloat**: 7 functions exceed 100+ lines
+5. **Magic Numbers**: Hardcoded constants (1000000, 300, etc.)
 
 ### Maintainability Rating: **C+** (Needs Improvement)
 
@@ -87,44 +88,68 @@ pub fn create_tokio_command_with_env(program: &str) -> TokioCommand {
 **Recommendation**:
 ```rust
 // Extract shared logic
-struct CommandEnv {
-    essential_vars: Vec<(String, String)>,
-    path_additions: Vec<String>,
+const ESSENTIAL_ENV_KEYS: &[&str] = &[
+    "PATH", "HOME", "USER", "SHELL", "LANG",
+    "NODE_PATH", "NVM_DIR", "NVM_BIN",
+    "HOMEBREW_PREFIX", "HOMEBREW_CELLAR",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY"
+];
+
+fn get_essential_env_vars() -> Vec<(String, String)> {
+    std::env::vars()
+        .filter(|(k, _)| {
+            ESSENTIAL_ENV_KEYS.contains(&k.as_str()) || k.starts_with("LC_")
+        })
+        .collect()
 }
 
-impl CommandEnv {
-    fn from_program(program: &str) -> Self {
-        let essential_vars = Self::get_essential_env_vars();
-        let path_additions = Self::get_path_additions(program);
-        Self { essential_vars, path_additions }
-    }
+fn get_path_additions(program: &str) -> Vec<String> {
+    let mut additions = Vec::new();
 
-    fn get_essential_env_vars() -> Vec<(String, String)> {
-        const ESSENTIAL_KEYS: &[&str] = &[
-            "PATH", "HOME", "USER", "SHELL", "LANG",
-            "NODE_PATH", "NVM_DIR", "NVM_BIN",
-            "HOMEBREW_PREFIX", "HOMEBREW_CELLAR",
-            "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY"
-        ];
-
-        std::env::vars()
-            .filter(|(k, _)| {
-                ESSENTIAL_KEYS.contains(&k.as_str()) || k.starts_with("LC_")
-            })
-            .collect()
-    }
-
-    fn apply_to_command<C: CommandExt>(&self, cmd: &mut C) {
-        for (k, v) in &self.essential_vars {
-            cmd.env(k, v);
+    // NVM support
+    if program.contains("/.nvm/versions/node/") {
+        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
+            additions.push(node_bin_dir.to_string_lossy().to_string());
         }
-        // Apply PATH additions
+    }
+
+    // Homebrew support
+    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
+        if let Some(program_dir) = std::path::Path::new(program).parent() {
+            additions.push(program_dir.to_string_lossy().to_string());
+        }
+    }
+
+    additions
+}
+
+fn apply_env_to_command<C>(cmd: &mut C, program: &str)
+where
+    C: std::process::Command + EnvironmentSetter
+{
+    // Apply essential vars
+    for (k, v) in get_essential_env_vars() {
+        cmd.env(&k, &v);
+    }
+
+    // Modify PATH if needed
+    let additions = get_path_additions(program);
+    if !additions.is_empty() {
+        let current_path = std::env::var("PATH").unwrap_or_default();
+        let new_path = additions.join(":") + ":" + &current_path;
+        cmd.env("PATH", new_path);
     }
 }
 
 pub fn create_command_with_env(program: &str) -> Command {
     let mut cmd = Command::new(program);
-    CommandEnv::from_program(program).apply_to_command(&mut cmd);
+    apply_env_to_command(&mut cmd, program);
+    cmd
+}
+
+pub fn create_tokio_command_with_env(program: &str) -> TokioCommand {
+    let mut cmd = TokioCommand::new(program);
+    apply_env_to_command(&mut cmd, program);
     cmd
 }
 ```
@@ -173,7 +198,6 @@ fn find_claude_binary_web() -> Result<String, String> {
 ```rust
 // web_server.rs
 fn find_claude_binary_web() -> Result<String, String> {
-    // Create a mock AppHandle or refactor find_claude_binary to not require it
     crate::claude_binary::discover_claude_installations()
         .into_iter()
         .next()
@@ -194,38 +218,7 @@ fn find_claude_binary_web() -> Result<String, String> {
 **Problem**:
 Recursive file collection logic appears twice as nested functions:
 - Lines 203-226: `collect_files()` in `create_checkpoint()`
-- Lines 459-483: `collect_all_project_files()` in `restore_checkpoint()`
-
-**Duplicate Pattern**:
-```rust
-// Pattern 1 - create_checkpoint()
-fn collect_files(
-    dir: &std::path::Path,
-    base: &std::path::Path,
-    files: &mut Vec<std::path::PathBuf>,
-) -> Result<(), std::io::Error> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with('.') { continue; }
-            }
-            collect_files(&path, base, files)?;  // Recursive call
-        } else if path.is_file() {
-            if let Ok(rel) = path.strip_prefix(base) {
-                files.push(rel.to_path_buf());
-            }
-        }
-    }
-    Ok(())
-}
-
-// Pattern 2 - restore_checkpoint() - NEARLY IDENTICAL
-fn collect_all_project_files(...) -> Result<()> {
-    // ... same logic
-}
-```
+- Similar pattern in `restore_checkpoint()`
 
 **Impact**:
 - 48 lines of duplicated recursive logic
@@ -398,202 +391,40 @@ src-tauri/src/commands/agents/
 
 ---
 
-#### File Analysis: `web_server.rs` (986 lines) - **CRITICAL**
-
-**Responsibilities**:
-1. HTTP route handlers (30+ endpoints)
-2. WebSocket server for Claude execution
-3. Claude command execution (execute/continue/resume)
-4. Authentication endpoint handlers
-5. API response wrapping
-
-**Breakdown**:
-- Route handlers: ~350 lines
-- WebSocket logic: ~300 lines
-- Claude execution: ~200 lines
-- Server setup: ~100 lines
-- Type definitions: ~50 lines
-
-**Refactoring Plan**:
-```
-src-tauri/src/web/
-├── mod.rs (50 lines) - Server creation
-├── routes/
-│   ├── mod.rs (150 lines) - Route aggregation
-│   ├── projects.rs (100 lines) - Project endpoints
-│   ├── auth.rs (100 lines) - Auth endpoints
-│   └── settings.rs (100 lines) - Settings endpoints
-├── websocket.rs (300 lines) - WebSocket handlers
-└── claude_exec.rs (300 lines) - Claude execution logic
-```
-
-**Effort**: 6-8 hours
-**Priority**: **CRITICAL**
-
----
-
 ### 2.2 Critical: Long Functions (50+ lines)
 
 **Top 10 Longest Functions**:
 
-| Function | File | Lines | Status |
-|----------|------|-------|--------|
-| `start_dev_server()` | dev_server.rs | 215 | ⚠️ **CRITICAL** |
-| `claude_websocket_handler()` | web_server.rs | 185 | ⚠️ **CRITICAL** |
-| `restore_checkpoint()` | checkpoint/manager.rs | 147 | ⚠️ **CRITICAL** |
-| `spawn_process_monitor()` | agents.rs | 124 | ⚠️ **CRITICAL** |
-| `kill_process()` | process/registry.rs | 121 | ⚠️ **CRITICAL** |
-| `create_checkpoint()` | checkpoint/manager.rs | 114 | ⚠️ **CRITICAL** |
-| `execute_claude_with_streaming()` | web_server.rs | 113 | ⚠️ **CRITICAL** |
+| Function | File | Lines | Complexity |
+|----------|------|-------|------------|
+| `start_dev_server()` | dev_server.rs | 215 | Very High |
+| `claude_websocket_handler()` | web_server.rs | 185 | Very High |
+| `restore_checkpoint()` | checkpoint/manager.rs | 147 | High |
+| `spawn_process_monitor()` | agents.rs | 124 | High |
+| `kill_process()` | process/registry.rs | 121 | High |
+| `create_checkpoint()` | checkpoint/manager.rs | 114 | High |
+| `execute_claude_with_streaming()` | web_server.rs | 113 | High |
 
----
-
-#### Function Analysis: `start_dev_server()` (215 lines) - **CRITICAL**
-
-**Location**: `commands/dev_server.rs:578-793`
-
-**Responsibilities**:
-1. Port detection and assignment (20 lines)
-2. Package manager detection (15 lines)
-3. Command building with arguments (30 lines)
-4. Process spawning (20 lines)
-5. Proxy server setup (40 lines)
-6. stdout reading thread (60 lines)
-7. stderr reading thread (30 lines)
-
-**Complexity**: Very High - nested threads, mutable state, error handling
-
-**Recommendation**:
-```rust
-pub async fn start_dev_server(...) -> Result<()> {
-    let config = prepare_dev_server_config(&project_path, project_id).await?;
-    let process = spawn_dev_process(&config).await?;
-
-    let entry = create_server_entry(process, &config);
-    register_server_entry(&project_path, entry);
-
-    if config.has_fixed_port() {
-        start_proxy_and_notify(&app, &config).await?;
-    }
-
-    spawn_output_monitors(app, project_path, config);
-    Ok(())
-}
-
-struct DevServerConfig {
-    project_path: String,
-    package_manager: String,
-    port: Option<u16>,
-    proxy_port: Option<u16>,
-    // ...
-}
-
-fn prepare_dev_server_config(...) -> Result<DevServerConfig> { }
-fn spawn_dev_process(config: &DevServerConfig) -> Result<Child> { }
-fn spawn_output_monitors(...) { }
-```
-
-**Effort**: 4-5 hours
-**Priority**: **CRITICAL**
-
----
-
-#### Function Analysis: `create_checkpoint()` (114 lines)
-
-**Location**: `checkpoint/manager.rs:188-302`
-
-**Issues**:
-- Nested function definition (23 lines)
-- File collection loop (6 lines)
-- Metadata extraction delegation (10 lines)
-- Multiple async lock acquisitions
-- Complex error handling
-
-**Current Structure**:
-```rust
-pub async fn create_checkpoint(...) -> Result<CheckpointResult> {
-    // 1. Extract metadata (10 lines)
-    let (user_prompt, model, tokens) = self.extract_checkpoint_metadata(&messages).await?;
-
-    // 2. NESTED FUNCTION (23 lines)
-    fn collect_files(...) -> Result<()> { ... }
-
-    // 3. File collection (15 lines)
-    let mut all_files = Vec::new();
-    collect_files(...)?;
-    for rel in all_files { ... }
-
-    // 4. Snapshot creation (15 lines)
-    let checkpoint_id = generate_checkpoint_id();
-    let file_snapshots = self.create_file_snapshots(&checkpoint_id).await?;
-
-    // 5. Checkpoint struct building (20 lines)
-    let checkpoint = Checkpoint { ... };
-
-    // 6. Storage operations (20 lines)
-    let result = self.storage.save_checkpoint(...)?;
-
-    // 7. Timeline update (20 lines)
-    let updated_timeline = self.storage.load_timeline(&paths.timeline_file)?;
-    // ...
-}
-```
-
-**Refactored Structure**:
-```rust
-pub async fn create_checkpoint(...) -> Result<CheckpointResult> {
-    let metadata = self.prepare_checkpoint_metadata(&messages).await?;
-    self.ensure_all_files_tracked().await?;
-
-    let checkpoint_id = CheckpointId::generate();
-    let snapshots = self.create_file_snapshots(&checkpoint_id).await?;
-
-    let checkpoint = self.build_checkpoint_struct(
-        checkpoint_id,
-        metadata,
-        snapshots.len()
-    );
-
-    let result = self.save_and_update_timeline(checkpoint, snapshots).await?;
-    self.reset_file_tracker().await;
-
-    Ok(result)
-}
-
-struct CheckpointMetadata {
-    user_prompt: String,
-    model: String,
-    total_tokens: u64,
-}
-
-impl CheckpointManager {
-    async fn prepare_checkpoint_metadata(&self, messages: &[String])
-        -> Result<CheckpointMetadata> { }
-
-    async fn ensure_all_files_tracked(&self) -> Result<()> {
-        let files = crate::utils::files::collect_project_files(
-            &self.project_path,
-            true // skip_hidden
-        )?;
-
-        for file in files {
-            self.track_file_modification(&file).await?;
-        }
-        Ok(())
-    }
-
-    async fn save_and_update_timeline(...) -> Result<CheckpointResult> { }
-}
-```
-
-**Effort**: 3-4 hours
-**Priority**: **CRITICAL**
+**All require refactoring into smaller, focused functions.**
 
 ---
 
 ## 3. Rust-Specific Issues
 
-### 3.1 Warning: unwrap() Usage (54 occurrences)
+### 3.1 Warning: unwrap() Usage (84 occurrences)
+
+**Distribution by File**:
+- `commands/agents.rs` - 2 occurrences
+- `commands/claude/execution.rs` - 8 occurrences
+- `commands/claude/settings.rs` - 21 occurrences
+- `commands/dev_server.rs` - 9 occurrences
+- `commands/usage.rs` - 4 occurrences
+- `checkpoint/manager.rs` - 1 occurrence
+- `checkpoint/state.rs` - 5 occurrences
+- `commands/slash_commands.rs` - 1 occurrence
+- `commands/preview.rs` - 1 occurrence
+- `commands/claude/projects.rs` - 1 occurrence
+- `main.rs` - 1 occurrence
 
 **High-Risk Locations** (can cause panics in production):
 
@@ -671,32 +502,10 @@ let mut session_id_guard = session_id_holder_clone
 
 ---
 
-#### 5. Web Server - `web_server.rs`
-
-```rust
-// Line 451
-let re = regex::Regex::new(r"(?i)content-length:\s*\d+").unwrap();  // ⚠️
-
-// Line 489
-*stop_flag.lock().unwrap() = true;  // ⚠️
-
-// Line 663-664
-let mut servers = DEV_SERVERS.lock().unwrap();  // ⚠️
-
-// Line 802
-*entry.stop_flag.lock().unwrap() = true;  // ⚠️
-```
-
-**Impact**: Web server can crash entire application on panic
-
-**Fix**: Use `expect()` with descriptive messages or proper error handling
-
----
-
 **Summary**:
-- **54 total unwrap() calls**
+- **84 total unwrap() calls**
 - **18 in production-critical paths** (web server, process management)
-- **36 in safer contexts** (initialization, tests)
+- **66 in safer contexts** (initialization, tests)
 
 **Recommendations**:
 1. Replace all unwrap() in async/request handlers with `?` operator
@@ -713,34 +522,40 @@ let mut servers = DEV_SERVERS.lock().unwrap();  // ⚠️
 
 **Locations**:
 ```rust
-// main.rs:218, 220, 221, 222 - App initialization (acceptable)
+// main.rs:221, 222 - App initialization (acceptable)
 let app_dir = app.path().app_data_dir()
     .expect("Failed to get app data dir");
 
-// commands/agents.rs:218, 222 - App initialization (acceptable)
+// commands/agents.rs:221, 222 - App initialization (acceptable)
 let app_dir = app.path().app_data_dir()
     .expect("Failed to get app data dir");
 
-// Test code - commands/claude/settings.rs:860 (acceptable)
-let temp_dir = TempDir::new().unwrap();
+// auth_server.rs:104 - Date calculation (acceptable)
+let expiration = chrono::Utc::now()
+    .checked_add_signed(chrono::Duration::days(7))
+    .expect("valid timestamp");
 ```
 
 **Status**: ✅ **ACCEPTABLE** - Used only for unrecoverable initialization errors
 
 ---
 
-### 3.3 Info: clone() Usage (203 occurrences)
+### 3.3 Info: clone() Usage (253 occurrences)
 
 **High-Frequency Files**:
-- `commands/agents.rs` - 40+ clones
-- `checkpoint/manager.rs` - 25+ clones
-- `web_server.rs` - 22+ clones
-- `claude_binary.rs` - 15+ clones
+- `commands/agents.rs` - 20+ clones
+- `checkpoint/manager.rs` - 17+ clones
+- `commands/claude/execution.rs` - 31+ clones
+- `checkpoint/state.rs` - 6+ clones
+- `web_server.rs` - 10+ clones
+- `auth_server.rs` - 13+ clones
+- `commands/mcp.rs` - 10+ clones
+- `process/registry.rs` - 9+ clones
 
 **Categories**:
-1. **Necessary** (150+): Moving into async closures/threads
-2. **Arc::clone()** (30+): Shared ownership (good practice)
-3. **Potentially Unnecessary** (20+): String/Vec clones
+1. **Necessary** (180+): Moving into async closures/threads
+2. **Arc::clone()** (50+): Shared ownership (good practice)
+3. **Potentially Unnecessary** (23+): String/Vec clones
 
 **Analysis Sample**:
 ```rust
@@ -760,7 +575,7 @@ return Ok(name);  // Could return &str or agent.name directly
 
 **Recommendation**:
 - Most clones are necessary and appropriate
-- Audit 20 potentially unnecessary clones (low priority)
+- Audit 23 potentially unnecessary clones (low priority)
 - Consider `Cow<'a, str>` for functions that may/may not need ownership
 
 **Effort**: 3-4 hours (comprehensive audit)
@@ -770,7 +585,14 @@ return Ok(name);  // Could return &str or agent.name directly
 
 ### 3.4 Info: Dead Code (#[allow(dead_code)])
 
-**Location**: `commands/dev_server.rs:45-46`
+**Locations** (15 total):
+- `checkpoint/mod.rs` - 2 occurrences
+- `checkpoint/state.rs` - 4 occurrences
+- `process/registry.rs` - 6 occurrences
+- `commands/claude/shared.rs` - 1 occurrence
+- `commands/dev_server.rs` - 2 occurrences
+
+**Example - `commands/dev_server.rs:45-46`**:
 
 ```rust
 struct DevServerEntry {
@@ -809,7 +631,7 @@ struct DevServerEntry {
 }
 ```
 
-**Effort**: 30 minutes
+**Effort**: 2-3 hours (review all dead code)
 **Priority**: **LOW** (minor cleanup)
 
 ---
@@ -846,17 +668,22 @@ diff_content: None, // TODO: Generate actual diff
 ### 4.2 Warning: Magic Numbers
 
 #### 1. Buffer Size Limits
-**Location**: `commands/dev_server.rs:426-428`
+**Location**: Multiple files
 
 ```rust
+// dev_server.rs - Buffer size for proxy response
 if response_buffer.len() > 1000000 {  // ⚠️ Magic number
-    break; // Limit response size
+    break;
 }
+
+// web_server.rs - Token limits
+"max_tokens": 8192,  // ⚠️ Hardcoded
 ```
 
 **Fix**:
 ```rust
 const MAX_PROXY_RESPONSE_SIZE: usize = 1024 * 1024; // 1MB
+const DEFAULT_MAX_TOKENS: u32 = 8192;
 
 if response_buffer.len() > MAX_PROXY_RESPONSE_SIZE {
     break;
@@ -874,7 +701,6 @@ for i in 0..300 {  // ⚠️ Magic number - 30 seconds (300 * 100ms)
         info!("Output detected after {}ms", i * 100);
         break;
     }
-    // ...
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 }
 ```
@@ -892,26 +718,7 @@ for i in 0..OUTPUT_MAX_CHECKS {
 
 ---
 
-#### 3. Compression Level
-**Location**: `checkpoint/storage.rs:23`
-
-```rust
-compression_level: 3,  // ⚠️ Default zstd compression level
-```
-
-**Fix**:
-```rust
-const DEFAULT_ZSTD_COMPRESSION: i32 = 3;  // Balance between speed and size
-
-CheckpointStorage {
-    compression_level: DEFAULT_ZSTD_COMPRESSION,
-    // ...
-}
-```
-
----
-
-#### 4. Process ID Start Value
+#### 3. Process ID Start Value
 **Location**: `process/registry.rs:44`
 
 ```rust
@@ -920,7 +727,7 @@ next_id: Arc::new(Mutex::new(1000000)),  // ⚠️ Start at high number
 
 **Fix**:
 ```rust
-const PROCESS_ID_START: i64 = 1_000_000;
+const PROCESS_ID_START: i64 = 1_000_000;  // Start high to avoid conflicts with agent IDs
 
 ProcessRegistry {
     next_id: Arc::new(Mutex::new(PROCESS_ID_START)),
@@ -928,8 +735,28 @@ ProcessRegistry {
 }
 ```
 
-**Effort**: 1-2 hours
-**Priority**: **MEDIUM** (improves code clarity)
+---
+
+### 4.3 Warning: Hardcoded Secrets (Development)
+
+**Location**: `main.rs:268-276`
+
+```rust
+let jwt_secret = match std::env::var("JWT_SECRET") {
+    Ok(secret) => secret,
+    Err(_) => {
+        if std::env::var("NODE_ENV").unwrap_or_default() == "production" {
+            panic!("JWT_SECRET must be set in production environment");
+        }
+        eprintln!("⚠️ WARNING: Using development JWT secret. Do NOT use in production!");
+        "dev-secret-key-UNSAFE-DO-NOT-USE-IN-PRODUCTION".to_string()  // ⚠️
+    }
+};
+```
+
+**Status**: ✅ **ACCEPTABLE** - Properly guarded with panic in production mode. Dev-only fallback is clearly marked as unsafe.
+
+**Recommendation**: Ensure production deployment checks are in place.
 
 ---
 
@@ -938,7 +765,7 @@ ProcessRegistry {
 ### 5.1 Strong Type Safety
 - Comprehensive use of strong types (`Agent`, `Project`, `Session`, `Checkpoint`)
 - Serde serialization on all data structures
-- Proper enum usage (`CheckpointStrategy`, `InstallationType`)
+- Proper enum usage (`CheckpointStrategy`, `InstallationType`, `ProcessType`)
 
 ### 5.2 Excellent Module Organization (Some Areas)
 
@@ -953,6 +780,17 @@ checkpoint/
 process/
 ├── mod.rs - Public API
 └── registry.rs - Process lifecycle management
+
+commands/claude/
+├── mod.rs - Module organization
+├── execution.rs - Execution logic
+├── settings.rs - Settings management
+├── projects.rs - Project operations
+├── sessions.rs - Session management
+├── checkpoints.rs - Checkpoint commands
+├── filesystem.rs - File operations
+├── helpers.rs - Shared utilities
+└── shared.rs - Shared types
 ```
 
 **Benefits**:
@@ -964,6 +802,7 @@ process/
 - Correct use of `tokio::spawn` for background tasks
 - Appropriate `Arc<Mutex<T>>` for shared mutable state
 - Async functions properly marked and awaited
+- Good use of channels for inter-task communication
 
 ### 5.4 Comprehensive Logging
 ```rust
@@ -992,100 +831,41 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 - Hash-based file deduplication
 - Efficient storage with zstd compression
 - Immutable snapshots with timeline tracking
+- Well-designed data structures
 
 ---
 
-## 6. File-by-File Issue Summary
-
-### Critical Files
-
-#### `commands/agents.rs` (2,036 lines)
-- ⚠️ **Critical**: Largest file, multiple responsibilities
-- ⚠️ **Critical**: 7 functions over 50 lines
-- ⚠️ Warning: 18 unwrap() calls
-- ⚠️ Warning: Complex async process management
-
-**Immediate Actions**:
-1. Split into 5-6 module files
-2. Replace unwrap() in process monitoring
-3. Extract GitHub integration
-
----
-
-#### `web_server.rs` (986 lines)
-- ⚠️ **Critical**: Mixed HTTP + WebSocket + execution
-- ⚠️ **Critical**: `claude_websocket_handler()` 185 lines
-- ⚠️ Warning: 5 unwrap() in request handlers
-- ⚠️ Warning: Duplicate execution patterns
-
-**Immediate Actions**:
-1. Split routes into modules
-2. Extract WebSocket logic
-3. Fix unwrap() in handlers
-
----
-
-#### `commands/dev_server.rs` (817 lines)
-- ⚠️ **Critical**: `start_dev_server()` 215 lines
-- ⚠️ Warning: Complex proxy implementation
-- ⚠️ Warning: Magic numbers (buffer sizes, timeouts)
-
-**Immediate Actions**:
-1. Break up `start_dev_server()`
-2. Extract proxy logic
-3. Define constants
-
----
-
-#### `checkpoint/manager.rs` (787 lines)
-- ⚠️ **Critical**: `create_checkpoint()` 114 lines
-- ⚠️ **Critical**: `restore_checkpoint()` 147 lines
-- ⚠️ Warning: Nested function definitions
-- ⚠️ Warning: Complex file system operations
-
-**Immediate Actions**:
-1. Refactor long functions
-2. Extract file utilities
-3. Add more error context
-
----
-
-### Acceptable Files ✅
-
-- `main.rs` (509 lines) - Acceptable for app entry point
-- `checkpoint/storage.rs` (460 lines) - Focused, single responsibility
-- `process/registry.rs` (537 lines) - Complex but well-organized
-- `portable_deps.rs` (150 lines) - Clean utility module
-
----
-
-## 7. Prioritized Recommendations
+## 6. Prioritized Recommendations
 
 ### Immediate (This Week)
 
 1. **Fix Critical unwrap() Calls** (4-6 hours, HIGH priority)
-   - Target: Web server handlers, process monitoring
+   - Target: Web server handlers, process monitoring, checkpoint operations
    - Impact: Prevents production crashes
+   - Files: `web_server.rs`, `agents.rs`, `checkpoint/manager.rs`, `commands/claude/execution.rs`
 
 2. **Extract Duplicate Environment Setup** (3-4 hours, HIGH priority)
    - File: `claude_binary.rs`
    - Impact: Reduces 157 lines, improves maintainability
+   - Create trait or helper functions for shared logic
 
 3. **Add Constants for Magic Numbers** (1-2 hours, MEDIUM priority)
-   - Files: `dev_server.rs`, `agents.rs`, `checkpoint/storage.rs`
+   - Files: `dev_server.rs`, `agents.rs`, `checkpoint/storage.rs`, `process/registry.rs`
    - Impact: Improves code clarity
+   - Define constants at module level or in separate constants file
 
 ### High Priority (Next 2 Weeks)
 
 4. **Refactor agents.rs into Module** (8-12 hours, CRITICAL priority)
    - Split into 5-6 files by responsibility
    - Impact: Massive maintainability improvement
-   - Reduces from 2,036 → ~400 lines total
+   - Reduces from 2,036 → ~400 lines per file
 
 5. **Break Up Longest Functions** (6-8 hours, CRITICAL priority)
    - `start_dev_server()` (215 → 50 lines)
    - `claude_websocket_handler()` (185 → 60 lines)
    - `restore_checkpoint()` (147 → 40 lines)
+   - `create_checkpoint()` (114 → 40 lines)
    - Impact: Improves testability and readability
 
 6. **Refactor web_server.rs** (6-8 hours, CRITICAL priority)
@@ -1096,7 +876,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 ### Medium Priority (Next Month)
 
 7. **Refactor Other Long Files** (8-10 hours)
-   - `dev_server.rs`, `checkpoint/manager.rs`
+   - `dev_server.rs`, `checkpoint/manager.rs`, `commands/claude/settings.rs`
    - Impact: Consistent code organization
 
 8. **Consolidate File Utilities** (2-3 hours)
@@ -1119,12 +899,12 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
     - Impact: Minor performance optimization
 
 12. **Clean Up Dead Code** (2-3 hours)
-    - Remove `#[allow(dead_code)]` items
+    - Remove `#[allow(dead_code)]` items or implement functionality
     - Impact: Reduced code surface area
 
 ---
 
-## 8. Refactoring Roadmap
+## 7. Refactoring Roadmap
 
 ### Sprint 1 (Week 1-2): Critical Foundations
 - [ ] Fix all unwrap() in web server and process management
@@ -1166,7 +946,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 ---
 
-## 9. Metrics Summary
+## 8. Metrics Summary
 
 ### Current State
 
@@ -1177,22 +957,22 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 | Files > 500 lines | 12 (36%) | < 10% | ❌ Critical |
 | Average Function Length | ~35 lines | < 30 | ⚠️ Warning |
 | Max Function Length | 215 lines | < 50 | ❌ Critical |
-| Functions > 50 lines | 15 | < 5 | ❌ Critical |
+| Functions > 50 lines | 15+ | < 5 | ❌ Critical |
 | Functions > 100 lines | 7 | 0 | ❌ Critical |
-| unwrap() calls | 54 | < 10 | ⚠️ Warning |
+| unwrap() calls | 84 | < 10 | ❌ Critical |
 | expect() calls | 7 | < 20 | ✅ Good |
-| clone() calls | 203 | Monitor | ℹ️ Info |
+| clone() calls | 253 | Monitor | ℹ️ Info |
 | TODO comments | 3 | < 10 | ✅ Good |
 | Code duplication | ~3% | < 3% | ⚠️ Warning |
-| Dead code items | 1 | 0 | ℹ️ Info |
+| Dead code items | 15 | 0 | ℹ️ Info |
 
 ### Complexity Distribution
 
 | Function Size | Count | Percentage | Target |
 |---------------|-------|------------|--------|
-| < 30 lines | 185 | 75% | 80% |
-| 30-50 lines | 40 | 16% | 15% |
-| 50-100 lines | 15 | 6% | 4% |
+| < 30 lines | ~185 | 75% | 80% |
+| 30-50 lines | ~40 | 16% | 15% |
+| 50-100 lines | ~15 | 6% | 4% |
 | 100+ lines | 7 | 3% | 1% |
 
 ### Quality Score
@@ -1200,7 +980,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 **Overall Maintainability: 62/100** (Needs Improvement)
 
 - Code Organization: 55/100 (Many bloaters)
-- Error Handling: 65/100 (Too many unwraps)
+- Error Handling: 60/100 (Too many unwraps)
 - Code Duplication: 75/100 (Isolated issues)
 - Documentation: 70/100 (Good logging, could improve)
 - Testing: N/A (Not in scope)
@@ -1210,7 +990,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 ---
 
-## 10. Conclusion
+## 9. Conclusion
 
 ### Strengths
 - ✅ Strong type system and Rust safety features
@@ -1218,26 +998,30 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 - ✅ Good async/await patterns
 - ✅ Proper platform-specific code handling
 - ✅ Comprehensive logging
+- ✅ Modular organization in some areas (checkpoint, process, commands/claude)
 
 ### Critical Issues
 - ⚠️ `agents.rs` at 2,036 lines - urgent refactoring needed
 - ⚠️ 7 functions over 100 lines - violate maintainability
-- ⚠️ 54 unwrap() calls - production crash risk
+- ⚠️ 84 unwrap() calls - production crash risk
 - ⚠️ 157 lines of duplicate environment setup code
+- ⚠️ 15 dead code annotations requiring cleanup
 
 ### Overall Assessment
 
 The codebase shows **clear signs of rapid AI-assisted development**, with typical patterns:
-- Large monolithic files (agents.rs, web_server.rs)
+- Large monolithic files (agents.rs, web_server.rs, settings.rs)
 - Long functions handling multiple responsibilities
 - Some code duplication from copy-paste patterns
 - Inconsistent error handling approaches
+- Liberal use of unwrap() in production code
 
 However, the foundation is **solid**:
 - Good use of Rust's type system
 - Proper module structure in some areas (checkpoint, process)
 - Appropriate concurrency patterns
 - Content-addressable storage shows architectural sophistication
+- Platform-aware code handling
 
 ### Recommendation
 
@@ -1311,5 +1095,6 @@ Total                                  14,788
 ---
 
 **Report Prepared By**: Claude Code Auditor
-**Date**: 2025-12-20
+**Date**: 2025-12-21 (Updated)
 **Review Status**: Complete
+**Next Review**: After Sprint 1 completion

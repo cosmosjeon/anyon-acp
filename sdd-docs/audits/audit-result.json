@@ -1,182 +1,54 @@
 {
-  "timestamp": "2025-12-20T00:00:00.000Z",
+  "timestamp": "2025-12-21T00:00:00.000Z",
   "summary": {
-    "critical": 27,
-    "warning": 114,
-    "info": 243,
-    "total": 384,
+    "critical": 29,
+    "warning": 159,
+    "info": 241,
+    "total": 429,
     "pass": false,
     "grade": "C"
   },
   "areas": {
     "frontend": {
-      "critical": 18,
-      "warning": 42,
-      "info": 21,
+      "critical": 19,
+      "warning": 85,
+      "info": 20,
       "grade": "C",
-      "filesAnalyzed": 236,
-      "linesOfCode": 7988
+      "files": 236,
+      "lines": 61233
     },
     "desktop": {
       "critical": 7,
       "warning": 66,
       "info": 218,
       "grade": "C+",
-      "filesAnalyzed": 33,
-      "linesOfCode": 14788
+      "files": 33,
+      "lines": 14700
     },
     "server": {
-      "critical": 2,
-      "warning": 6,
-      "info": 4,
-      "grade": "C+",
-      "filesAnalyzed": 2,
-      "linesOfCode": 425
+      "critical": 3,
+      "warning": 8,
+      "info": 3,
+      "grade": "B",
+      "files": 2,
+      "lines": 424
     }
   },
   "issues": [
     {
-      "id": "frontend-bloater-001",
-      "priority": "P1",
-      "area": "frontend",
-      "type": "bloater",
-      "title": "ClaudeCodeSession.tsx is 1,723 lines",
-      "file": "src/components/ClaudeCodeSession.tsx",
-      "line": null,
-      "action": "split_file",
-      "description": "God component with 10+ responsibilities including session management, message handling, streaming, checkpoints, timeline, analytics, attachments, slash commands, preview, and path management",
-      "fix": {
-        "type": "refactor",
-        "target": "src/components/ClaudeCodeSession.tsx",
-        "replacement": "Split into ClaudeSession.tsx (~200 lines) + useSessionState.ts + useStreamingState.ts + types.ts"
-      }
-    },
-    {
-      "id": "frontend-bloater-002",
-      "priority": "P1",
-      "area": "frontend",
-      "type": "bloater",
-      "title": "FloatingPromptInput.tsx is 1,543 lines",
-      "file": "src/components/FloatingPromptInput.tsx",
-      "line": null,
-      "action": "split_file",
-      "description": "Monolithic input component with model picker, file picker, image handling, slash commands, execution mode, components, IME, and shortcuts",
-      "fix": {
-        "type": "refactor",
-        "target": "src/components/FloatingPromptInput.tsx",
-        "replacement": "Split into FloatingPromptInput.tsx (~300 lines) + ModelPicker.tsx + ExecutionModePicker.tsx + AttachmentsBar.tsx + InputTextarea.tsx"
-      }
-    },
-    {
-      "id": "frontend-bloater-003",
-      "priority": "P1",
-      "area": "frontend",
-      "type": "bloater",
-      "title": "Settings.tsx is 1,279 lines",
-      "file": "src/components/Settings.tsx",
-      "line": null,
-      "action": "split_file",
-      "description": "14 different responsibilities including appearance, privacy, AI config, account, and subscription settings",
-      "fix": {
-        "type": "refactor",
-        "target": "src/components/Settings.tsx",
-        "replacement": "Split into Settings.tsx (~200 lines) + AppearanceSettings.tsx + PrivacySettings.tsx + AISettings/ folder + AccountSettings.tsx"
-      }
-    },
-    {
-      "id": "frontend-tech-debt-001",
-      "priority": "P1",
-      "area": "frontend",
-      "type": "tech_debt",
-      "title": "218 console.log statements in production code",
-      "file": "src/",
-      "line": null,
-      "action": "remove_log",
-      "description": "Console.log statements cause performance degradation and information leakage",
-      "fix": {
-        "type": "replace",
-        "target": "console.log",
-        "replacement": "createLogger('module').debug()"
-      }
-    },
-    {
-      "id": "frontend-type-safety-001",
-      "priority": "P2",
-      "area": "frontend",
-      "type": "type_safety",
-      "title": "218 any type usages",
-      "file": "src/",
-      "line": null,
-      "action": "add_type",
-      "description": "Use of any compromises TypeScript type safety benefits",
-      "fix": {
-        "type": "refactor",
-        "target": "any",
-        "replacement": "Proper typed interfaces"
-      }
-    },
-    {
-      "id": "frontend-duplication-001",
-      "priority": "P1",
-      "area": "frontend",
-      "type": "duplication",
-      "title": "MODELS constant duplicated in 3+ files",
-      "file": "src/components/FloatingPromptInput.tsx",
-      "line": 206,
-      "action": "extract_utility",
-      "description": "Same model picker logic duplicated across multiple files",
-      "fix": {
-        "type": "create",
-        "target": "src/constants/models.ts",
-        "replacement": "export const MODELS: Model[] = [...]"
-      }
-    },
-    {
-      "id": "frontend-workflow-001",
-      "priority": "P1",
-      "area": "frontend",
-      "type": "bloater",
-      "title": "Workflow configs stored as TS strings (~7,500 lines)",
-      "file": "src/constants/workflows/",
-      "line": null,
-      "action": "refactor_function",
-      "description": "YAML workflow configurations embedded in TypeScript files as template strings",
-      "fix": {
-        "type": "refactor",
-        "target": "src/constants/workflows/*.ts",
-        "replacement": "Move to .anyon/workflows/*.yaml with runtime loading"
-      }
-    },
-    {
-      "id": "desktop-bloater-001",
+      "id": "desktop-bloat-001",
       "priority": "P0",
       "area": "desktop",
       "type": "bloater",
-      "title": "agents.rs is 2,036 lines",
+      "title": "agents.rs - 2,036 lines (largest file)",
       "file": "src-tauri/src/commands/agents.rs",
       "line": null,
       "action": "split_file",
-      "description": "Multiple responsibilities: database, process spawning, metrics, GitHub, WebSocket, file ops",
+      "description": "코드베이스 최대 파일. 6개 책임 혼합: DB 연산, 프로세스 스폰, 메트릭 계산, GitHub 통합, WebSocket, 파일 연산",
       "fix": {
         "type": "refactor",
         "target": "src-tauri/src/commands/agents.rs",
-        "replacement": "Split into agents/mod.rs + database.rs + execution.rs + metrics.rs + github.rs + types.rs"
-      }
-    },
-    {
-      "id": "desktop-bloater-002",
-      "priority": "P0",
-      "area": "desktop",
-      "type": "bloater",
-      "title": "start_dev_server() is 215 lines",
-      "file": "src-tauri/src/commands/dev_server.rs",
-      "line": 578,
-      "action": "refactor_function",
-      "description": "Long function with port detection, package manager, process spawning, proxy, and output monitoring",
-      "fix": {
-        "type": "refactor",
-        "target": "start_dev_server()",
-        "replacement": "Split into prepare_dev_server_config() + spawn_dev_process() + spawn_output_monitors()"
+        "replacement": "Split into agents/mod.rs, agents/database.rs, agents/execution.rs, agents/metrics.rs, agents/github.rs, agents/types.rs"
       }
     },
     {
@@ -184,63 +56,31 @@
       "priority": "P0",
       "area": "desktop",
       "type": "security",
-      "title": "54 unwrap() calls creating panic risk",
+      "title": "84 unwrap() calls - production crash risk",
       "file": "src-tauri/src/",
       "line": null,
       "action": "replace_pattern",
-      "description": "unwrap() in async/request handlers can crash the entire application",
+      "description": "unwrap() 호출이 프로덕션 환경에서 패닉 발생 가능. 특히 web_server.rs, agents.rs, checkpoint/manager.rs에 집중",
       "fix": {
         "type": "replace",
         "target": ".unwrap()",
-        "replacement": ".map_err(|e| e.to_string())? or .unwrap_or_else(|| default)"
+        "replacement": "Use .map_err()?, .unwrap_or_else(), or .context()?"
       }
     },
     {
-      "id": "desktop-duplication-001",
-      "priority": "P1",
+      "id": "desktop-dup-001",
+      "priority": "P0",
       "area": "desktop",
       "type": "duplication",
       "title": "157 lines duplicate environment setup",
       "file": "src-tauri/src/claude_binary.rs",
       "line": 622,
       "action": "extract_utility",
-      "description": "create_command_with_env() and create_tokio_command_with_env() have 95% identical code",
-      "fix": {
-        "type": "create",
-        "target": "CommandEnv struct",
-        "replacement": "Extract shared logic to CommandEnv::from_program().apply_to_command()"
-      }
-    },
-    {
-      "id": "desktop-bloater-003",
-      "priority": "P1",
-      "area": "desktop",
-      "type": "bloater",
-      "title": "web_server.rs is 986 lines",
-      "file": "src-tauri/src/web_server.rs",
-      "line": null,
-      "action": "split_file",
-      "description": "Mixed HTTP routes, WebSocket server, and Claude execution",
+      "description": "create_command_with_env()와 create_tokio_command_with_env() 함수가 95% 중복",
       "fix": {
         "type": "refactor",
-        "target": "src-tauri/src/web_server.rs",
-        "replacement": "Split into web/mod.rs + routes/ + websocket.rs + claude_exec.rs"
-      }
-    },
-    {
-      "id": "server-arch-001",
-      "priority": "P0",
-      "area": "server",
-      "type": "bloater",
-      "title": "Monolithic file structure (376 lines)",
-      "file": "server/index.js",
-      "line": null,
-      "action": "split_file",
-      "description": "All server logic in single file needs modularization",
-      "fix": {
-        "type": "refactor",
-        "target": "server/index.js",
-        "replacement": "Split into config/, middleware/, routes/, services/, models/, utils/"
+        "target": "create_command_with_env, create_tokio_command_with_env",
+        "replacement": "Extract get_essential_env_vars() and apply_env_to_command<C>()"
       }
     },
     {
@@ -248,15 +88,15 @@
       "priority": "P0",
       "area": "server",
       "type": "security",
-      "title": "In-memory database causes data loss",
+      "title": "In-memory database - data loss on restart",
       "file": "server/index.js",
       "line": 89,
       "action": "refactor_function",
-      "description": "All data lost on server restart or crash",
+      "description": "모든 데이터가 Map 객체에 저장됨. 서버 재시작 시 완전한 데이터 손실",
       "fix": {
         "type": "refactor",
-        "target": "const users = new Map()",
-        "replacement": "Implement SQLite with better-sqlite3 or PostgreSQL"
+        "target": "const users = new Map(); const userSettings = new Map();",
+        "replacement": "Implement SQLite or PostgreSQL persistence"
       }
     },
     {
@@ -268,45 +108,271 @@
       "file": "server/index.js",
       "line": 140,
       "action": "replace_pattern",
-      "description": "Development endpoints exposed in production",
+      "description": "/auth/dev/login, /dev/create-user, /dev/users 엔드포인트가 프로덕션에서도 노출 가능",
+      "fix": {
+        "type": "create",
+        "target": "devOnly middleware",
+        "replacement": "Add if (NODE_ENV === 'production') return res.status(404) guard"
+      }
+    },
+    {
+      "id": "frontend-bloat-001",
+      "priority": "P1",
+      "area": "frontend",
+      "type": "bloater",
+      "title": "ClaudeCodeSession.tsx - 1,703 lines",
+      "file": "src/components/ClaudeCodeSession.tsx",
+      "line": null,
+      "action": "split_file",
+      "description": "God component with 8+ responsibilities, 41+ hooks. SRP 심각 위반",
+      "fix": {
+        "type": "refactor",
+        "target": "ClaudeCodeSession.tsx",
+        "replacement": "Split into ClaudeCodeSession.tsx (~300), SessionStateManager.tsx, MessageStreamHandler.tsx, CheckpointManager.tsx, useSessionAnalytics.ts, useSessionEventListeners.ts"
+      }
+    },
+    {
+      "id": "frontend-bloat-002",
+      "priority": "P1",
+      "area": "frontend",
+      "type": "bloater",
+      "title": "FloatingPromptInput.tsx - 1,543 lines",
+      "file": "src/components/FloatingPromptInput.tsx",
+      "line": null,
+      "action": "split_file",
+      "description": "20+ state 변수. 입력, 파일 첨부, 슬래시 명령, 드래그드롭, 실행 모드 혼합",
+      "fix": {
+        "type": "refactor",
+        "target": "FloatingPromptInput.tsx",
+        "replacement": "Extract FileAttachmentManager.tsx, SlashCommandIntegration.tsx, DragDropHandler.tsx, KeyboardShortcutHandler.tsx"
+      }
+    },
+    {
+      "id": "frontend-bloat-003",
+      "priority": "P1",
+      "area": "frontend",
+      "type": "bloater",
+      "title": "Settings.tsx - 1,279 lines",
+      "file": "src/components/Settings.tsx",
+      "line": null,
+      "action": "split_file",
+      "description": "13개 설정 섹션이 단일 파일에 존재",
+      "fix": {
+        "type": "refactor",
+        "target": "Settings.tsx",
+        "replacement": "Split into Settings.tsx (nav), AppearanceSettings.tsx, PrivacySettings.tsx, AISettings.tsx, AccountSettings.tsx, SubscriptionSettings.tsx"
+      }
+    },
+    {
+      "id": "frontend-type-001",
+      "priority": "P1",
+      "area": "frontend",
+      "type": "type_safety",
+      "title": "97 instances of 'any' type",
+      "file": "src/",
+      "line": null,
+      "action": "add_type",
+      "description": "타입 안전성 심각 위반. StreamMessage.tsx (15), promptHandlers.ts (12), ClaudeCodeSession.tsx (8) 등",
+      "fix": {
+        "type": "create",
+        "target": "src/types/claude.ts",
+        "replacement": "Create MessageContent, ClaudeMessage, TauriEventPayload interfaces"
+      }
+    },
+    {
+      "id": "desktop-bloat-002",
+      "priority": "P1",
+      "area": "desktop",
+      "type": "bloater",
+      "title": "web_server.rs - 986 lines",
+      "file": "src-tauri/src/web_server.rs",
+      "line": null,
+      "action": "split_file",
+      "description": "HTTP + WebSocket + proxy 로직 혼합",
+      "fix": {
+        "type": "refactor",
+        "target": "web_server.rs",
+        "replacement": "Split into routes/, websocket/, proxy/ modules"
+      }
+    },
+    {
+      "id": "desktop-bloat-003",
+      "priority": "P1",
+      "area": "desktop",
+      "type": "bloater",
+      "title": "start_dev_server() - 215 lines",
+      "file": "src-tauri/src/commands/dev_server.rs",
+      "line": null,
+      "action": "refactor_function",
+      "description": "함수가 너무 김. 50줄 임계값의 4배 초과",
+      "fix": {
+        "type": "refactor",
+        "target": "start_dev_server()",
+        "replacement": "Extract setup_dev_server(), start_proxy(), inject_scripts() functions"
+      }
+    },
+    {
+      "id": "server-struct-001",
+      "priority": "P1",
+      "area": "server",
+      "type": "bloater",
+      "title": "Monolithic file structure - 376 lines",
+      "file": "server/index.js",
+      "line": null,
+      "action": "split_file",
+      "description": "모든 서버 로직이 단일 파일에 집중. SRP 위반",
+      "fix": {
+        "type": "refactor",
+        "target": "server/index.js",
+        "replacement": "Split into routes/auth.js, routes/settings.js, middleware/auth.js, services/jwt.js, services/userService.js"
+      }
+    },
+    {
+      "id": "frontend-log-001",
+      "priority": "P2",
+      "area": "frontend",
+      "type": "tech_debt",
+      "title": "587 console.log statements",
+      "file": "src/",
+      "line": null,
+      "action": "remove_log",
+      "description": "97개 파일에 걸쳐 587개 console.log 문. logger 인프라 존재하나 미사용",
       "fix": {
         "type": "replace",
-        "target": "app.post('/auth/dev/login'",
-        "replacement": "if (NODE_ENV !== 'production') { app.post('/auth/dev/login' ... }"
+        "target": "console.log",
+        "replacement": "Use createLogger() from src/lib/logger.ts"
+      }
+    },
+    {
+      "id": "frontend-todo-001",
+      "priority": "P2",
+      "area": "frontend",
+      "type": "tech_debt",
+      "title": "20 TODO/FIXME comments",
+      "file": "src/",
+      "line": null,
+      "action": "refactor_function",
+      "description": "미완료 기능: MCP export (High), Problems integration (High), agent analytics (Medium)",
+      "fix": {
+        "type": "refactor",
+        "target": "TODO comments",
+        "replacement": "Complete MCPImportExport.tsx:146, Problems.tsx:234"
+      }
+    },
+    {
+      "id": "desktop-magic-001",
+      "priority": "P2",
+      "area": "desktop",
+      "type": "tech_debt",
+      "title": "Magic numbers scattered",
+      "file": "src-tauri/src/",
+      "line": null,
+      "action": "extract_utility",
+      "description": "1000000, 300, 8192 등 하드코딩된 상수",
+      "fix": {
+        "type": "create",
+        "target": "src-tauri/src/constants.rs",
+        "replacement": "Extract MAX_PROXY_RESPONSE_SIZE, OUTPUT_TIMEOUT_SECS, DEFAULT_MAX_TOKENS, PROCESS_ID_START"
+      }
+    },
+    {
+      "id": "desktop-dead-001",
+      "priority": "P2",
+      "area": "desktop",
+      "type": "dead_code",
+      "title": "15 #[allow(dead_code)] annotations",
+      "file": "src-tauri/src/",
+      "line": null,
+      "action": "delete_file",
+      "description": "checkpoint/mod.rs, process/registry.rs, dev_server.rs 등에 사용하지 않는 코드",
+      "fix": {
+        "type": "delete",
+        "target": "#[allow(dead_code)] items",
+        "replacement": "Remove unused fields or implement functionality"
+      }
+    },
+    {
+      "id": "server-magic-001",
+      "priority": "P2",
+      "area": "server",
+      "type": "tech_debt",
+      "title": "Magic numbers duplicated",
+      "file": "server/index.js",
+      "line": null,
+      "action": "extract_utility",
+      "description": "30 * 24 * 60 * 60 * 1000 중복, 15분, 7d 등 하드코딩",
+      "fix": {
+        "type": "create",
+        "target": "server/config/constants.js",
+        "replacement": "Create TIME_CONSTANTS, RATE_LIMIT_CONFIG, SERVER_CONFIG"
+      }
+    },
+    {
+      "id": "server-dup-001",
+      "priority": "P2",
+      "area": "server",
+      "type": "duplication",
+      "title": "User serialization duplicated 3 times",
+      "file": "server/index.js",
+      "line": 150,
+      "action": "extract_utility",
+      "description": "user response 포맷이 3곳에서 중복 (150-159, 237-242, 289-297)",
+      "fix": {
+        "type": "create",
+        "target": "server/utils/responseFormatter.js",
+        "replacement": "Create serializeUser(), serializeUserWithAuth() functions"
+      }
+    },
+    {
+      "id": "server-log-001",
+      "priority": "P2",
+      "area": "server",
+      "type": "tech_debt",
+      "title": "console.log instead of structured logger",
+      "file": "server/index.js",
+      "line": null,
+      "action": "replace_pattern",
+      "description": "console.error 2개, console.warn 1개, console.log 12개",
+      "fix": {
+        "type": "replace",
+        "target": "console.log/error/warn",
+        "replacement": "Use Winston logger with structured format"
       }
     }
   ],
   "recommendations": {
     "P0": [
-      "Implement SQLite database for server (prevents data loss)",
-      "Guard dev endpoints with environment check",
-      "Fix critical unwrap() calls in Rust (prevents crashes)",
-      "Extract duplicate environment setup in claude_binary.rs"
+      "agents.rs 모듈 분할 (2,036줄 → 5개 파일)",
+      "unwrap() 84개 제거 (프로덕션 크래시 방지)",
+      "환경 설정 중복 코드 통합 (157줄)",
+      "Server 데이터베이스 구현 (In-memory → SQLite)",
+      "Dev 엔드포인트 환경 체크 추가"
     ],
     "P1": [
-      "Split ClaudeCodeSession.tsx (1,723 → ~300 lines)",
-      "Split FloatingPromptInput.tsx (1,543 → ~300 lines)",
-      "Split Settings.tsx (1,279 → ~200 lines)",
-      "Move workflow configs to YAML files (~7,500 lines reduction)",
-      "Split agents.rs into 5-6 modules",
-      "Split web_server.rs into modules",
-      "Replace console.log with proper logger (218 instances)",
-      "Modularize server into routes/services/middleware"
+      "ClaudeCodeSession.tsx 분할 (1,703 → ~300줄)",
+      "FloatingPromptInput.tsx 분할 (1,543 → ~400줄)",
+      "Settings.tsx 분할 (1,279 → 6개 컴포넌트)",
+      "타입 안전성 개선 (97개 any 제거)",
+      "web_server.rs 모듈화",
+      "Long functions 리팩토링 (7개 함수)"
     ],
     "P2": [
-      "Fix 218 any types in frontend",
-      "Complete 21 TODO items in frontend",
-      "Audit clone() usage in Rust (203 occurrences)",
-      "Add Winston logger to server",
-      "Add Zod input validation to server",
-      "Consider TypeScript migration for server"
+      "console.log → logger 전환 (587개)",
+      "TODO 23개 처리",
+      "Magic numbers → 상수 추출",
+      "Dead code 정리",
+      "clone() 사용 최적화"
     ]
   },
   "metadata": {
     "workflow": "BMAD Code Audit v1.0",
-    "agents": ["Frontend Auditor", "Desktop Auditor", "Server Auditor"],
+    "agents": [
+      "Frontend Auditor",
+      "Desktop Auditor",
+      "Server Auditor"
+    ],
     "parallelExecution": true,
     "executionTime": "~3 minutes",
-    "nextReview": "2025-01-20"
+    "nextReview": "After P0 completion"
   }
 }
