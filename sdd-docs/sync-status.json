@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "description": "Tracks documentation freshness and sync status for SDD methodology",
-  "last_full_sync": "2025-12-19T18:02:05.000Z",
+  "last_full_sync": "2025-12-21T12:10:00.000Z",
   "documents": {
     "auto_generated": {
       "specs/component-inventory.md": {
@@ -11,7 +11,7 @@
           "src/hooks/**/*.ts",
           "src/stores/**/*.ts"
         ],
-        "last_synced": "2025-12-19T21:00:00.000Z",
+        "last_synced": "2025-12-21T12:10:00.000Z",
         "regenerate_on": [
           "component_add",
           "component_remove",
@@ -36,9 +36,10 @@
         "source_patterns": [
           "src-tauri/src/main.rs",
           "src-tauri/src/commands/storage.rs",
-          "src/types/**/*.ts"
+          "src/types/**/*.ts",
+          "server/db/**/*.js"
         ],
-        "last_synced": "2025-12-19T21:00:00.000Z",
+        "last_synced": "2025-12-21T12:10:00.000Z",
         "regenerate_on": [
           "schema_change",
           "type_change"
@@ -71,18 +72,20 @@
         "watch_patterns": [
           "src-tauri/src/main.rs",
           "src-tauri/src/lib.rs",
-          "src-tauri/Cargo.toml"
+          "src-tauri/Cargo.toml",
+          "src-tauri/src/commands/agents/**/*.rs"
         ],
-        "last_reviewed": "2025-12-19T21:00:00.000Z",
+        "last_reviewed": "2025-12-21T12:10:00.000Z",
         "drift_indicators": []
       },
       "specs/architecture-server.md": {
         "type": "manual",
         "watch_patterns": [
           "server/index.js",
-          "server/package.json"
+          "server/package.json",
+          "server/db/**/*.js"
         ],
-        "last_reviewed": "2025-12-19T21:00:00.000Z",
+        "last_reviewed": "2025-12-21T12:10:00.000Z",
         "drift_indicators": []
       },
       "specs/integration-architecture.md": {

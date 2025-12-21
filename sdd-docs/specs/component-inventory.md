@@ -6,10 +6,12 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 81 |
+| **React Components** | 140 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 17 |
+| **Custom Hooks** | 18 |
 | **Context Providers** | 3 |
+
+> Last synced: 2025-12-21
 
 ---
 

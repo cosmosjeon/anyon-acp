@@ -205,12 +205,38 @@ pub enum ProcessType {
 
 ### Auth Server Storage (Node.js)
 
-```javascript
-// In-memory maps (development only)
-const users = new Map();        // userId -> User
-const sessions = new Map();      // sessionId -> Session
-const userSettings = new Map();  // userId -> Settings
+**SQLite Database** (better-sqlite3)
+
+Location: `server/data/anyon.db`
+
+```sql
+-- 사용자 테이블
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  profile_picture TEXT,
+  google_id TEXT UNIQUE,
+  plan_type TEXT DEFAULT 'FREE' CHECK(plan_type IN ('FREE', 'PRO')),
+  subscription_status TEXT DEFAULT 'ACTIVE',
+  current_period_end TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 사용자 설정 (Key-Value)
+CREATE TABLE user_settings (
+  user_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (user_id, key),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 ```
+
+**Repository Pattern:**
+- `server/db/repositories/userRepository.js` - User CRUD
+- `server/db/repositories/settingsRepository.js` - Settings CRUD
 
 ---
 
