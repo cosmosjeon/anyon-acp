@@ -1,13 +1,12 @@
 import React from "react";
-import { CheckCircle2, Circle, Clock, FileEdit } from "lucide-react";
+import { CheckCircle2, Clock, Circle, FileEdit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import type { TodoWidgetProps } from "@/types/widgets";
 
-interface TodoWidgetProps {
-  todos: any[];
-  result?: any;
-}
-
+/**
+ * Widget for TodoWrite tool - displays a beautiful TODO list
+ */
 export const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, result: _result }) => {
   const statusIcons = {
     completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
@@ -47,8 +46,8 @@ export const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, result: _result }
                 {todo.content}
               </p>
               {todo.priority && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={cn("text-xs", priorityColors[todo.priority as keyof typeof priorityColors])}
                 >
                   {todo.priority}

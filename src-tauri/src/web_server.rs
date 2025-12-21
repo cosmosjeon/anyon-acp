@@ -668,13 +668,134 @@ async fn execute_claude_command(
     session_id: String,
     state: AppState,
 ) -> Result<(), String> {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-    use tokio::process::Command;
-
     println!("[TRACE] execute_claude_command called:");
     println!("[TRACE]   project_path: {}", project_path);
     println!("[TRACE]   prompt length: {} chars", prompt.len());
     println!("[TRACE]   model: {}", model);
+    println!("[TRACE]   session_id: {}", session_id);
+
+    let args = vec![
+        "-p".to_string(),
+        prompt,
+        "--model".to_string(),
+        model,
+        "--output-format".to_string(),
+        "stream-json".to_string(),
+        "--verbose".to_string(),
+        "--dangerously-skip-permissions".to_string(),
+    ];
+
+    execute_claude_with_streaming(
+        project_path,
+        args,
+        session_id,
+        state,
+        "Starting Claude execution...",
+    )
+    .await
+}
+
+async fn continue_claude_command(
+    project_path: String,
+    prompt: String,
+    model: String,
+    session_id: String,
+    state: AppState,
+) -> Result<(), String> {
+    let args = vec![
+        "-c".to_string(), // Continue flag
+        "-p".to_string(),
+        prompt,
+        "--model".to_string(),
+        model,
+        "--output-format".to_string(),
+        "stream-json".to_string(),
+        "--verbose".to_string(),
+        "--dangerously-skip-permissions".to_string(),
+    ];
+
+    execute_claude_with_streaming(
+        project_path,
+        args,
+        session_id,
+        state,
+        "Continuing Claude session...",
+    )
+    .await
+}
+
+async fn resume_claude_command(
+    project_path: String,
+    claude_session_id: String,
+    prompt: String,
+    model: String,
+    session_id: String,
+    state: AppState,
+) -> Result<(), String> {
+    println!("[resume_claude_command] Starting with project_path: {}, claude_session_id: {}, prompt: {}, model: {}",
+             project_path, claude_session_id, prompt, model);
+
+    let args = vec![
+        "--resume".to_string(),
+        claude_session_id,
+        "-p".to_string(),
+        prompt,
+        "--model".to_string(),
+        model,
+        "--output-format".to_string(),
+        "stream-json".to_string(),
+        "--verbose".to_string(),
+        "--dangerously-skip-permissions".to_string(),
+    ];
+
+    execute_claude_with_streaming(
+        project_path,
+        args,
+        session_id,
+        state,
+        "Resuming Claude session...",
+    )
+    .await
+}
+
+async fn send_to_session(state: &AppState, session_id: &str, message: String) {
+    println!("[TRACE] send_to_session called for session: {}", session_id);
+    println!("[TRACE] Message: {}", message);
+
+    let sessions = state.active_sessions.lock().await;
+    if let Some(sender) = sessions.get(session_id) {
+        println!("[TRACE] Found session in active sessions, sending message...");
+        match sender.send(message).await {
+            Ok(_) => println!("[TRACE] Message sent successfully"),
+            Err(e) => println!("[TRACE] Failed to send message: {}", e),
+        }
+    } else {
+        println!(
+            "[TRACE] Session {} not found in active sessions",
+            session_id
+        );
+        println!(
+            "[TRACE] Active sessions: {:?}",
+            sessions.keys().collect::<Vec<_>>()
+        );
+    }
+}
+
+/// Common utility function for executing Claude commands with streaming output
+/// Handles the full lifecycle: spawn process, stream output, wait for completion
+async fn execute_claude_with_streaming(
+    project_path: String,
+    args: Vec<String>,
+    session_id: String,
+    state: AppState,
+    start_message: &str,
+) -> Result<(), String> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::process::Command;
+
+    println!("[TRACE] execute_claude_with_streaming called:");
+    println!("[TRACE]   project_path: {}", project_path);
+    println!("[TRACE]   args: {:?}", args);
     println!("[TRACE]   session_id: {}", session_id);
 
     // Send initial message
@@ -684,13 +805,13 @@ async fn execute_claude_command(
         &session_id,
         json!({
             "type": "start",
-            "message": "Starting Claude execution..."
+            "message": start_message
         })
         .to_string(),
     )
     .await;
 
-    // Find Claude binary (simplified for web mode)
+    // Find Claude binary
     println!("[TRACE] Finding Claude binary...");
     let claude_path = find_claude_binary_web().map_err(|e| {
         let error = format!("Claude binary not found: {}", e);
@@ -702,17 +823,7 @@ async fn execute_claude_command(
     // Create Claude command
     println!("[TRACE] Creating Claude command...");
     let mut cmd = Command::new(&claude_path);
-    let args = [
-        "-p",
-        &prompt,
-        "--model",
-        &model,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ];
-    cmd.args(args);
+    cmd.args(&args);
     cmd.current_dir(&project_path);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
@@ -783,206 +894,8 @@ async fn execute_claude_command(
         return Err(error);
     }
 
-    println!("[TRACE] execute_claude_command completed successfully");
+    println!("[TRACE] execute_claude_with_streaming completed successfully");
     Ok(())
-}
-
-async fn continue_claude_command(
-    project_path: String,
-    prompt: String,
-    model: String,
-    session_id: String,
-    state: AppState,
-) -> Result<(), String> {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-    use tokio::process::Command;
-
-    send_to_session(
-        &state,
-        &session_id,
-        json!({
-            "type": "start",
-            "message": "Continuing Claude session..."
-        })
-        .to_string(),
-    )
-    .await;
-
-    // Find Claude binary
-    let claude_path =
-        find_claude_binary_web().map_err(|e| format!("Claude binary not found: {}", e))?;
-
-    // Create continue command
-    let mut cmd = Command::new(&claude_path);
-    cmd.args([
-        "-c", // Continue flag
-        "-p",
-        &prompt,
-        "--model",
-        &model,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ]);
-    cmd.current_dir(&project_path);
-    cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::piped());
-
-    // Spawn and stream output
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Failed to spawn Claude: {}", e))?;
-    let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
-    let stdout_reader = BufReader::new(stdout);
-
-    let mut lines = stdout_reader.lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        send_to_session(
-            &state,
-            &session_id,
-            json!({
-                "type": "output",
-                "content": line
-            })
-            .to_string(),
-        )
-        .await;
-    }
-
-    let exit_status = child
-        .wait()
-        .await
-        .map_err(|e| format!("Failed to wait for Claude: {}", e))?;
-    if !exit_status.success() {
-        return Err(format!(
-            "Claude execution failed with exit code: {:?}",
-            exit_status.code()
-        ));
-    }
-
-    Ok(())
-}
-
-async fn resume_claude_command(
-    project_path: String,
-    claude_session_id: String,
-    prompt: String,
-    model: String,
-    session_id: String,
-    state: AppState,
-) -> Result<(), String> {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-    use tokio::process::Command;
-
-    println!("[resume_claude_command] Starting with project_path: {}, claude_session_id: {}, prompt: {}, model: {}", 
-             project_path, claude_session_id, prompt, model);
-
-    send_to_session(
-        &state,
-        &session_id,
-        json!({
-            "type": "start",
-            "message": "Resuming Claude session..."
-        })
-        .to_string(),
-    )
-    .await;
-
-    // Find Claude binary
-    println!("[resume_claude_command] Finding Claude binary...");
-    let claude_path =
-        find_claude_binary_web().map_err(|e| format!("Claude binary not found: {}", e))?;
-    println!(
-        "[resume_claude_command] Found Claude binary: {}",
-        claude_path
-    );
-
-    // Create resume command
-    println!("[resume_claude_command] Creating command...");
-    let mut cmd = Command::new(&claude_path);
-    let args = [
-        "--resume",
-        &claude_session_id,
-        "-p",
-        &prompt,
-        "--model",
-        &model,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ];
-    cmd.args(args);
-    cmd.current_dir(&project_path);
-    cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::piped());
-
-    println!(
-        "[resume_claude_command] Command: {} {:?} (in dir: {})",
-        claude_path, args, project_path
-    );
-
-    // Spawn and stream output
-    println!("[resume_claude_command] Spawning process...");
-    let mut child = cmd.spawn().map_err(|e| {
-        let error = format!("Failed to spawn Claude: {}", e);
-        println!("[resume_claude_command] Spawn error: {}", error);
-        error
-    })?;
-    println!("[resume_claude_command] Process spawned successfully");
-    let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
-    let stdout_reader = BufReader::new(stdout);
-
-    let mut lines = stdout_reader.lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        send_to_session(
-            &state,
-            &session_id,
-            json!({
-                "type": "output",
-                "content": line
-            })
-            .to_string(),
-        )
-        .await;
-    }
-
-    let exit_status = child
-        .wait()
-        .await
-        .map_err(|e| format!("Failed to wait for Claude: {}", e))?;
-    if !exit_status.success() {
-        return Err(format!(
-            "Claude execution failed with exit code: {:?}",
-            exit_status.code()
-        ));
-    }
-
-    Ok(())
-}
-
-async fn send_to_session(state: &AppState, session_id: &str, message: String) {
-    println!("[TRACE] send_to_session called for session: {}", session_id);
-    println!("[TRACE] Message: {}", message);
-
-    let sessions = state.active_sessions.lock().await;
-    if let Some(sender) = sessions.get(session_id) {
-        println!("[TRACE] Found session in active sessions, sending message...");
-        match sender.send(message).await {
-            Ok(_) => println!("[TRACE] Message sent successfully"),
-            Err(e) => println!("[TRACE] Failed to send message: {}", e),
-        }
-    } else {
-        println!(
-            "[TRACE] Session {} not found in active sessions",
-            session_id
-        );
-        println!(
-            "[TRACE] Active sessions: {:?}",
-            sessions.keys().collect::<Vec<_>>()
-        );
-    }
 }
 
 /// Create the web server

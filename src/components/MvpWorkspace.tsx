@@ -282,10 +282,10 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   }, []);
 
   // Start a new workflow (new conversation) from PlanningDocsPanel
-  const handleStartNewWorkflow = useCallback((workflowPrompt: string) => {
+  const handleStartNewWorkflow = useCallback((workflowPrompt: string, userMessage?: string) => {
     if (claudeSessionRef.current) {
-      // Start a new session with the workflow prompt (slash command)
-      claudeSessionRef.current.startNewSession(workflowPrompt);
+      // Start a new session with the workflow prompt and optional user message
+      claudeSessionRef.current.startNewSession(workflowPrompt, userMessage);
     }
   }, []);
 

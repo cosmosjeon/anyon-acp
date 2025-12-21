@@ -6,6 +6,9 @@ import { OAuth2Client } from 'google-auth-library';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
+import rateLimit from 'express-rate-limit';
+import { createUser } from './models/userFactory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,15 +24,24 @@ const envPaths = [
 for (const envPath of envPaths) {
   const result = dotenv.config({ path: envPath });
   if (!result.error) {
-    console.log(`Loaded .env from: ${envPath}`);
     break;
   }
 }
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Secure JWT_SECRET handling with production safety check
+const JWT_SECRET = process.env.JWT_SECRET;
+if (NODE_ENV === 'production' && !JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable must be set in production');
+    process.exit(1);
+}
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || (() => {
+    console.warn('⚠️ WARNING: Using development JWT secret. Do NOT use in production!');
+    return 'dev-secret-key-UNSAFE-DO-NOT-USE-IN-PRODUCTION';
+})();
 
 // Google OAuth Client
 const oauth2Client = new OAuth2Client(
@@ -38,24 +50,62 @@ const oauth2Client = new OAuth2Client(
   process.env.OAUTH_REDIRECT_URI || 'http://localhost:4000/auth/google/callback'
 );
 
+// CORS Configuration - only allow specific origins
+const allowedOrigins = [
+  'http://localhost:5173',  // Vite dev server
+  'http://localhost:4000',  // Self
+  'tauri://localhost',      // Tauri app
+  'https://tauri.localhost' // Tauri app (alternative)
+];
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json());
+
+// Rate limiting - prevent brute force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // stricter limit for sensitive endpoints
+  message: { error: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to auth routes
+app.use('/auth', authLimiter);
+app.use('/dev', strictLimiter);
 
 // Mock database (in-memory for development)
 const users = new Map();
 const sessions = new Map();
 const userSettings = new Map(); // userId -> settings object
 
+// Load OAuth callback HTML template
+const oauthCallbackTemplate = readFileSync(
+  path.join(__dirname, 'views', 'oauth-callback.html'),
+  'utf-8'
+);
+
 // Helper: Generate JWT token
 function generateToken(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, EFFECTIVE_JWT_SECRET, { expiresIn: '7d' });
 }
 
 // Helper: Verify JWT token
 function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, EFFECTIVE_JWT_SECRET);
   } catch (error) {
     return null;
   }
@@ -88,21 +138,14 @@ function authenticate(req, res, next) {
 
 // Dev Login endpoint - simplified version
 app.post('/auth/dev/login', (req, res) => {
-  console.log('🔧 Dev Login: Creating mock user');
-  const userId = uuidv4();
-  const user = {
-    id: userId,
+  const user = createUser({
     email: 'dev@example.com',
     name: 'Dev User',
-    profilePicture: null, // Use default icon
-    subscription: {
-      planType: 'PRO',
-      status: 'ACTIVE',
-    },
-  };
+    planType: 'PRO',
+  });
 
-  users.set(userId, user);
-  const token = generateToken(userId);
+  users.set(user.id, user);
+  const token = generateToken(user.id);
 
   return res.json({
     token: token,
@@ -166,122 +209,22 @@ app.get('/auth/google/callback', async (req, res) => {
 
     if (!user) {
       // Create new user
-      const userId = uuidv4();
-      user = {
-        id: userId,
-        googleId: googleId,
-        email: email,
-        name: name,
+      user = createUser({
+        email,
+        name,
+        googleId,
         profilePicture: picture,
-        subscription: {
-          planType: 'FREE',
-          status: 'ACTIVE',
-        },
-      };
-      users.set(userId, user);
-      console.log('✅ New user created:', email);
-    } else {
-      console.log('✅ Existing user logged in:', email);
+        planType: 'FREE',
+      });
+      users.set(user.id, user);
     }
 
     // Generate JWT token
     const jwtToken = generateToken(user.id);
 
-    // res.redirect(`anyon://auth/callback?token=${jwtToken}`);
-
-    // Serve a simple HTML page to trigger the deep link
+    // Serve HTML page with deep link
     const deepLink = `anyon://auth/callback?token=${jwtToken}`;
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Login Successful</title>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
-            .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
-            h1 { font-size: 1.5rem; color: #111827; margin-bottom: 1rem; }
-            p { color: #6b7280; margin-bottom: 1.5rem; line-height: 1.6; }
-            .button { display: inline-block; background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: background 0.2s; cursor: pointer; border: none; font-size: 1rem; }
-            .button:hover { background: #1d4ed8; }
-            .status { margin-top: 1rem; font-size: 0.875rem; color: #9ca3af; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>로그인 성공!</h1>
-            <p id="message">ANYON 앱으로 이동합니다.<br>자동으로 열리지 않으면 아래 버튼을 눌러주세요.</p>
-            <button onclick="openApp()" class="button">ANYON 앱 열기</button>
-            <div class="status" id="status"></div>
-          </div>
-          <script>
-            let attempts = 0;
-            const maxAttempts = 3;
-
-            function openApp() {
-              attempts++;
-              const statusEl = document.getElementById('status');
-              statusEl.textContent = '앱을 여는 중... (' + attempts + '/' + maxAttempts + ')';
-
-              // Try multiple methods for Windows compatibility
-
-              // Method 1: Direct window.location
-              try {
-                window.location.href = "${deepLink}";
-              } catch (e) {
-                console.error('Method 1 failed:', e);
-              }
-
-              // Method 2: Create hidden iframe (works better on some Windows browsers)
-              setTimeout(() => {
-                try {
-                  const iframe = document.createElement('iframe');
-                  iframe.style.display = 'none';
-                  iframe.src = "${deepLink}";
-                  document.body.appendChild(iframe);
-
-                  setTimeout(() => {
-                    document.body.removeChild(iframe);
-                  }, 1000);
-                } catch (e) {
-                  console.error('Method 2 failed:', e);
-                }
-              }, 200);
-
-              // Method 3: Create link and click it
-              setTimeout(() => {
-                try {
-                  const link = document.createElement('a');
-                  link.href = "${deepLink}";
-                  link.style.display = 'none';
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                } catch (e) {
-                  console.error('Method 3 failed:', e);
-                }
-              }, 400);
-
-              if (attempts >= maxAttempts) {
-                statusEl.textContent = '앱이 열리지 않으면 ANYON이 설치되었는지 확인해주세요.';
-              }
-            }
-
-            // Auto-trigger on load - only for browsers that allow it
-            window.onload = function() {
-              // Try once automatically, but user will need to click button if blocked
-              setTimeout(() => {
-                try {
-                  window.location.href = "${deepLink}";
-                } catch (e) {
-                  console.log('Auto-redirect blocked, user needs to click button');
-                }
-              }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `;
+    const html = oauthCallbackTemplate.replace(/\{\{DEEP_LINK\}\}/g, deepLink);
     res.send(html);
   } catch (error) {
     console.error('❌ OAuth callback error:', error);
@@ -331,24 +274,16 @@ app.post('/auth/subscription', authenticate, (req, res) => {
 app.post('/dev/create-user', (req, res) => {
   const { email, name, planType = 'FREE' } = req.body;
 
-  const userId = uuidv4();
   const userName = name || 'Test User';
-  const user = {
-    id: userId,
+  const user = createUser({
     email: email || `test-${Date.now()}@example.com`,
     name: userName,
     profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=6366f1&color=fff&size=150`,
-    subscription: {
-      planType,
-      status: 'ACTIVE',
-      currentPeriodEnd: planType === 'PRO'
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        : undefined,
-    },
-  };
+    planType,
+  });
 
-  users.set(userId, user);
-  const token = generateToken(userId);
+  users.set(user.id, user);
+  const token = generateToken(user.id);
 
   res.json({
     user: {

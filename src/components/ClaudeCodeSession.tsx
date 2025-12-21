@@ -7,6 +7,9 @@ declare global {
   }
 }
 import { motion, AnimatePresence } from "framer-motion";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger('ClaudeCodeSession');
 import {
   Copy,
   ChevronDown,
@@ -14,15 +17,6 @@ import {
   ChevronUp,
   X,
   Wrench,
-  FileText as FileTextIcon,
-  Palette,
-  Paintbrush,
-  Settings,
-  Boxes,
-  Database,
-  LayoutList,
-  Rocket,
-  CheckCircle,
   Loader2,
   AlertCircle
 } from "lucide-react";
@@ -55,23 +49,19 @@ import type { ClaudeStreamMessage } from "./AgentExecution";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
 import { SessionPersistenceService, type TabType } from "@/services/sessionPersistence";
-import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
-
-// Icon mapping for workflow prompts
-const WorkflowIcon: React.FC<{ icon: PromptIconType | null; className?: string }> = ({ icon, className = "h-4 w-4" }) => {
-  switch (icon) {
-    case 'file-text': return <FileTextIcon className={className} />;
-    case 'palette': return <Palette className={className} />;
-    case 'paintbrush': return <Paintbrush className={className} />;
-    case 'settings': return <Settings className={className} />;
-    case 'boxes': return <Boxes className={className} />;
-    case 'database': return <Database className={className} />;
-    case 'layout-list': return <LayoutList className={className} />;
-    case 'rocket': return <Rocket className={className} />;
-    case 'check-circle': return <CheckCircle className={className} />;
-    default: return null;
-  }
-};
+import {
+  validatePromptInput,
+  createQueuedPrompt,
+  setupSessionIfNeeded,
+  createStreamMessageHandler,
+  createCompletionHandler,
+  setupEventListeners,
+  trackPromptMetrics,
+  executePromptCommand,
+  addUserMessageToUI,
+  updateSessionFirstMessage,
+  type QueuedPrompt,
+} from "./claude-session/promptHandlers";
 
 interface ClaudeCodeSessionProps {
   /**
@@ -123,7 +113,7 @@ interface ClaudeCodeSessionProps {
  */
 export interface ClaudeCodeSessionRef {
   sendPrompt: (prompt: string, model?: "haiku" | "sonnet" | "opus") => void;
-  startNewSession: (initialPrompt: string) => void;
+  startNewSession: (backendPrompt: string, userMessage?: string) => void;
   isLoading: boolean;
 }
 
@@ -177,7 +167,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const [forkSessionName, setForkSessionName] = useState("");
   
   // Queued prompts state
-  const [queuedPrompts, setQueuedPrompts] = useState<Array<{ id: string; prompt: string; displayText?: string; icon?: PromptIconType | null; model: "haiku" | "sonnet" | "opus" }>>([]);
+  const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
   
   // New state for preview feature
   const [showPreview, setShowPreview] = useState(false);
@@ -193,11 +183,12 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const hasActiveSessionRef = useRef(false);
   const floatingPromptRef = useRef<FloatingPromptInputRef>(null);
-  const queuedPromptsRef = useRef<Array<{ id: string; prompt: string; displayText?: string; icon?: PromptIconType | null; model: "haiku" | "sonnet" | "opus" }>>([]);
+  const queuedPromptsRef = useRef<QueuedPrompt[]>([]);
   const isMountedRef = useRef(true);
   const isListeningRef = useRef(false);
   const sessionStartTime = useRef<number>(Date.now());
   const isIMEComposingRef = useRef(false);
+  const currentSessionIdRef = useRef<string | null>(null);
   
   // Session metrics state for enhanced analytics
   const sessionMetrics = useRef({
@@ -376,7 +367,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   // Debug logging
   useEffect(() => {
-    console.log('[ClaudeCodeSession] State update:', {
+    logger.debug('State update:', {
       projectPath,
       session,
       extractedSessionInfo,
@@ -545,7 +536,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         }
       });
     } catch (err) {
-      console.error("Failed to load session history:", err);
+      logger.error("Failed to load session history:", err);
       setError("Failed to load session history");
     } finally {
       setIsLoading(false);
@@ -566,28 +557,28 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         
         if (activeSession) {
           // Session is still active, reconnect to its stream
-          console.log('[ClaudeCodeSession] Found active session, reconnecting:', session.id);
+          logger.log('Found active session, reconnecting:', session.id);
           // IMPORTANT: Set claudeSessionId before reconnecting
           setClaudeSessionId(session.id);
-          
+
           // Don't add buffered messages here - they've already been loaded by loadSessionHistory
           // Just set up listeners for new messages
-          
+
           // Set up listeners for the active session
           reconnectToSession(session.id);
         }
       } catch (err) {
-        console.error('Failed to check for active sessions:', err);
+        logger.error('Failed to check for active sessions:', err);
       }
     }
   };
 
   const reconnectToSession = async (sessionId: string) => {
-    console.log('[ClaudeCodeSession] Reconnecting to session:', sessionId);
-    
+    logger.log('Reconnecting to session:', sessionId);
+
     // Prevent duplicate listeners
     if (isListeningRef.current) {
-      console.log('[ClaudeCodeSession] Already listening to session, skipping reconnect');
+      logger.log('Already listening to session, skipping reconnect');
       return;
     }
     
@@ -604,30 +595,30 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     // Set up session-specific listeners
     const outputUnlisten = await listen(`claude-output:${sessionId}`, async (event: any) => {
       try {
-        console.log('[ClaudeCodeSession] Received claude-output on reconnect:', event.payload);
-        
+        logger.log('Received claude-output on reconnect:', event.payload);
+
         if (!isMountedRef.current) return;
-        
+
         // Store raw JSONL
         setRawJsonlOutput(prev => [...prev, event.payload]);
-        
+
         // Parse and display
         const message = JSON.parse(event.payload) as ClaudeStreamMessage;
         setMessages(prev => [...prev, message]);
       } catch (err) {
-        console.error("Failed to parse message:", err, event.payload);
+        logger.error("Failed to parse message:", err, event.payload);
       }
     });
 
     const errorUnlisten = await listen(`claude-error:${sessionId}`, (event: any) => {
-      console.error("Claude error:", event.payload);
+      logger.error("Claude error:", event.payload);
       if (isMountedRef.current) {
         setError(event.payload);
       }
     });
 
     const completeUnlisten = await listen(`claude-complete:${sessionId}`, async (event: any) => {
-      console.log('[ClaudeCodeSession] Received claude-complete on reconnect:', event.payload);
+      logger.log('Received claude-complete on reconnect:', event.payload);
       if (isMountedRef.current) {
         setIsLoading(false);
         hasActiveSessionRef.current = false;
@@ -650,519 +641,157 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     sendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus" = "sonnet") => {
       handleSendPrompt(prompt, model);
     },
-    startNewSession: (initialPrompt: string) => {
+    startNewSession: (backendPrompt: string, userMessage?: string) => {
       // Clear current session and start a new one
       setMessages([]);
       setRawJsonlOutput([]);
       setError(null);
       setIsFirstPrompt(true);
       setTotalTokens(0);
-      // Send the initial prompt (slash command will be processed by Claude Code directly)
-      handleSendPrompt(initialPrompt, "sonnet");
+
+      // Add display message to UI if provided (for workflow prompts)
+      if (userMessage) {
+        addUserMessageToUI({ prompt: userMessage, setMessages });
+      }
+
+      // Send the backend prompt (full workflow prompt) to Claude
+      handleSendPrompt(backendPrompt, "sonnet", undefined, userMessage ? true : false);
     },
     isLoading,
   }), [isLoading]);
 
-  const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode) => {
-    console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
+  const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode, skipAddUserMessage?: boolean) => {
+    logger.log('handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
 
-    if (!projectPath?.trim()) {
-      setError("Please select a project directory first");
+    // 1. Validate input
+    const validation = validatePromptInput(prompt, projectPath);
+    if (!validation.valid) {
+      if (validation.error) {
+        setError(validation.error);
+      }
       return;
     }
 
-    if (!prompt?.trim()) {
-      console.warn('[ClaudeCodeSession] Empty prompt received, ignoring');
-      return;
-    }
-
-    // If already loading, queue the prompt
+    // 2. Queue if already loading
     if (isLoading) {
-      const displayInfo = isAnyonWorkflowCommand(prompt) ? getPromptDisplayInfo(prompt) : null;
-      const newPrompt = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        prompt,
-        displayText: displayInfo?.text,
-        icon: displayInfo?.icon,
-        model
-      };
+      const newPrompt = createQueuedPrompt(prompt, model);
       setQueuedPrompts(prev => [...prev, newPrompt]);
       return;
     }
 
     try {
+      // 3. Setup session state
       setIsLoading(true);
       setError(null);
       hasActiveSessionRef.current = true;
-      
-      // For resuming sessions, ensure we have the session ID
-      if (effectiveSession && !claudeSessionId) {
-        setClaudeSessionId(effectiveSession.id);
-      }
-      
-      // Only clean up and set up new listeners if not already listening
+
+      // 4. Setup session ID if resuming
+      setupSessionIfNeeded({
+        effectiveSession,
+        claudeSessionId,
+        setClaudeSessionId
+      });
+
+      // 5. Setup event listeners if not already listening
       if (!isListeningRef.current) {
         // Clean up previous listeners
         unlistenRefs.current.forEach(unlisten => unlisten());
         unlistenRefs.current = [];
-        
+
         // Mark as setting up listeners
         isListeningRef.current = true;
-        
-        // --------------------------------------------------------------------
-        // 1️⃣  Event Listener Setup Strategy
-        // --------------------------------------------------------------------
-        // Claude Code may emit a *new* session_id even when we pass --resume. If
-        // we listen only on the old session-scoped channel we will miss the
-        // stream until the user navigates away & back. To avoid this we:
-        //   • Always start with GENERIC listeners (no suffix) so we catch the
-        //     very first "system:init" message regardless of the session id.
-        //   • Once that init message provides the *actual* session_id, we
-        //     dynamically switch to session-scoped listeners and stop the
-        //     generic ones to prevent duplicate handling.
-        // --------------------------------------------------------------------
 
-        console.log('[ClaudeCodeSession] Setting up generic event listeners first');
-
-        let currentSessionId: string | null = claudeSessionId || effectiveSession?.id || null;
-
-        // Helper to attach session-specific listeners **once we are sure**
-        const attachSessionSpecificListeners = async (sid: string) => {
-          console.log('[ClaudeCodeSession] Attaching session-specific listeners for', sid);
-
-          const specificOutputUnlisten = await listen(`claude-output:${sid}`, (evt: any) => {
-            handleStreamMessage(evt.payload);
-          });
-
-          const specificErrorUnlisten = await listen(`claude-error:${sid}`, (evt: any) => {
-            console.error('Claude error (scoped):', evt.payload);
-            setError(evt.payload);
-          });
-
-          const specificCompleteUnlisten = await listen(`claude-complete:${sid}`, (evt: any) => {
-            console.log('[ClaudeCodeSession] Received claude-complete (scoped):', evt.payload);
-            processComplete(evt.payload);
-          });
-
-          // Replace existing unlisten refs with these new ones (after cleaning up)
-          unlistenRefs.current.forEach((u) => u());
-          unlistenRefs.current = [specificOutputUnlisten, specificErrorUnlisten, specificCompleteUnlisten];
-        };
-
-        // Generic listeners (catch-all)
-        const genericOutputUnlisten = await listen('claude-output', async (event: any) => {
-          handleStreamMessage(event.payload);
-
-          // Attempt to extract session_id on the fly (for the very first init)
-          try {
-            const msg = JSON.parse(event.payload) as ClaudeStreamMessage;
-            if (msg.type === 'system' && msg.subtype === 'init' && msg.session_id) {
-              if (!currentSessionId || currentSessionId !== msg.session_id) {
-                console.log('[ClaudeCodeSession] Detected new session_id from generic listener:', msg.session_id);
-                currentSessionId = msg.session_id;
-                setClaudeSessionId(msg.session_id);
-
-                // If we haven't extracted session info before, do it now
-                if (!extractedSessionInfo) {
-                  const projectId = projectPath.replace(/[^a-zA-Z0-9]/g, '-');
-                  setExtractedSessionInfo({ sessionId: msg.session_id, projectId });
-
-                  // Save session data for restoration (tab-specific if tabType provided)
-                  if (tabType) {
-                    SessionPersistenceService.saveSessionForTab(
-                      msg.session_id,
-                      projectId,
-                      projectPath,
-                      tabType,
-                      undefined, // firstMessage will be updated later
-                      messages.length
-                    );
-                    SessionPersistenceService.saveLastSessionForTab(projectPath, tabType, msg.session_id);
-                  } else {
-                    SessionPersistenceService.saveSession(
-                      msg.session_id,
-                      projectId,
-                      projectPath,
-                      messages.length
-                    );
-                  }
-
-                  // Notify parent about new session
-                  onSessionCreated?.(msg.session_id);
-                }
-
-                // Switch to session-specific listeners
-                await attachSessionSpecificListeners(msg.session_id);
-              }
-            }
-          } catch {
-            /* ignore parse errors */
-          }
+        // Create handler functions using extracted utilities
+        const handleStreamMessage = createStreamMessageHandler({
+          isMountedRef,
+          accumulatedTextRef,
+          setStreamingText,
+          setRawJsonlOutput,
+          setMessages,
+          sessionMetrics,
+          workflowTracking,
+          trackEvent
         });
 
-        // Helper to process any JSONL stream message string or object
-        function handleStreamMessage(payload: string | ClaudeStreamMessage) {
-          try {
-            // Don't process if component unmounted
-            if (!isMountedRef.current) return;
-            
-            let message: ClaudeStreamMessage;
-            let rawPayload: string;
-            
-            if (typeof payload === 'string') {
-              // Tauri mode: payload is a JSON string
-              rawPayload = payload;
-              message = JSON.parse(payload) as ClaudeStreamMessage;
-            } else {
-              // Web mode: payload is already parsed object
-              message = payload;
-              rawPayload = JSON.stringify(payload);
-            }
-            
-            console.log('[ClaudeCodeSession] handleStreamMessage - message type:', message.type);
-
-            // Store raw JSONL
-            setRawJsonlOutput((prev) => [...prev, rawPayload]);
-
-            // Track enhanced tool execution
-            if (message.type === 'assistant' && message.message?.content) {
-              const toolUses = message.message.content.filter((c: any) => c.type === 'tool_use');
-              toolUses.forEach((toolUse: any) => {
-                // Increment tools executed counter
-                sessionMetrics.current.toolsExecuted += 1;
-                sessionMetrics.current.lastActivityTime = Date.now();
-
-                // Track file operations
-                const toolName = toolUse.name?.toLowerCase() || '';
-                if (toolName.includes('create') || toolName.includes('write')) {
-                  sessionMetrics.current.filesCreated += 1;
-                } else if (toolName.includes('edit') || toolName.includes('multiedit') || toolName.includes('search_replace')) {
-                  sessionMetrics.current.filesModified += 1;
-                } else if (toolName.includes('delete')) {
-                  sessionMetrics.current.filesDeleted += 1;
-                }
-
-                // Track tool start - we'll track completion when we get the result
-                workflowTracking.trackStep(toolUse.name);
-              });
-            }
-
-            // Track tool results
-            if (message.type === 'user' && message.message?.content) {
-              const toolResults = message.message.content.filter((c: any) => c.type === 'tool_result');
-              toolResults.forEach((result: any) => {
-                const isError = result.is_error || false;
-                // Note: We don't have execution time here, but we can track success/failure
-                if (isError) {
-                  sessionMetrics.current.toolsFailed += 1;
-                  sessionMetrics.current.errorsEncountered += 1;
-
-                  trackEvent.enhancedError({
-                    error_type: 'tool_execution',
-                    error_code: 'tool_failed',
-                    error_message: result.content,
-                    context: `Tool execution failed`,
-                    user_action_before_error: 'executing_tool',
-                    recovery_attempted: false,
-                    recovery_successful: false,
-                    error_frequency: 1,
-                    stack_trace_hash: undefined
-                  });
-                }
-              });
-            }
-
-            // Track code blocks generated
-            if (message.type === 'assistant' && message.message?.content) {
-              const codeBlocks = message.message.content.filter((c: any) =>
-                c.type === 'text' && c.text?.includes('```')
-              );
-              if (codeBlocks.length > 0) {
-                // Count code blocks in text content
-                codeBlocks.forEach((block: any) => {
-                  const matches = (block.text.match(/```/g) || []).length;
-                  sessionMetrics.current.codeBlocksGenerated += Math.floor(matches / 2);
-                });
-              }
-            }
-
-            // Track errors in system messages
-            if (message.type === 'system' && (message.subtype === 'error' || message.error)) {
-              sessionMetrics.current.errorsEncountered += 1;
-            }
-
-            // Handle streaming text for real-time typing effect
-            if ((message as any).type === 'content_block_delta') {
-              const delta = (message as any).delta;
-              if (delta?.type === 'text_delta' && delta?.text) {
-                accumulatedTextRef.current += delta.text;
-                setStreamingText(accumulatedTextRef.current);
-              }
-              return; // Don't add delta messages to the message list
-            } else if ((message as any).type === 'stream_event') {
-              // Handle stream_event which wraps the actual streaming data
-              const streamEvent = message as any;
-
-              // Debug: Log stream_event structure (first few only)
-              if (!window._streamEventLogged) {
-                window._streamEventLogged = 0;
-              }
-              if (window._streamEventLogged < 5) {
-                console.log('[stream_event] Full structure:', JSON.stringify(streamEvent, null, 2));
-                window._streamEventLogged++;
-              }
-
-              // Check for content_block_delta inside stream_event
-              if (streamEvent.event?.type === 'content_block_delta') {
-                const delta = streamEvent.event.delta;
-                if (delta?.type === 'text_delta' && delta?.text) {
-                  accumulatedTextRef.current += delta.text;
-                  setStreamingText(accumulatedTextRef.current);
-                }
-                return; // Don't add to message list
-              }
-
-              // Check for raw text in various possible locations
-              const textContent = streamEvent.text || streamEvent.content ||
-                                  streamEvent.event?.text || streamEvent.event?.content ||
-                                  streamEvent.delta?.text;
-              if (typeof textContent === 'string' && textContent) {
-                accumulatedTextRef.current += textContent;
-                setStreamingText(accumulatedTextRef.current);
-                return;
-              }
-
-              // For message_start, clear accumulated text
-              if (streamEvent.event?.type === 'message_start') {
-                accumulatedTextRef.current = '';
-                setStreamingText('');
-              }
-
-              // For message_stop, also clear
-              if (streamEvent.event?.type === 'message_stop') {
-                accumulatedTextRef.current = '';
-                setStreamingText('');
-              }
-
-              return; // Don't add stream_event to message list
-            } else if ((message as any).type === 'partial') {
-              const partialContent = (message as any).content;
-              if (typeof partialContent === 'string') {
-                accumulatedTextRef.current += partialContent;
-                setStreamingText(accumulatedTextRef.current);
-              }
-            } else if (message.type === 'assistant' && message.message?.content) {
-              // Full assistant message arrived - clear streaming text
-              if (accumulatedTextRef.current) {
-                accumulatedTextRef.current = '';
-                setStreamingText('');
-              }
-            }
-
-            setMessages((prev) => [...prev, message]);
-          } catch (err) {
-            console.error('Failed to parse message:', err, payload);
-          }
-        }
-
-        // Helper to handle completion events (both generic and scoped)
-        const processComplete = async (success: boolean) => {
-          setIsLoading(false);
-          hasActiveSessionRef.current = false;
-          isListeningRef.current = false; // Reset listening state
-          
-          // Clear streaming text on completion
-          accumulatedTextRef.current = '';
-          setStreamingText('');
-          
-          // Track enhanced session stopped metrics when session completes
-          if (effectiveSession && claudeSessionId) {
-            const sessionStartTimeValue = messages.length > 0 ? messages[0].timestamp || Date.now() : Date.now();
-            const duration = Date.now() - sessionStartTimeValue;
-            const metrics = sessionMetrics.current;
-            const timeToFirstMessage = metrics.firstMessageTime 
-              ? metrics.firstMessageTime - sessionStartTime.current 
-              : undefined;
-            const idleTime = Date.now() - metrics.lastActivityTime;
-            const avgResponseTime = metrics.toolExecutionTimes.length > 0
-              ? metrics.toolExecutionTimes.reduce((a, b) => a + b, 0) / metrics.toolExecutionTimes.length
-              : undefined;
-            
-            trackEvent.enhancedSessionStopped({
-              // Basic metrics
-              duration_ms: duration,
-              messages_count: messages.length,
-              reason: success ? 'completed' : 'error',
-              
-              // Timing metrics
-              time_to_first_message_ms: timeToFirstMessage,
-              average_response_time_ms: avgResponseTime,
-              idle_time_ms: idleTime,
-              
-              // Interaction metrics
-              prompts_sent: metrics.promptsSent,
-              tools_executed: metrics.toolsExecuted,
-              tools_failed: metrics.toolsFailed,
-              files_created: metrics.filesCreated,
-              files_modified: metrics.filesModified,
-              files_deleted: metrics.filesDeleted,
-              
-              // Content metrics
-              total_tokens_used: totalTokens,
-              code_blocks_generated: metrics.codeBlocksGenerated,
-              errors_encountered: metrics.errorsEncountered,
-              
-              // Session context
-              model: metrics.modelChanges.length > 0 
-                ? metrics.modelChanges[metrics.modelChanges.length - 1].to 
-                : 'sonnet',
-              has_checkpoints: metrics.checkpointCount > 0,
-              checkpoint_count: metrics.checkpointCount,
-              was_resumed: metrics.wasResumed,
-              
-              // Agent context (if applicable)
-              agent_type: undefined, // TODO: Pass from agent execution
-              agent_name: undefined, // TODO: Pass from agent execution
-              agent_success: success,
-              
-              // Stop context
-              stop_source: 'completed',
-              final_state: success ? 'success' : 'failed',
-              has_pending_prompts: queuedPrompts.length > 0,
-              pending_prompts_count: queuedPrompts.length,
-            });
-          }
-
-          if (effectiveSession && success) {
-            try {
-              const settings = await api.getCheckpointSettings(
-                effectiveSession.id,
-                effectiveSession.project_id,
-                projectPath
-              );
-
-              if (settings.auto_checkpoint_enabled) {
-                await api.checkAutoCheckpoint(
-                  effectiveSession.id,
-                  effectiveSession.project_id,
-                  projectPath,
-                  prompt
-                );
-                // Reload timeline to show new checkpoint
-                setTimelineVersion((v) => v + 1);
-              }
-            } catch (err) {
-              console.error('Failed to check auto checkpoint:', err);
-            }
-          }
-
-          // Process queued prompts after completion
-          if (queuedPromptsRef.current.length > 0) {
-            const [nextPrompt, ...remainingPrompts] = queuedPromptsRef.current;
-            setQueuedPrompts(remainingPrompts);
-            
-            // Small delay to ensure UI updates
-            setTimeout(() => {
-              handleSendPrompt(nextPrompt.prompt, nextPrompt.model);
-            }, 100);
-          }
-        };
-
-        const genericErrorUnlisten = await listen('claude-error', (evt: any) => {
-          console.error('Claude error:', evt.payload);
-          setError(evt.payload);
+        const processComplete = createCompletionHandler({
+          setIsLoading,
+          hasActiveSessionRef,
+          isListeningRef,
+          accumulatedTextRef,
+          setStreamingText,
+          effectiveSession,
+          claudeSessionId,
+          messages,
+          sessionMetrics,
+          sessionStartTime,
+          totalTokens,
+          queuedPrompts,
+          trackEvent,
+          api,
+          setTimelineVersion,
+          setQueuedPrompts,
+          handleSendPrompt,
+          prompt,
+          projectPath
         });
 
-        const genericCompleteUnlisten = await listen('claude-complete', (evt: any) => {
-          console.log('[ClaudeCodeSession] Received claude-complete (generic):', evt.payload);
-          processComplete(evt.payload);
+        // Setup all event listeners
+        await setupEventListeners({
+          claudeSessionId,
+          effectiveSession,
+          handleStreamMessage,
+          setError,
+          processComplete,
+          unlistenRefs,
+          currentSessionIdRef,
+          setClaudeSessionId,
+          extractedSessionInfo,
+          setExtractedSessionInfo,
+          projectPath,
+          tabType,
+          messages,
+          onSessionCreated
         });
-
-        // Store the generic unlisteners for now; they may be replaced later.
-        unlistenRefs.current = [genericOutputUnlisten, genericErrorUnlisten, genericCompleteUnlisten];
-
-        // --------------------------------------------------------------------
-        // 2️⃣  Auto-checkpoint logic moved after listener setup (unchanged)
-        // --------------------------------------------------------------------
-
-        // Add the user message immediately to the UI (after setting up listeners)
-        const userMessage: ClaudeStreamMessage = {
-          type: "user",
-          message: {
-            content: [
-              {
-                type: "text",
-                text: prompt
-              }
-            ]
-          }
-        };
-        setMessages(prev => [...prev, userMessage]);
-
-        // Update first message for session if this is the first prompt
-        if (isFirstPrompt && tabType && claudeSessionId) {
-          const truncatedPrompt = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
-          SessionPersistenceService.updateSessionFirstMessage(claudeSessionId, truncatedPrompt);
-          onSessionCreated?.(claudeSessionId, truncatedPrompt);
-        }
-
-        // Update session metrics
-        sessionMetrics.current.promptsSent += 1;
-        sessionMetrics.current.lastActivityTime = Date.now();
-        if (!sessionMetrics.current.firstMessageTime) {
-          sessionMetrics.current.firstMessageTime = Date.now();
-        }
-        
-        // Track model changes
-        const lastModel = sessionMetrics.current.modelChanges.length > 0 
-          ? sessionMetrics.current.modelChanges[sessionMetrics.current.modelChanges.length - 1].to
-          : (sessionMetrics.current.wasResumed ? 'sonnet' : model); // Default to sonnet if resumed
-        
-        if (lastModel !== model) {
-          sessionMetrics.current.modelChanges.push({
-            from: lastModel,
-            to: model,
-            timestamp: Date.now()
-          });
-        }
-        
-        // Track enhanced prompt submission
-        const codeBlockMatches = prompt.match(/```[\s\S]*?```/g) || [];
-        const hasCode = codeBlockMatches.length > 0;
-        const conversationDepth = messages.filter(m => m.user_message).length;
-        const sessionAge = sessionStartTime.current ? Date.now() - sessionStartTime.current : 0;
-        const wordCount = prompt.split(/\s+/).filter(word => word.length > 0).length;
-        
-        trackEvent.enhancedPromptSubmitted({
-          prompt_length: prompt.length,
-          model: model,
-          has_attachments: false, // TODO: Add attachment support when implemented
-          source: 'keyboard', // TODO: Track actual source (keyboard vs button)
-          word_count: wordCount,
-          conversation_depth: conversationDepth,
-          prompt_complexity: wordCount < 20 ? 'simple' : wordCount < 100 ? 'moderate' : 'complex',
-          contains_code: hasCode,
-          language_detected: hasCode ? codeBlockMatches?.[0]?.match(/```(\w+)/)?.[1] : undefined,
-          session_age_ms: sessionAge
-        });
-
-        // Execute the appropriate command
-        // Pass executionMode to use --permission-mode plan when plan mode is selected
-        if (effectiveSession && !isFirstPrompt) {
-          console.log('[ClaudeCodeSession] Resuming session:', effectiveSession.id, 'executionMode:', executionMode);
-          trackEvent.sessionResumed(effectiveSession.id);
-          trackEvent.modelSelected(model);
-          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model, executionMode);
-        } else {
-          console.log('[ClaudeCodeSession] Starting new session, executionMode:', executionMode);
-          setIsFirstPrompt(false);
-          trackEvent.sessionCreated(model, 'prompt_input');
-          trackEvent.modelSelected(model);
-          await api.executeClaudeCode(projectPath, prompt, model, executionMode);
-        }
       }
+
+      // 6. Add user message to UI (skip if already added by startNewSession)
+      if (!skipAddUserMessage) {
+        addUserMessageToUI({ prompt, setMessages });
+      }
+
+      // 7. Update first message if needed
+      updateSessionFirstMessage({
+        isFirstPrompt,
+        tabType,
+        claudeSessionId,
+        prompt,
+        onSessionCreated
+      });
+
+      // 8. Track metrics
+      trackPromptMetrics({
+        sessionMetrics,
+        sessionStartTime,
+        messages,
+        model,
+        prompt,
+        trackEvent
+      });
+
+      // 9. Execute the command
+      await executePromptCommand({
+        effectiveSession,
+        isFirstPrompt,
+        projectPath,
+        prompt,
+        model,
+        executionMode,
+        setIsFirstPrompt,
+        trackEvent,
+        api
+      });
     } catch (err) {
-      console.error("Failed to send prompt:", err);
+      logger.error("Failed to send prompt:", err);
       setError("Failed to send prompt");
       setIsLoading(false);
       hasActiveSessionRef.current = false;
@@ -1261,11 +890,11 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   const handleCancelExecution = async () => {
     if (!claudeSessionId) {
-      console.warn('[ClaudeCodeSession] Cannot cancel: no active session');
+      logger.warn('Cannot cancel: no active session');
       return;
     }
     if (!isLoading) {
-      console.log('[ClaudeCodeSession] Cancel called but not loading, ignoring');
+      logger.log('Cancel called but not loading, ignoring');
       return;
     }
     
@@ -1352,7 +981,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       };
       setMessages(prev => [...prev, cancelMessage]);
     } catch (err) {
-      console.error("Failed to cancel execution:", err);
+      logger.error("Failed to cancel execution:", err);
       
       // Even if backend fails, we should update UI to reflect stopped state
       // Add error message but still stop the UI loading state
@@ -1394,15 +1023,15 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   const handleConfirmFork = async () => {
     if (!forkCheckpointId) {
-      console.warn('[ClaudeCodeSession] Cannot fork: no checkpoint ID');
+      logger.warn('Cannot fork: no checkpoint ID');
       return;
     }
     if (!forkSessionName?.trim()) {
-      console.warn('[ClaudeCodeSession] Cannot fork: no session name');
+      logger.warn('Cannot fork: no session name');
       return;
     }
     if (!effectiveSession) {
-      console.warn('[ClaudeCodeSession] Cannot fork: no effective session');
+      logger.warn('Cannot fork: no effective session');
       setError("Cannot fork: no active session");
       return;
     }
@@ -1420,16 +1049,17 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         newSessionId,
         forkSessionName
       );
-      
+
+
       // Open the new forked session
       // You would need to implement navigation to the new session
-      console.log("Forked to new session:", newSessionId);
-      
+      logger.log("Forked to new session:", newSessionId);
+
       setShowForkDialog(false);
       setForkCheckpointId(null);
       setForkSessionName("");
     } catch (err) {
-      console.error("Failed to fork checkpoint:", err);
+      logger.error("Failed to fork checkpoint:", err);
       setError("Failed to fork checkpoint");
     } finally {
       setIsLoading(false);
@@ -1451,7 +1081,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   };
 
   const handlePreviewUrlChange = (url: string) => {
-    console.log('[ClaudeCodeSession] Preview URL changed to:', url);
+    logger.log('Preview URL changed to:', url);
     setPreviewUrl(url);
   };
 
@@ -1466,9 +1096,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   // Cleanup event listeners and track mount state
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     return () => {
-      console.log('[ClaudeCodeSession] Component unmounting, cleaning up listeners');
+      logger.log('Component unmounting, cleaning up listeners');
       isMountedRef.current = false;
       isListeningRef.current = false;
       
@@ -1478,7 +1108,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         
         // Track session engagement
         const sessionDuration = sessionStartTime.current ? Date.now() - sessionStartTime.current : 0;
-        const messageCount = messages.filter(m => m.user_message).length;
+        const messageCount = messages.filter(m => m.type === 'user').length;
         const toolsUsed = new Set<string>();
         messages.forEach(msg => {
           if (msg.type === 'assistant' && msg.message?.content) {
@@ -1510,7 +1140,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       // Clear checkpoint manager when session ends
       if (effectiveSession) {
         api.clearCheckpointManager(effectiveSession.id).catch(err => {
-          console.error("Failed to clear checkpoint manager:", err);
+          logger.error("Failed to clear checkpoint manager:", err);
         });
       }
     };
@@ -1728,9 +1358,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                             {queuedPrompt.model === "opus" ? "Opus" : "Sonnet"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm line-clamp-2 break-words">
-                          {queuedPrompt.icon && <WorkflowIcon icon={queuedPrompt.icon} className="h-3.5 w-3.5 flex-shrink-0 text-primary" />}
-                          <span>{queuedPrompt.displayText || queuedPrompt.prompt}</span>
+                        <div className="text-sm line-clamp-2 break-words">
+                          <span>{queuedPrompt.prompt.length > 100 ? queuedPrompt.prompt.slice(0, 100) + '...' : queuedPrompt.prompt}</span>
                         </div>
                       </div>
                       <motion.div

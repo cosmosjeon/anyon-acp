@@ -1,34 +1,14 @@
 import React from "react";
-import { Terminal, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 
-interface BashWidgetProps {
-  command: string;
-  description?: string;
-  result?: any;
-}
+import { ChevronRight, Terminal } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { extractResultContent } from "@/lib/extractResultContent";
+import type { BashWidgetProps } from "@/types/widgets";
 
 export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, result }) => {
   // Extract result content if available
-  let resultContent = '';
-  let isError = false;
-  
-  if (result) {
-    isError = result.is_error || false;
-    if (typeof result.content === 'string') {
-      resultContent = result.content;
-    } else if (result.content && typeof result.content === 'object') {
-      if (result.content.text) {
-        resultContent = result.content.text;
-      } else if (Array.isArray(result.content)) {
-        resultContent = result.content
-          .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-          .join('\n');
-      } else {
-        resultContent = JSON.stringify(result.content, null, 2);
-      }
-    }
-  }
+  const resultContent = extractResultContent(result);
+  const isError = result?.is_error || false;
   
   return (
     <div className="rounded-lg border bg-background overflow-hidden">
@@ -59,8 +39,8 @@ export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, re
           <div className={cn(
             "mt-3 p-3 rounded-md border text-xs font-mono whitespace-pre-wrap overflow-x-auto",
             isError 
-              ? "border-[color:var(--color-destructive)]/20 bg-[color:var(--color-destructive)]/5 text-[color:var(--color-destructive)]" 
-              : "border-[color:var(--color-green-500)]/20 bg-[color:var(--color-green-500)]/5 text-[color:var(--color-green-500)]"
+              ? "border-red-500/20 bg-red-500/5 text-red-400" 
+              : "border-green-500/20 bg-green-500/5 text-green-300"
           )}>
             {resultContent || (isError ? "Command failed" : "Command completed")}
           </div>
@@ -69,3 +49,7 @@ export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, re
     </div>
   );
 };
+
+/**
+ * Widget for Write tool
+ */

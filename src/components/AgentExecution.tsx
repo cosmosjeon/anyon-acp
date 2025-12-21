@@ -26,7 +26,6 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api, type Agent } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { StreamMessage } from "./StreamMessage";
 import { ExecutionControlBar } from "./ExecutionControlBar";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -34,6 +33,10 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { HooksEditor } from "./HooksEditor";
 import { useTrackEvent, useComponentMetrics, useFeatureAdoptionTracking } from "@/hooks";
 import { useTabState } from "@/hooks/useTabState";
+import { useManualEventListeners } from "@/hooks/useEventListeners";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger('AgentExecution');
 
 interface AgentExecutionProps {
   /**
@@ -124,9 +127,11 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fullscreenScrollRef = useRef<HTMLDivElement>(null);
   const fullscreenMessagesEndRef = useRef<HTMLDivElement>(null);
-  const unlistenRefs = useRef<UnlistenFn[]>([]);
   const elapsedTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
+
+  // Event listeners management
+  const { setupListeners, cleanupListeners } = useManualEventListeners();
 
   // Filter out messages that shouldn't be displayed
   const displayableMessages = React.useMemo(() => {
@@ -213,12 +218,12 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   useEffect(() => {
     // Clean up listeners on unmount
     return () => {
-      unlistenRefs.current.forEach(unlisten => unlisten());
+      cleanupListeners();
       if (elapsedTimeIntervalRef.current) {
         clearInterval(elapsedTimeIntervalRef.current);
       }
     };
-  }, []);
+  }, [cleanupListeners]);
 
   // Check if user is at the very bottom of the scrollable container
   const isAtBottom = () => {
@@ -290,7 +295,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
     try {
       setIsRunning(true);
       // Update tab status to running
-      console.log('Setting tab status to running for tab:', tabId);
+      logger.log('Setting tab status to running for tab:', tabId);
       if (tabId) {
         updateTabStatus(tabId, 'running');
       }
@@ -298,93 +303,101 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       setMessages([]);
       setRawJsonlOutput([]);
       setRunId(null);
-      
+
       // Clear any existing listeners
-      unlistenRefs.current.forEach(unlisten => unlisten());
-      unlistenRefs.current = [];
-      
+      cleanupListeners();
+
       // Execute the agent and get the run ID
       const executionRunId = await api.executeAgent(agent.id!, projectPath, task, model);
-      console.log("Agent execution started with run ID:", executionRunId);
+      logger.log("Agent execution started with run ID:", executionRunId);
       setRunId(executionRunId);
-      
+
       // Track agent execution start
       trackEvent.agentStarted({
         agent_type: agent.name || 'custom',
         agent_name: agent.name,
         has_custom_prompt: task !== agent.default_task
       });
-      
+
       // Track feature adoption
       agentFeatureTracking.trackUsage();
-      
+
       // Set up event listeners with run ID isolation
-      const outputUnlisten = await listen<string>(`agent-output:${executionRunId}`, (event) => {
-        try {
-          // Store raw JSONL
-          setRawJsonlOutput(prev => [...prev, event.payload]);
-          
-          // Parse and display
-          const message = JSON.parse(event.payload) as ClaudeStreamMessage;
-          setMessages(prev => [...prev, message]);
-        } catch (err) {
-          console.error("Failed to parse message:", err, event.payload);
-        }
-      });
+      await setupListeners([
+        {
+          eventName: `agent-output:${executionRunId}`,
+          handler: (payload: string) => {
+            try {
+              // Store raw JSONL
+              setRawJsonlOutput(prev => [...prev, payload]);
 
-      const errorUnlisten = await listen<string>(`agent-error:${executionRunId}`, (event) => {
-        console.error("Agent error:", event.payload);
-        setError(event.payload);
-        
-        // Track agent error
-        trackEvent.agentError({
-          error_type: 'runtime_error',
-          error_stage: 'execution',
-          retry_count: 0,
-          agent_type: agent.name || 'custom'
-        });
-      });
-
-      const completeUnlisten = await listen<boolean>(`agent-complete:${executionRunId}`, (event) => {
-        setIsRunning(false);
-        const duration = executionStartTime ? Date.now() - executionStartTime : undefined;
-        setExecutionStartTime(null);
-        if (!event.payload) {
-          setError("Agent execution failed");
-          // Update tab status to error
-          if (tabId) {
-            updateTabStatus(tabId, 'error');
+              // Parse and display
+              const message = JSON.parse(payload) as ClaudeStreamMessage;
+              setMessages(prev => [...prev, message]);
+            } catch (err) {
+              logger.error("Failed to parse message:", err, payload);
+            }
           }
-          // Track both the old event for compatibility and the new error event
-          trackEvent.agentExecuted(agent.name || 'custom', false, agent.name, duration);
-          trackEvent.agentError({
-            error_type: 'execution_failed',
-            error_stage: 'completion',
-            retry_count: 0,
-            agent_type: agent.name || 'custom'
-          });
-        } else {
-          // Update tab status to complete on success
-          if (tabId) {
-            updateTabStatus(tabId, 'complete');
+        },
+        {
+          eventName: `agent-error:${executionRunId}`,
+          handler: (payload: string) => {
+            logger.error("Agent error:", payload);
+            setError(payload);
+
+            // Track agent error
+            trackEvent.agentError({
+              error_type: 'runtime_error',
+              error_stage: 'execution',
+              retry_count: 0,
+              agent_type: agent.name || 'custom'
+            });
           }
-          trackEvent.agentExecuted(agent.name || 'custom', true, agent.name, duration);
+        },
+        {
+          eventName: `agent-complete:${executionRunId}`,
+          handler: (payload: boolean) => {
+            setIsRunning(false);
+            const duration = executionStartTime ? Date.now() - executionStartTime : undefined;
+            setExecutionStartTime(null);
+            if (!payload) {
+              setError("Agent execution failed");
+              // Update tab status to error
+              if (tabId) {
+                updateTabStatus(tabId, 'error');
+              }
+              // Track both the old event for compatibility and the new error event
+              trackEvent.agentExecuted(agent.name || 'custom', false, agent.name, duration);
+              trackEvent.agentError({
+                error_type: 'execution_failed',
+                error_stage: 'completion',
+                retry_count: 0,
+                agent_type: agent.name || 'custom'
+              });
+            } else {
+              // Update tab status to complete on success
+              if (tabId) {
+                updateTabStatus(tabId, 'complete');
+              }
+              trackEvent.agentExecuted(agent.name || 'custom', true, agent.name, duration);
+            }
+          }
+        },
+        {
+          eventName: `agent-cancelled:${executionRunId}`,
+          handler: () => {
+            setIsRunning(false);
+            setExecutionStartTime(null);
+            setError("Agent execution was cancelled");
+            // Update tab status to idle when cancelled
+            if (tabId) {
+              updateTabStatus(tabId, 'idle');
+            }
+          }
         }
-      });
-
-      const cancelUnlisten = await listen<boolean>(`agent-cancelled:${executionRunId}`, () => {
-        setIsRunning(false);
-        setExecutionStartTime(null);
-        setError("Agent execution was cancelled");
-        // Update tab status to idle when cancelled
-        if (tabId) {
-          updateTabStatus(tabId, 'idle');
-        }
-      });
-
-      unlistenRefs.current = [outputUnlisten, errorUnlisten, completeUnlisten, cancelUnlisten];
+      ]);
     } catch (err) {
-      console.error("Failed to execute agent:", err);
+      logger.error("Failed to execute agent:", err);
       setIsRunning(false);
       setExecutionStartTime(null);
       setRunId(null);
@@ -410,7 +423,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   const handleStop = async () => {
     try {
       if (!runId) {
-        console.error("No run ID available to stop");
+        logger.error("No run ID available to stop");
         return;
       }
 
@@ -418,16 +431,16 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       const success = await api.killAgentSession(runId);
 
       if (success) {
-        console.log(`Successfully stopped agent session ${runId}`);
+        logger.log(`Successfully stopped agent session ${runId}`);
       } else {
-        console.warn(`Failed to stop agent session ${runId} - it may have already finished`);
+        logger.warn(`Failed to stop agent session ${runId} - it may have already finished`);
       }
 
       // Update UI state
       setIsRunning(false);
       setExecutionStartTime(null);
     } catch (err) {
-      console.error("Failed to stop agent:", err);
+      logger.error("Failed to stop agent:", err);
     }
   };
 
@@ -453,8 +466,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
     }
     
     // Clean up listeners but don't stop the actual agent process
-    unlistenRefs.current.forEach(unlisten => unlisten());
-    unlistenRefs.current = [];
+    cleanupListeners();
     
     // Navigate back
     onBack();
