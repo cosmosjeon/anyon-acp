@@ -6,12 +6,12 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 145 |
+| **React Components** | 139 |
 | **UI Components** | 21 |
 | **Widget Components** | 29 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 21 |
-| **Context Providers** | 3 |
+| **Custom Hooks** | 18 |
+| **Context Providers** | 2 |
 
 > Last synced: 2025-12-22
 
@@ -282,24 +282,11 @@ interface ThemeContextValue {
 }
 ```
 
-### OutputCacheProvider
-
-```typescript
-// src/contexts/OutputCacheContext.tsx
-
-interface OutputCacheValue {
-  cache: Map<string, string>;
-  getOutput(sessionId: string): string | undefined;
-  setOutput(sessionId: string, output: string): void;
-  clearCache(): void;
-}
-```
-
 ---
 
 ## Custom Hooks
 
-Located in `src/hooks/` (17 hooks):
+Located in `src/hooks/` (18 hooks):
 
 ### Core Hooks
 

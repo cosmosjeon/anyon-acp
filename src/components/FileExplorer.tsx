@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FileCode, FolderOpen, Code , Loader2 } from 'lucide-react';
+import { FileCode, FolderOpen, Code , Loader2 } from "@/lib/icons";
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';

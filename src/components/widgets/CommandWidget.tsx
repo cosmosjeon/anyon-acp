@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Terminal } from "lucide-react";
+import { Terminal } from "@/lib/icons";
 
 export const CommandWidget: React.FC<{ 
   commandName: string;

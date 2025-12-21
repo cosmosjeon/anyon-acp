@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronDown, ChevronUp, Sparkles, AlertTriangle } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Sparkles, AlertTriangle } from "@/lib/icons";
 import type { PreviewError } from '@/types/preview';
 import { cn } from '@/lib/utils';
 

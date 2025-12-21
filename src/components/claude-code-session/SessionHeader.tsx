@@ -9,9 +9,9 @@ import {
   Settings,
   Hash,
   Command
-} from 'lucide-react';
+} from "@/lib/icons";
 import { Button } from '@/components/ui/button';
-import { Popover } from '@/components/ui/popover';
+import { LegacyPopover as Popover } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';

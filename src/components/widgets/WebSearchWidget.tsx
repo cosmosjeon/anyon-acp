@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, Globe, Globe2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Globe, Globe2 } from "@/lib/icons";
 import { extractResultContent } from "@/lib/extractResultContent";
 import ReactMarkdown from "react-markdown";
 import type { ToolResult } from "@/types/widgets";

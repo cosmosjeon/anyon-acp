@@ -77,6 +77,53 @@ bun test --watch      # 파일 변경 감지
 3. 테스트 통과 확인
 4. 커밋
 
+## Design System - shadcn/ui Maia (Dec 2025 Migration)
+
+### 색상 체계
+- **Base**: Maia Neutral Palette (shadcn/ui default)
+- **Brand Colors**: `#d97757` (primary), `#ff9a7a` (secondary)
+- **Themes**: Dark (기본값), Light (`.light` class)
+- **CSS Variables**: `/src/styles.css`의 `@theme` 지시어에서 정의
+
+### 아이콘 라이브러리
+- **Library**: `hugeicons-react` v0.3.0
+- **Mapping Layer**: `/src/lib/icons.ts` (207개 아이콘 매핑)
+- **Import Pattern**: `import { X, Check } from "@/lib/icons"`
+- **Custom Sizes**: `sm: 16px`, `md: 20px`, `lg: 24px`, `xl: 32px`
+
+### 새로운 컴포넌트 추가
+
+```bash
+# shadcn 컴포넌트 생성
+bunx shadcn@latest add [component-name]
+
+# 아이콘 추가 (필요한 경우)
+# 1. /src/lib/icons.ts에 매핑 추가
+# 2. 컴포넌트에서 import
+import { X, Check } from "@/lib/icons"
+
+# 색상 클래스 사용
+className="bg-background text-foreground border-border"
+```
+
+### 테마 전환 테스트
+```bash
+# 개발 모드에서 테마 토글 버튼 클릭
+# 또는 DevTools Console에서:
+document.documentElement.classList.toggle('light')
+```
+
+### Tauri 데스크톱 앱 기능
+- **Transparency**: `rgba(0, 0, 0, 0)` 배경
+- **Drag Regions**: `.tauri-drag` / `.tauri-no-drag` 클래스
+- **Platform Styles**: `.is-macos`, `.is-windows`, `.is-linux`
+- **Brand Animations**: `/src/assets/shimmer.css` (변경하지 말 것)
+
+### 마이그레이션 참고
+전체 마이그레이션 내용은 `/docs/shadcn-maia-migration-summary.md` 참조
+
+---
+
 ## 개발 가이드
 
 ```bash

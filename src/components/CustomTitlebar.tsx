@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Minus, Square, X, Copy, Maximize2 } from 'lucide-react';
+import { Minus, Square, X, Copy, Maximize2 } from "@/lib/icons";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { platform } from '@/lib/utils';
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTabState } from '@/hooks/useTabState';
 import { useScreenTracking } from '@/hooks/useAnalytics';
 import { Tab } from '@/contexts/TabContext';
-import { Plus , Loader2 } from 'lucide-react';
+import { Plus , Loader2 } from "@/lib/icons";
 import { ProjectRoutes } from '@/components/ProjectRoutes';
 import { Button } from '@/components/ui/button';
 

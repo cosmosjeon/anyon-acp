@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { AlertCircle, Bot, CheckCircle2, ChevronRight, Loader2 } from "lucide-react";
+import { AlertCircle, Bot, CheckCircle2, ChevronRight, Loader2 } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ToolResult } from "@/types/widgets";

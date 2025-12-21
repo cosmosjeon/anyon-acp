@@ -1,6 +1,6 @@
 import React from "react";
 
-import { GitBranch } from "lucide-react";
+import { GitBranch } from "@/lib/icons";
 
 export const MultiEditResultWidget: React.FC<{ 
   content: string;

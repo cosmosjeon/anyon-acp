@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 export const SkillPromptWidget: React.FC<{

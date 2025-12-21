@@ -4,7 +4,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
-import { Terminal, Loader2 } from 'lucide-react';
+import { Terminal, Loader2 } from "@/lib/icons";
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import anyonTextLogo from '@/assets/ANYON.png';
@@ -168,7 +168,7 @@ export const LoginPage: React.FC = () => {
         <div className="w-full max-w-sm space-y-8">
           {/* 로고 */}
           <div className="text-center">
-            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto" />
+            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto invert dark:invert-0" />
           </div>
 
           {/* 환영 메시지 */}

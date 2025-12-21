@@ -33,7 +33,7 @@ import {
   Loader2,
   Cpu,
   Key,
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";

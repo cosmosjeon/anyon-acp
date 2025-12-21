@@ -1,6 +1,6 @@
 import React from "react";
 
-import { FileEdit } from "lucide-react";
+import { FileEdit } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { getClaudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock } from "@/lib/icons";
 import { Card } from '@/components/ui/card';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';

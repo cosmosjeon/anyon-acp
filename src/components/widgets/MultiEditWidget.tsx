@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { ChevronRight, FileEdit, FileText } from "lucide-react";
+import { ChevronRight, FileEdit, FileText } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { getClaudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";

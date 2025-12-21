@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Maximize2 } from "lucide-react";
+import { X, Maximize2 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";

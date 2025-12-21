@@ -15,10 +15,10 @@ import {
   Loader2,
   FileText,
   Play,
-} from "lucide-react";
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Popover } from "@/components/ui/popover";
+import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { TooltipProvider, TooltipSimple, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip-modern";
 import { FilePicker } from "./FilePicker";

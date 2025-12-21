@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { api, type ClaudeInstallation } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { CheckCircle, HardDrive, Settings, Terminal, Info } from "lucide-react";
+import { CheckCircle, HardDrive, Settings, Terminal, Info } from "@/lib/icons";
 
 interface ClaudeVersionSelectorProps {
   /**

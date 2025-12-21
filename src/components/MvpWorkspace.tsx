@@ -11,7 +11,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Loader2,
-} from 'lucide-react';
+} from "@/lib/icons";
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';

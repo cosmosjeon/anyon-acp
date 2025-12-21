@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { ChevronRight, FileCode, FileText, Folder, FolderOpen, Terminal } from "lucide-react";
+import { ChevronRight, FileCode, FileText, Folder, FolderOpen, Terminal } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 export const LSResultWidget: React.FC<{ content: string }> = ({ content }) => {

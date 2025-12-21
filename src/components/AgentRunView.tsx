@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, 
-  Copy, 
-  ChevronDown, 
+import {
+  ArrowLeft,
+  Copy,
+  ChevronDown,
   Clock,
   Hash,
   DollarSign,
   Bot,
   StopCircle
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Popover } from "@/components/ui/popover";
+import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type AgentRunWithMetrics } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatISOTimestamp } from "@/lib/date-utils";

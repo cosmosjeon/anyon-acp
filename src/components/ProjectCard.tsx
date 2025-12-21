@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Folder, MoreVertical, Trash2, Clock, CheckSquare, Square } from 'lucide-react';
+import { Folder, MoreVertical, Trash2, Clock, CheckSquare, Square } from "@/lib/icons";
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {

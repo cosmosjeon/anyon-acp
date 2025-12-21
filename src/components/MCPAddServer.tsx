@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Terminal, Globe, Trash2, Info , Loader2 } from "lucide-react";
+import { Plus, Terminal, Globe, Trash2, Info , Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -6,7 +6,7 @@ import {
   Wrench,
   RefreshCw,
   Check,
-} from 'lucide-react';
+} from "@/lib/icons";
 import type { Problem, ProblemReport } from '@/types/preview';
 import { usePreviewStore } from '@/stores/previewStore';
 import { createProblemFixPrompt } from '@/lib/problemPrompt';

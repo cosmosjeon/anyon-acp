@@ -1,5 +1,5 @@
 import React from 'react';
-import { Code2, X } from 'lucide-react';
+import { Code2, X } from "@/lib/icons";
 import { usePreviewStore } from '@/stores/previewStore';
 import { cn } from '@/lib/utils';
 

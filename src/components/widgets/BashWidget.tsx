@@ -1,6 +1,6 @@
 import React from "react";
 
-import { ChevronRight, Terminal } from "lucide-react";
+import { ChevronRight, Terminal } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { extractResultContent } from "@/lib/extractResultContent";
 import type { BashWidgetProps } from "@/types/widgets";

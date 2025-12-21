@@ -1,157 +1,53 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import * as TabsPrimitive from "@radix-ui/react-tabs"
 
-const TabsContext = React.createContext<{
-  value: string;
-  onValueChange: (value: string) => void;
-}>({
-  value: "",
-  onValueChange: () => {},
-});
+import { cn } from "@/lib/utils"
 
-export interface TabsProps {
-  /**
-   * The controlled value of the tab to activate
-   */
-  value: string;
-  /**
-   * Event handler called when the value changes
-   */
-  onValueChange: (value: string) => void;
-  /**
-   * The tabs and their content
-   */
-  children: React.ReactNode;
-  /**
-   * Additional CSS classes
-   */
-  className?: string;
-}
+const Tabs = TabsPrimitive.Root
 
-/**
- * Root tabs component
- * 
- * @example
- * <Tabs value={activeTab} onValueChange={setActiveTab}>
- *   <TabsList>
- *     <TabsTrigger value="general">General</TabsTrigger>
- *   </TabsList>
- *   <TabsContent value="general">Content</TabsContent>
- * </Tabs>
- */
-const Tabs: React.FC<TabsProps> = ({
-  value,
-  onValueChange,
-  children,
-  className,
-}) => {
-  return (
-    <TabsContext.Provider value={{ value, onValueChange }}>
-      <div className={cn("w-full", className)}>{children}</div>
-    </TabsContext.Provider>
-  );
-};
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+      className
+    )}
+    {...props}
+  />
+))
+TabsList.displayName = TabsPrimitive.List.displayName
 
-export interface TabsListProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-/**
- * Container for tab triggers
- */
-const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "flex h-9 items-center justify-start rounded-lg p-1",
-        className
-      )}
-      style={{
-        backgroundColor: "var(--color-muted)",
-        color: "var(--color-muted-foreground)"
-      }}
-      {...props}
-    />
-  )
-);
-
-TabsList.displayName = "TabsList";
-
-export interface TabsTriggerProps {
-  value: string;
-  children: React.ReactNode;
-  className?: string;
-  disabled?: boolean;
-}
-
-/**
- * Individual tab trigger button
- */
 const TabsTrigger = React.forwardRef<
-  HTMLButtonElement,
-  TabsTriggerProps
->(({ className, value, disabled, ...props }, ref) => {
-  const { value: selectedValue, onValueChange } = React.useContext(TabsContext);
-  const isSelected = selectedValue === value;
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+      className
+    )}
+    {...props}
+  />
+))
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      role="tab"
-      aria-selected={isSelected}
-      disabled={disabled}
-      onClick={() => onValueChange(value)}
-      className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all",
-        "disabled:pointer-events-none disabled:opacity-50",
-        className
-      )}
-      style={{
-        backgroundColor: isSelected ? "var(--color-background)" : "transparent",
-        color: isSelected ? "var(--color-foreground)" : "inherit",
-        boxShadow: isSelected ? "0 1px 2px rgba(0,0,0,0.1)" : "none"
-      }}
-      {...props}
-    />
-  );
-});
-
-TabsTrigger.displayName = "TabsTrigger";
-
-export interface TabsContentProps {
-  value: string;
-  children: React.ReactNode;
-  className?: string;
-}
-
-/**
- * Tab content panel
- */
 const TabsContent = React.forwardRef<
-  HTMLDivElement,
-  TabsContentProps
->(({ className, value, ...props }, ref) => {
-  const { value: selectedValue } = React.useContext(TabsContext);
-  const isSelected = selectedValue === value;
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      className
+    )}
+    {...props}
+  />
+))
+TabsContent.displayName = TabsPrimitive.Content.displayName
 
-  if (!isSelected) return null;
-
-  return (
-    <div
-      ref={ref}
-      role="tabpanel"
-      className={cn(
-        "mt-2",
-        className
-      )}
-      {...props}
-    />
-  );
-});
-
-TabsContent.displayName = "TabsContent";
-
-export { Tabs, TabsList, TabsTrigger, TabsContent }; 
+export { Tabs, TabsList, TabsTrigger, TabsContent }

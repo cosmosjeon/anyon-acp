@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FolderOpen, Loader2 } from 'lucide-react';
+import { FolderOpen, Loader2 } from "@/lib/icons";
 import maintainTabIcon from '@/assets/maintain-tab-icon.png';
 import mvpTabIcon from '@/assets/mvp-tab-icon.png';
 import { SelectionCard } from '@/components/ui/selection-card';

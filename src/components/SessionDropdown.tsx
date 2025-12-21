@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Plus, MessageSquare, Clock, Check } from 'lucide-react';
+import { ChevronDown, Plus, MessageSquare, Clock, Check } from "@/lib/icons";
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

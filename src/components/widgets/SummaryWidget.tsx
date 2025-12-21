@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Info } from "lucide-react";
+import { Info } from "@/lib/icons";
 
 export const SummaryWidget: React.FC<{ 
   summary: string;

@@ -12,11 +12,19 @@ interface StatusBadgeProps {
  */
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ variant, children, pulse }) => {
   const variants = {
-    success: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-    warning: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-    error: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-    info: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
-    muted: 'bg-muted text-muted-foreground',
+    success: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900',
+    warning: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900',
+    error: 'bg-destructive/10 text-destructive border border-destructive/20',
+    info: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900',
+    muted: 'bg-muted text-muted-foreground border border-border',
+  };
+
+  const pulseColors = {
+    success: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    error: 'bg-destructive',
+    info: 'bg-blue-500',
+    muted: 'bg-muted-foreground',
   };
 
   return (
@@ -27,11 +35,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ variant, children, pul
       {pulse && (
         <span className={cn(
           'w-1.5 h-1.5 rounded-full animate-pulse',
-          variant === 'success' && 'bg-green-500',
-          variant === 'warning' && 'bg-amber-500',
-          variant === 'error' && 'bg-red-500',
-          variant === 'info' && 'bg-blue-500',
-          variant === 'muted' && 'bg-muted-foreground'
+          pulseColors[variant]
         )} />
       )}
       {children}

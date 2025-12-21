@@ -11,7 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2
-} from "lucide-react";
+} from "@/lib/icons";
 
 interface UsageDashboardProps {
   /**

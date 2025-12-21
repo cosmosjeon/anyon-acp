@@ -23,7 +23,7 @@ import {
   MoreVertical,
   Eye,
   Loader2,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { Button } from '@/components/ui/button';
 import {

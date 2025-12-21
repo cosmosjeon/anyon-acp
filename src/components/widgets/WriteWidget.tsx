@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FileEdit, FileText, Maximize2, X } from "lucide-react";
+import { FileEdit, FileText, Maximize2, X } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";

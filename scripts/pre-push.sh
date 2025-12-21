@@ -20,6 +20,18 @@ AUDIT_RESULT="$PROJECT_ROOT/sdd-docs/audits/pre-push-result.json"
 TEMP_AUDIT="$PROJECT_ROOT/.audit-temp.json"
 
 # ============================================================
+# macOS 호환성: timeout → gtimeout
+# ============================================================
+if [[ "$OSTYPE" == "darwin"* ]] && ! command -v timeout &> /dev/null; then
+    if command -v gtimeout &> /dev/null; then
+        timeout() { gtimeout "$@"; }
+    else
+        echo "Warning: timeout/gtimeout not found. Install with: brew install coreutils"
+        timeout() { "$@"; }  # fallback: no timeout
+    fi
+fi
+
+# ============================================================
 # 유틸리티 함수
 # ============================================================
 print_header() {

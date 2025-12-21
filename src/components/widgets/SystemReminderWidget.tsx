@@ -1,6 +1,6 @@
 import React from "react";
 
-import { AlertCircle, Info } from "lucide-react";
+import { AlertCircle, Info } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 export const SystemReminderWidget: React.FC<{ message: string }> = ({ message }) => {
