@@ -46,11 +46,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const applyTheme = useCallback((themeMode: ThemeMode) => {
     const root = document.documentElement;
 
-    // Remove all theme classes
-    root.classList.remove('theme-dark', 'theme-light');
-
-    // Add new theme class
-    root.classList.add(`theme-${themeMode}`);
+    // For Maia theme system: dark is default, light is a class
+    if (themeMode === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
 
     // Update color-scheme for browser UI
     root.style.colorScheme = themeMode === 'light' ? 'light' : 'dark';

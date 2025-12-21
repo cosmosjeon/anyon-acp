@@ -1,6 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { StopCircle, Clock, Hash , Loader2 } from "lucide-react";
+import { StopCircle, Clock, Hash , Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 

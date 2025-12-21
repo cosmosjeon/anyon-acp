@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { Activity, Hash } from "lucide-react";
+import { Activity, Hash } from "@/lib/icons";
 
 export const UsageStatsWidget: React.FC<{
   totalCost?: number;

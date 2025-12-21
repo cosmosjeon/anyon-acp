@@ -20,6 +20,18 @@ AUDIT_RESULT="$PROJECT_ROOT/sdd-docs/audits/pre-push-result.json"
 TEMP_AUDIT="$PROJECT_ROOT/.audit-temp.json"
 
 # ============================================================
+# macOS 호환성: timeout → gtimeout
+# ============================================================
+if [[ "$OSTYPE" == "darwin"* ]] && ! command -v timeout &> /dev/null; then
+    if command -v gtimeout &> /dev/null; then
+        timeout() { gtimeout "$@"; }
+    else
+        echo "Warning: timeout/gtimeout not found. Install with: brew install coreutils"
+        timeout() { "$@"; }  # fallback: no timeout
+    fi
+fi
+
+# ============================================================
 # 유틸리티 함수
 # ============================================================
 print_header() {
@@ -166,8 +178,8 @@ EOF
 )
 
 # Claude 실행
-echo "Claude에 감사 요청 중..."
-AUDIT_OUTPUT=$(claude -p "$AUDIT_PROMPT" 2>&1 || echo '{"summary":{"critical":0,"warning":0,"info":0,"pass":true},"issues":[]}')
+echo "Claude에 감사 요청 중... (타임아웃: 5분)"
+AUDIT_OUTPUT=$(timeout 300 claude -p "$AUDIT_PROMPT" --dangerously-skip-permissions 2>&1 || echo '{"summary":{"critical":0,"warning":0,"info":0,"pass":true},"issues":[]}')
 
 # JSON 추출 (마크다운 코드블록 제거)
 AUDIT_JSON=$(echo "$AUDIT_OUTPUT" | sed -n '/^{/,/^}/p' | head -1)
@@ -261,7 +273,7 @@ EOF
     )
 
     echo "Claude에 수정 요청 중..."
-    REFACTOR_OUTPUT=$(claude -p "$REFACTOR_PROMPT" 2>&1 || echo "FIX_FAILED")
+    REFACTOR_OUTPUT=$(timeout 300 claude -p "$REFACTOR_PROMPT" --dangerously-skip-permissions 2>&1 || echo "FIX_FAILED")
 
     # 수정 결과 확인
     FIXED_COUNT=$(echo "$REFACTOR_OUTPUT" | grep -c "^FIXED:" || echo 0)
@@ -369,8 +381,8 @@ $CHANGED_FILES
 
 마지막 줄에 반드시: SYNC_DONE"
 
-    echo "Claude에 문서 동기화 요청 중..."
-    SYNC_OUTPUT=$(claude -p "$SYNC_PROMPT" 2>&1 || echo "SYNC_FAILED")
+    echo "Claude에 문서 동기화 요청 중... (타임아웃: 120초)"
+    SYNC_OUTPUT=$(timeout 120 claude -p "$SYNC_PROMPT" --dangerously-skip-permissions 2>&1 || echo "SYNC_TIMEOUT")
 
     # 변경된 문서 스테이징
     if git diff --name-only sdd-docs/specs/ 2>/dev/null | grep -q .; then

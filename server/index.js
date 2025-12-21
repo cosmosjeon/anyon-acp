@@ -9,6 +9,9 @@ import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 import rateLimit from 'express-rate-limit';
 import { createUser } from './models/userFactory.js';
+import { closeDatabase } from './db/index.js';
+import userRepository from './db/repositories/userRepository.js';
+import settingsRepository from './db/repositories/settingsRepository.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,11 +89,6 @@ const strictLimiter = rateLimit({
 app.use('/auth', authLimiter);
 app.use('/dev', strictLimiter);
 
-// Mock database (in-memory for development)
-const users = new Map();
-const sessions = new Map();
-const userSettings = new Map(); // userId -> settings object
-
 // Load OAuth callback HTML template
 const oauthCallbackTemplate = readFileSync(
   path.join(__dirname, 'views', 'oauth-callback.html'),
@@ -125,7 +123,7 @@ function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
-  const user = users.get(decoded.userId);
+  const user = userRepository.findById(decoded.userId);
   if (!user) {
     return res.status(401).json({ error: 'User not found' });
   }
@@ -138,13 +136,19 @@ function authenticate(req, res, next) {
 
 // Dev Login endpoint - simplified version
 app.post('/auth/dev/login', (req, res) => {
-  const user = createUser({
-    email: 'dev@example.com',
-    name: 'Dev User',
-    planType: 'PRO',
-  });
+  // Check if dev user already exists
+  let user = userRepository.findByEmail('dev@example.com');
 
-  users.set(user.id, user);
+  if (!user) {
+    // Create new dev user
+    user = createUser({
+      email: 'dev@example.com',
+      name: 'Dev User',
+      planType: 'PRO',
+    });
+    userRepository.create(user);
+  }
+
   const token = generateToken(user.id);
 
   return res.json({
@@ -205,7 +209,7 @@ app.get('/auth/google/callback', async (req, res) => {
     const picture = payload.picture;
 
     // Check if user exists
-    let user = Array.from(users.values()).find(u => u.email === email);
+    let user = userRepository.findByEmail(email);
 
     if (!user) {
       // Create new user
@@ -216,7 +220,7 @@ app.get('/auth/google/callback', async (req, res) => {
         profilePicture: picture,
         planType: 'FREE',
       });
-      users.set(user.id, user);
+      userRepository.create(user);
     }
 
     // Generate JWT token
@@ -259,15 +263,15 @@ app.post('/auth/subscription', authenticate, (req, res) => {
     return res.status(400).json({ error: 'Invalid status' });
   }
 
-  req.user.subscription = {
+  const subscription = {
     planType,
     status,
     currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  users.set(req.user.id, req.user);
+  const updatedUser = userRepository.updateSubscription(req.user.id, subscription);
 
-  res.json({ subscription: req.user.subscription });
+  res.json({ subscription: updatedUser.subscription });
 });
 
 // Development: Create test user
@@ -282,7 +286,7 @@ app.post('/dev/create-user', (req, res) => {
     planType,
   });
 
-  users.set(user.id, user);
+  userRepository.create(user);
   const token = generateToken(user.id);
 
   res.json({
@@ -299,7 +303,7 @@ app.post('/dev/create-user', (req, res) => {
 
 // Development: List all users
 app.get('/dev/users', (req, res) => {
-  const allUsers = Array.from(users.values()).map(user => ({
+  const allUsers = userRepository.list().map(user => ({
     id: user.id,
     email: user.email,
     name: user.name,
@@ -311,7 +315,7 @@ app.get('/dev/users', (req, res) => {
 
 // Get user settings
 app.get('/api/settings', authenticate, (req, res) => {
-  const settings = userSettings.get(req.user.id) || {};
+  const settings = settingsRepository.getAll(req.user.id);
   res.json({ settings });
 });
 
@@ -323,7 +327,7 @@ app.post('/api/settings', authenticate, (req, res) => {
     return res.status(400).json({ error: 'Invalid settings object' });
   }
 
-  userSettings.set(req.user.id, settings);
+  settingsRepository.replaceAll(req.user.id, settings);
   res.json({ success: true, settings });
 });
 
@@ -332,9 +336,7 @@ app.patch('/api/settings/:key', authenticate, (req, res) => {
   const { key } = req.params;
   const { value } = req.body;
 
-  const settings = userSettings.get(req.user.id) || {};
-  settings[key] = value;
-  userSettings.set(req.user.id, settings);
+  settingsRepository.set(req.user.id, key, value);
 
   res.json({ success: true, key, value });
 });
@@ -343,9 +345,7 @@ app.patch('/api/settings/:key', authenticate, (req, res) => {
 app.delete('/api/settings/:key', authenticate, (req, res) => {
   const { key } = req.params;
 
-  const settings = userSettings.get(req.user.id) || {};
-  delete settings[key];
-  userSettings.set(req.user.id, settings);
+  settingsRepository.delete(req.user.id, key);
 
   res.json({ success: true });
 });
@@ -356,7 +356,7 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀 Auth Server running on http://localhost:${PORT}`);
   console.log(`📦 Environment: ${NODE_ENV}`);
   console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Configured' : '❌ Not configured'}`);
@@ -374,3 +374,23 @@ app.listen(PORT, () => {
   console.log(`   PATCH  /api/settings/:key - Update specific setting`);
   console.log(`   DELETE /api/settings/:key - Delete specific setting\n`);
 });
+
+// Graceful shutdown
+const shutdown = (signal) => {
+  console.log(`\n${signal} received, shutting down gracefully...`);
+
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    closeDatabase();
+    process.exit(0);
+  });
+
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('⚠️  Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

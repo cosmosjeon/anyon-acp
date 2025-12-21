@@ -203,14 +203,82 @@ pub enum ProcessType {
 }
 ```
 
+### dev_sessions Table
+
+Stores development workflow session state for automatic PM workflow progression.
+
+```sql
+CREATE TABLE IF NOT EXISTS dev_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_path TEXT NOT NULL UNIQUE,
+    last_prompt TEXT NOT NULL DEFAULT '',
+    cycle_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'idle',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+**Field Details:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | INTEGER | Auto-incrementing primary key |
+| `project_path` | TEXT | Project directory path (unique) |
+| `last_prompt` | TEXT | Last executed workflow prompt |
+| `cycle_count` | INTEGER | Number of workflow cycles completed |
+| `status` | TEXT | idle, running, completed, error |
+| `created_at` | TEXT | ISO timestamp |
+| `updated_at` | TEXT | ISO timestamp |
+
+**Workflow Prompts:**
+- `/anyon:anyon-method:workflows:pm-orchestrator` - Initial planning
+- `/anyon:anyon-method:workflows:pm-executor` - Execute tasks
+- `/anyon:anyon-method:workflows:pm-reviewer` - Review and iterate
+
+---
+
 ### Auth Server Storage (Node.js)
 
-```javascript
-// In-memory maps (development only)
-const users = new Map();        // userId -> User
-const sessions = new Map();      // sessionId -> Session
-const userSettings = new Map();  // userId -> Settings
+**SQLite Database** (better-sqlite3)
+
+Location: `server/data/anyon.db`
+
+```sql
+-- 사용자 테이블
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  profile_picture TEXT,
+  google_id TEXT UNIQUE,
+  plan_type TEXT DEFAULT 'FREE' CHECK(plan_type IN ('FREE', 'PRO')),
+  subscription_status TEXT DEFAULT 'ACTIVE',
+  current_period_end TEXT DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 사용자 설정 (Key-Value)
+CREATE TABLE user_settings (
+  user_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, key),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
 ```
+
+**Repository Pattern:**
+- `server/db/repositories/userRepository.js` - User CRUD
+- `server/db/repositories/settingsRepository.js` - Settings CRUD
 
 ---
 
@@ -420,6 +488,105 @@ interface TabData {
   runId?: number;
   projectPath?: string;
 }
+```
+
+### Dev Server & Preview
+
+```typescript
+interface DevServerInfo {
+  project_path: string;
+  pid: number;
+  detected_port?: number;
+  original_url?: string;
+  proxy_port?: number;
+  proxy_url?: string;
+}
+
+interface DevServerOutput {
+  project_path: string;
+  output_type: 'stdout' | 'stderr' | 'info' | 'port-detected' | 'error';
+  message: string;
+  port?: number;
+  proxy_url?: string;
+}
+
+interface DevSession {
+  id: number;
+  project_path: string;
+  last_prompt: string;
+  cycle_count: number;
+  status: 'idle' | 'running' | 'completed' | 'error';
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProxySettings {
+  http_proxy?: string;
+  https_proxy?: string;
+  no_proxy?: string;
+  all_proxy?: string;
+  enabled: boolean;
+}
+
+interface AppOutput {
+  type: 'stdout' | 'stderr' | 'info' | 'client-error' | 'hmr';
+  message: string;
+  timestamp: number;
+  projectPath: string;
+}
+
+interface Problem {
+  file: string;
+  line: number;
+  column: number;
+  message: string;
+  code: string;
+  severity: 'error' | 'warning';
+  snippet?: string;
+}
+
+interface ComponentSelection {
+  id: string;           // "파일경로:줄:컬럼" 형식
+  name: string;         // 컴포넌트 이름
+  relativePath: string; // 상대 파일 경로
+  lineNumber: number;
+  columnNumber: number;
+}
+```
+
+### Slash Commands
+
+```typescript
+interface SlashCommand {
+  id: string;
+  name: string;
+  full_command: string;        // e.g., "/project:optimize"
+  scope: 'project' | 'user' | 'default';
+  namespace?: string;           // e.g., "frontend" in "/project:frontend:component"
+  file_path: string;
+  content: string;              // Markdown body
+  description?: string;         // From frontmatter
+  allowed_tools: string[];      // From frontmatter
+  has_bash_commands: boolean;   // Contains !` syntax
+  has_file_references: boolean; // Contains @ syntax
+  accepts_arguments: boolean;   // Contains $ARGUMENTS placeholder
+}
+```
+
+**Command Locations:**
+- Default: Built-in commands
+- User: `~/.claude/commands/*.md`
+- Project: `<project>/.claude/commands/*.md`
+
+**Frontmatter Format:**
+```yaml
+---
+description: Brief description
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+---
 ```
 
 ### File Operations

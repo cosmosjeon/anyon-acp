@@ -1,7 +1,7 @@
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FileCode, FolderOpen } from 'lucide-react';
+import { FileCode, FolderOpen } from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 

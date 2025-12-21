@@ -15,7 +15,7 @@ import {
   AlertCircle,
   User,
   Building2
-} from "lucide-react";
+} from "@/lib/icons";
 import type { SlashCommand } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useTrackEvent, useFeatureAdoptionTracking } from "@/hooks";

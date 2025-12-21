@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { Activity, BarChart3, CheckCircle2, Circle, Clock, Download, GitBranch, Hash, LayoutGrid, LayoutList, ListChecks, Search, X } from "lucide-react";
+import { Activity, BarChart3, CheckCircle2, Circle, Clock, Download, GitBranch, Hash, LayoutGrid, LayoutList, ListChecks, Search, X } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

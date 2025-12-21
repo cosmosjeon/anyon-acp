@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import { motion } from "framer-motion";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { api } from "@/lib/api";

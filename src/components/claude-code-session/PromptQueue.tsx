@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, Sparkles, Zap } from 'lucide-react';
+import { X, Clock, Sparkles, Zap } from "@/lib/icons";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';

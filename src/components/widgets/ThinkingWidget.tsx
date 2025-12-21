@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { Bot, ChevronRight, Sparkles } from "lucide-react";
+import { Bot, ChevronRight, Sparkles } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 export const ThinkingWidget: React.FC<{ 

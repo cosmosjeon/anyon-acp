@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, X, RefreshCw , Loader2 } from 'lucide-react';
+import { Download, X, RefreshCw , Loader2 } from "@/lib/icons";
 import { useUpdater } from '@/hooks';
 
 // 개발 환경에서 UI 테스트용 mock 모드

@@ -23,8 +23,8 @@ import {
   ListChecks,
   ListPlus,
   Globe2,
-  type LucideIcon,
-} from "lucide-react";
+  type IconComponent,
+} from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,7 @@ export const SystemInitializedWidget: React.FC<{
   const mcpTools = tools.filter(tool => tool.startsWith('mcp__'));
   
   // Tool icon mapping for regular tools
-  const toolIcons: Record<string, LucideIcon> = {
+  const toolIcons: Record<string, IconComponent> = {
     'task': CheckSquare,
     'bash': Terminal,
     'glob': FolderSearch,

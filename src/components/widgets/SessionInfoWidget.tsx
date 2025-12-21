@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { Bot, Cpu, Server, Sparkles, Wrench } from "lucide-react";
+import { Bot, Cpu, Server, Sparkles, Wrench } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 

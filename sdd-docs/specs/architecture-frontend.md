@@ -48,31 +48,61 @@
 ### Component-Based Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        App.tsx                               │
-│  - Auth gate                                                 │
-│  - Provider wrapping                                         │
-│  - Global modals                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                            App.tsx                                  │
+│  - Auth gate                                                        │
+│  - Provider wrapping (Tab, Theme, OutputCache)                      │
+│  - Global modals (StartupIntro, Update, Credits)                    │
+└─────────────────────────────────────────────────────────────────────┘
                                │
          ┌─────────────────────┼─────────────────────┐
          ▼                     ▼                     ▼
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│    LoginPage    │   │   AppLayout     │   │     Modals      │
-│                 │   │                 │   │                 │
-│  - OAuth        │   │  - 3-panel      │   │  - StartupIntro │
-│  - Dev login    │   │  - Responsive   │   │  - Update       │
-└─────────────────┘   └─────────────────┘   │  - Credits      │
+│    LoginPage    │   │   AppLayout     │   │  Global Modals  │
+│                 │   │  (3-panel)      │   │                 │
+│  - OAuth        │   │                 │   │  - StartupIntro │
+│  - Dev login    │   └─────────────────┘   │  - Update       │
+└─────────────────┘            │            │  - Credits      │
                                │            └─────────────────┘
          ┌─────────────────────┼─────────────────────┐
          ▼                     ▼                     ▼
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   AppSidebar    │   │   TabManager    │   │    Content      │
-│                 │   │                 │   │                 │
-│  - Navigation   │   │  - Tab bar      │   │  - TabContent   │
-│  - Status       │   │  - Ordering     │   │  - Dynamic      │
-└─────────────────┘   └─────────────────┘   └─────────────────┘
+│   AppSidebar    │   │   TabManager    │   │  TabContent     │
+│                 │   │                 │   │  (Dynamic)      │
+│  - Navigation   │   │  - Tab bar      │   │                 │
+│  - Status       │   │  - Reordering   │   └─────────────────┘
+│  - Projects     │   │  - 20 tab max   │            │
+└─────────────────┘   └─────────────────┘            │
+                                             ┌───────┴────────┐
+                                             ▼                ▼
+                               ┌─────────────────┐  ┌──────────────────┐
+                               │ ClaudeCodeSess. │  │  EnhancedPreview │
+                               │                 │  │                  │
+                               │  - Chat UI      │  │  - Preview mode  │
+                               │  - Tool render  │  │  - Console       │
+                               │  - Streaming    │  │  - Problems      │
+                               └─────────────────┘  │  - Component sel.│
+                                        │           └──────────────────┘
+                                        ▼
+                               ┌─────────────────┐
+                               │  Widget Layer   │
+                               │  (29 widgets)   │
+                               │                 │
+                               │  - File ops     │
+                               │  - Commands     │
+                               │  - Tasks        │
+                               │  - MCP/Web      │
+                               │  - System       │
+                               └─────────────────┘
 ```
+
+**Component Directories:**
+- `src/components/widgets/` - 29 tool execution widgets
+- `src/components/ui/` - 23 Radix UI components
+- `src/components/claude-code-session/` - Chat interface
+- `src/components/preview/` - Preview panel components
+- `src/components/planning/` - Planning workflow components
+- `src/components/development/` - Development workflow components
 
 ### State Management Layer
 
@@ -136,6 +166,70 @@
 | `AgentExecution` | ~400 | Agent run view |
 | `MCPManager` | ~300 | MCP server management |
 
+### Widget Components
+
+Total: 29 widgets (~3400 lines) for displaying Claude tool executions and outputs.
+
+#### File Operation Widgets
+
+| Widget | Lines | Purpose |
+|--------|-------|---------|
+| `ReadWidget` | ~50 | Shows Read tool execution with file path |
+| `ReadResultWidget` | ~180 | File content with syntax highlighting and line numbers |
+| `WriteWidget` | ~170 | Write tool execution with file path and content preview |
+| `EditWidget` | ~90 | Edit tool with unified diff view |
+| `EditResultWidget` | ~90 | Edit result confirmation with statistics |
+| `MultiEditWidget` | ~150 | Batch edit operations with file list |
+| `MultiEditResultWidget` | ~95 | Multi-edit results summary |
+| `LSWidget` | ~50 | List directory tool execution |
+| `LSResultWidget` | ~165 | Directory listing with file/folder icons |
+| `GlobWidget` | ~50 | File pattern search tool |
+| `GrepWidget` | ~190 | Text search with matches display and syntax highlighting |
+
+#### Command & System Widgets
+
+| Widget | Lines | Purpose |
+|--------|-------|---------|
+| `BashWidget` | ~55 | Terminal command execution with loading state |
+| `CommandWidget` | ~35 | User command display (e.g., /model, /clear) |
+| `CommandOutputWidget` | ~75 | Command output with ANSI parsing and link detection |
+| `SystemInitializedWidget` | ~250 | System initialization summary with context files |
+| `SystemReminderWidget` | ~35 | System reminder messages |
+
+#### Task & Agent Widgets
+
+| Widget | Lines | Purpose |
+|--------|-------|---------|
+| `TodoWidget` | ~65 | TodoWrite tool display with task list |
+| `TodoReadWidget` | ~565 | Interactive todo list with progress tracking |
+| `TaskWidget` | ~145 | Task execution widget with status |
+| `BackgroundAgentsPanel` | ~65 | Background agents progress panel |
+| `SkillPromptWidget` | ~50 | Skill tool execution display |
+
+#### MCP & Web Widgets
+
+| Widget | Lines | Purpose |
+|--------|-------|---------|
+| `MCPWidget` | ~175 | MCP tool execution with namespace/method display |
+| `WebSearchWidget` | ~200 | Web search results with collapsible links |
+| `WebFetchWidget` | ~205 | Web page fetch with content preview |
+
+#### Utility Widgets
+
+| Widget | Lines | Purpose |
+|--------|-------|---------|
+| `SessionInfoWidget` | ~85 | Session information display |
+| `UsageStatsWidget` | ~80 | Usage statistics widget |
+| `ThinkingWidget` | ~50 | AI thinking/reasoning display (collapsible) |
+| `SummaryWidget` | ~35 | AI-generated summary display |
+
+#### Shared Components
+
+| Component | Purpose |
+|-----------|---------|
+| `CollapsibleToolWidget` | Reusable collapsible tool container |
+| `getLanguage()` | File extension to syntax language mapper |
+
 ### UI Components (Radix-based)
 
 - `Button`, `Dialog`, `DropdownMenu`
@@ -149,59 +243,189 @@
 
 ### Zustand Stores
 
-#### authStore
+The application uses 5 Zustand stores with subscribeWithSelector middleware for granular updates.
+
+#### 1. authStore (Persisted)
+
+Authentication and user management with dev mode support.
+
 ```typescript
 interface AuthState {
+  // State
   user: User | null;
-  subscription: Subscription;
+  subscription: Subscription | null;
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-}
 
-// Actions
-login(token: string): Promise<void>
-logout(): void
-checkAuth(): Promise<void>
-refreshUserData(): Promise<void>
-getUserSettings(): Promise<Settings>
-saveUserSettings(settings: Settings): Promise<void>
+  // Actions
+  login(token: string): Promise<void>
+  logout(): void
+  checkAuth(): Promise<boolean>
+  canCreateProject(): boolean
+  refreshUserData(): Promise<void>
+  getUserSettings(): Promise<any>
+  saveUserSettings(settings: any): Promise<void>
+  updateUserSetting(key: string, value: any): Promise<void>
+}
 ```
 
-#### sessionStore
+**Features:**
+- Automatic dev user in development mode
+- Token persistence via localStorage
+- Server communication via Tauri HTTP
+- Project creation permission check
+
+#### 2. sessionStore (subscribeWithSelector)
+
+Claude Code session and project management.
+
 ```typescript
 interface SessionState {
+  // State
   projects: Project[];
-  sessions: Record<string, Session[]>;
+  sessions: Record<string, Session[]>; // Keyed by projectId
   currentSessionId: string | null;
   currentSession: Session | null;
-  sessionOutputs: Record<string, string>;
+  sessionOutputs: Record<string, string>; // Keyed by sessionId
   isLoadingProjects: boolean;
-}
+  isLoadingSessions: boolean;
+  isLoadingOutputs: boolean;
+  error: string | null;
 
-// Actions
-fetchProjects(): Promise<void>
-fetchProjectSessions(projectId: string): Promise<void>
-setCurrentSession(sessionId: string): void
-fetchSessionOutput(sessionId: string): Promise<void>
+  // Actions
+  fetchProjects(): Promise<void>
+  fetchProjectSessions(projectId: string): Promise<void>
+  setCurrentSession(sessionId: string | null): void
+  fetchSessionOutput(sessionId: string): Promise<void>
+  deleteSession(sessionId: string, projectId: string): Promise<void>
+  clearError(): void
+
+  // Real-time updates
+  handleSessionUpdate(session: Session): void
+  handleOutputUpdate(sessionId: string, output: string): void
+}
 ```
 
-#### agentStore
+**Features:**
+- Multi-project session management
+- Session output caching
+- Real-time session updates
+- Error state management
+
+#### 3. agentStore (subscribeWithSelector)
+
+Agent execution and monitoring.
+
 ```typescript
 interface AgentState {
+  // State
   agentRuns: AgentRunWithMetrics[];
   runningAgents: Set<string>;
   sessionOutputs: Record<string, string>;
   isLoadingRuns: boolean;
-}
+  isLoadingOutput: boolean;
+  error: string | null;
+  lastFetchTime: number;
+  pollingInterval: NodeJS.Timeout | null;
 
-// Actions
-fetchAgentRuns(forceRefresh?: boolean): Promise<void>
-createAgentRun(data: CreateAgentRunParams): Promise<void>
-cancelAgentRun(runId: string): Promise<void>
-deleteAgentRun(runId: string): Promise<void>
+  // Actions
+  fetchAgentRuns(forceRefresh?: boolean): Promise<void>
+  fetchSessionOutput(runId: number): Promise<void>
+  createAgentRun(data): Promise<AgentRunWithMetrics>
+  cancelAgentRun(runId: number): Promise<void>
+  deleteAgentRun(runId: number): Promise<void>
+  clearError(): void
+
+  // Real-time updates
+  handleAgentRunUpdate(run: AgentRunWithMetrics): void
+
+  // Polling management
+  startPolling(interval?: number): void
+  stopPolling(): void
+}
 ```
+
+**Features:**
+- 5-second cache for agent runs
+- Automatic polling for running agents
+- Agent lifecycle management (create, cancel, delete)
+- Real-time status updates
+
+#### 4. previewStore (subscribeWithSelector)
+
+Preview panel state and dev server management.
+
+```typescript
+interface PreviewState {
+  // Preview mode
+  previewMode: PreviewMode; // 'preview' | 'console' | 'problems'
+  isPreviewOpen: boolean;
+
+  // Console outputs
+  appOutputs: AppOutput[];
+
+  // Error state
+  previewError: PreviewError | undefined;
+
+  // Component selection
+  selectedComponents: ComponentSelection[];
+  selectedElement: SelectedElement | null;
+
+  // iframe management
+  iframeRef: HTMLIFrameElement | null;
+  isComponentSelectorInitialized: boolean;
+  isSelectorActive: boolean;
+
+  // Problems tab
+  problemReport: ProblemReport | null;
+  isCheckingProblems: boolean;
+
+  // Routing
+  routes: ParsedRoute[];
+  currentRoute: string;
+
+  // App URL
+  appUrl: string | null;
+  originalUrl: string | null;
+  isLoading: boolean;
+
+  // Dev server
+  devServerRunning: boolean;
+  devServerPort: number | null;
+  devServerProxyUrl: string | null;
+  packageManager: string | null;
+
+  // Actions (30+ setter methods)
+  // iframe messaging
+  postMessageToIframe(message): void
+  activateSelector(): void
+  deactivateSelector(): void
+}
+```
+
+**Features:**
+- 500 output limit for console
+- Component selector integration
+- Dev server lifecycle tracking
+- Route parsing and navigation
+- iframe postMessage communication
+
+#### 5. languageStore (Persisted)
+
+Simple i18n language preference.
+
+```typescript
+interface LanguageState {
+  language: Language; // 'en' | 'ko'
+  setLanguage(language: Language): void
+}
+```
+
+**Features:**
+- Default: Korean ('ko')
+- localStorage persistence
 
 ### Context Providers
 
@@ -220,35 +444,70 @@ deleteAgentRun(runId: string): Promise<void>
 
 ## Custom Hooks
 
+Total: 21 custom hooks for state management, performance, and feature integration.
+
 ### Core Hooks
 
-| Hook | Purpose |
-|------|---------|
-| `useTabState` | High-level tab management |
-| `useAnalytics` | Event tracking (PostHog) |
-| `useTranslation` | i18n (ko/en) |
-| `useTheme` | Theme context consumer |
-| `useUpdater` | App update checking |
+| Hook | Purpose | Returns | Usage |
+|------|---------|---------|-------|
+| `useTabState` | High-level tab management | `{ tabs, activeTab, createChatTab(), switchToTab(), ... }` | All tab operations (20+ methods) |
+| `useTheme` | Theme context consumer | `{ theme, setTheme }` | Dark/light mode |
+| `useTranslation` | i18n (ko/en) | `{ t, language, setLanguage }` | Translate UI strings |
+| `useUpdater` | App update checking | `{ checkForUpdates(), installUpdate(), ... }` | Tauri updater integration |
+
+### Analytics Hooks
+
+| Hook | Purpose | Returns | Usage |
+|------|---------|---------|-------|
+| `useAnalytics` | PostHog analytics client | `{ analytics }` | Direct analytics access |
+| `useTrackEvent` | Event tracking | `trackEvent(name, props)` | Custom event tracking |
+| `usePageView` | Page view tracking | `void` | Auto-track on mount |
+| `useAppLifecycle` | App lifecycle events | `void` | Track launch/close |
+| `useComponentMetrics` | Component render metrics | `void` | Performance tracking |
+| `useInteractionTracking` | UI interaction tracking | `trackClick(target)` | Button/link clicks |
+| `useScreenTracking` | Screen analytics | `void` | Track screen views |
+| `useFeatureExperiment` | A/B testing | `{ variant }` | Feature flags |
+| `usePathTracking` | Route tracking | `void` | URL change tracking |
+| `useFeatureAdoptionTracking` | Feature usage | `trackAdoption(feature)` | Adoption metrics |
+| `useWorkflowTracking` | Workflow metrics | `trackWorkflowStep(step)` | Multi-step flows |
+| `useAIInteractionTracking` | AI usage metrics | `trackAIInteraction(type)` | Claude interactions |
+| `useNetworkPerformanceTracking` | Network metrics | `void` | API call tracking |
 
 ### Feature Hooks
 
-| Hook | Purpose |
-|------|---------|
-| `useDevServer` | Dev server lifecycle |
-| `useDevWorkflow` | PM workflow tracking |
-| `usePlanningDocs` | Planning doc management |
-| `usePreviewMessages` | Preview iframe messaging |
-| `useWorkflowPreview` | Preview file detection |
+| Hook | Purpose | Returns | Usage |
+|------|---------|---------|-------|
+| `useDevServer` | Dev server lifecycle | `{ startDevServer(), stopDevServer(), getDevServerInfo() }` | Project dev server |
+| `useDevWorkflow` | PM workflow tracking | `{ currentPhase, updatePhase() }` | Planning/dev/testing phases |
+| `usePlanningDocs` | Planning doc management | `{ docs, createDoc(), updateDoc() }` | SDD docs CRUD |
+| `usePreviewMessages` | Preview iframe messaging | `{ sendMessage(), messages[] }` | iframe communication |
+| `useWorkflowPreview` | Preview file detection | `{ isPreviewable, getPreviewFile() }` | Workflow file matching |
+| `usePerformanceMonitor` | React performance monitoring | `{ metrics, reset() }` | Component render time |
+| `useAsyncPerformanceTracker` | Async operation tracking | `{ trackAsync() }` | Track promise timing |
+| `useComponentSelectorShortcut` | Component selector shortcut | `void` | Keyboard shortcut (Cmd/Ctrl+Shift+C) |
+| `useEventListeners` | Window event management | `void` | Global event setup |
+
+### API Layer Hooks
+
+| Hook | Purpose | Returns | Usage |
+|------|---------|---------|-------|
+| `useApiCall` | Generic API call wrapper | `{ data, isLoading, error, call(), reset() }` | API call with state |
+
+### Workflow Hooks
+
+| Hook | File | Purpose |
+|------|------|---------|
+| `promptHandlers` | `src/components/claude-session/promptHandlers.ts` | Prompt handling utilities |
 
 ### Utility Hooks
 
-| Hook | Purpose |
-|------|---------|
-| `useDebounce` | Value debouncing |
-| `useDebouncedCallback` | Callback debouncing |
-| `useLoadingState` | Loading state management |
-| `usePagination` | Pagination state |
-| `useApiCall` | Generic API wrapper |
+| Hook | Purpose | Returns | Usage |
+|------|---------|---------|-------|
+| `useLoadingState` | Loading state management | `{ isLoading, startLoading(), stopLoading() }` | Boolean loading state |
+| `useDebounce` | Value debouncing | `debouncedValue` | Debounce input changes |
+| `useDebouncedCallback` | Callback debouncing | `debouncedCallback` | Debounce function calls |
+| `usePagination` | Pagination state | `{ currentPage, totalPages, goToPage(), ... }` | Client-side pagination |
+| `useApiCall` | Generic API wrapper | `{ data, isLoading, error, call(), reset() }` | API call with state
 
 ---
 
@@ -440,3 +699,89 @@ src/
 // 4. AppLayout with providers if authenticated
 // 5. Global modals
 ```
+
+---
+
+## Frontend Architecture Summary
+
+### Key Metrics
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **Components** | 100+ | Layout, pages, features, widgets, UI |
+| **Widgets** | 29 | Tool execution displays (~3400 lines) |
+| **Custom Hooks** | 21 | Core, analytics, feature, utility |
+| **Zustand Stores** | 5 | Auth, session, agent, preview, language |
+| **Context Providers** | 3 | Tab, theme, output cache |
+| **UI Components** | 23 | Radix-based primitives |
+| **Dependencies** | 50+ | React ecosystem + Tauri |
+
+### Architecture Highlights
+
+**Component Organization:**
+- **Modular structure**: 6 component directories (widgets, ui, claude-code-session, preview, planning, development)
+- **Widget system**: 29 specialized widgets for Claude tool rendering
+- **3-panel layout**: Sidebar, tabs, content with responsive design
+- **Tab-based navigation**: Up to 20 concurrent tabs with localStorage persistence
+
+**State Management:**
+- **Zustand stores**: 5 stores with subscribeWithSelector for performance
+- **Persistence**: authStore and languageStore use localStorage
+- **Real-time updates**: Session and agent stores support live updates
+- **Context providers**: Tab, theme, and output cache contexts
+
+**Performance:**
+- **Code splitting**: Manual chunks for vendors (React, Radix, Tauri, etc.)
+- **Lazy loading**: Suspense-based component loading
+- **Virtual scrolling**: For long message/log lists
+- **Granular subscriptions**: Zustand subscribeWithSelector
+
+**Developer Experience:**
+- **TypeScript**: Full type safety across codebase
+- **Hot Module Replacement**: Vite HMR for fast iteration
+- **Dev mode**: Automatic dev user for local development
+- **Analytics**: Comprehensive PostHog integration (13 analytics hooks)
+
+**Key Features:**
+- **Claude Code integration**: Full chat interface with tool execution widgets
+- **Agent execution**: Create, monitor, cancel agent runs
+- **Preview panel**: Live preview with console, problems, component selector
+- **Dev server management**: Auto-start, proxy, port detection
+- **MCP support**: Dynamic MCP tool rendering
+- **Multi-language**: Korean/English i18n support
+
+### File Structure
+
+```
+src/
+├── components/          # UI components
+│   ├── widgets/        # 29 tool execution widgets
+│   ├── ui/             # 23 Radix UI components
+│   ├── claude-code-session/  # Chat interface
+│   ├── preview/        # Preview panel
+│   ├── planning/       # Planning workflow
+│   └── development/    # Development workflow
+├── hooks/              # 18 custom hooks
+├── stores/             # 5 Zustand stores
+├── contexts/           # 3 context providers
+├── lib/                # Utilities and helpers
+├── types/              # TypeScript types
+└── pages/              # Route components
+```
+
+### Technology Stack Summary
+
+| Layer | Technologies |
+|-------|-------------|
+| **Framework** | React 18.3.1 + TypeScript 5.6 |
+| **Build** | Vite 6.0.3 with HMR |
+| **Styling** | Tailwind CSS 4.1.8 |
+| **UI Library** | Radix UI primitives |
+| **State** | Zustand 5.0.6 + Context API |
+| **Routing** | React Router 7.10.1 (hash-based) |
+| **Desktop** | Tauri 2.x (IPC, HTTP, Shell, Dialog) |
+| **Analytics** | PostHog 1.258.3 |
+| **Forms** | React Hook Form 7.54.2 + Zod 3.24.1 |
+| **Markdown** | @uiw/react-md-editor 4.0.7 |
+| **Syntax** | react-syntax-highlighter 15.6.1 |
+| **Animation** | Framer Motion 12.0.0-alpha |

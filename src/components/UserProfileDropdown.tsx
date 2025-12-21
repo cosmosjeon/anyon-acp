@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Crown, ChevronDown } from 'lucide-react';
+import { LogOut, User, Crown, ChevronDown } from "@/lib/icons";
 import { useAuthStore } from '@/stores/authStore';
 
 interface UserProfileDropdownProps {

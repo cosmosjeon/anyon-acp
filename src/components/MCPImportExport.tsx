@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Download, Upload, FileText, Info, Network, Settings2 , Loader2 } from "lucide-react";
+import { Download, Upload, FileText, Info, Network, Settings2 , Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";

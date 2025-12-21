@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2, Clock, Circle, FileEdit } from "lucide-react";
+import { CheckCircle2, Clock, Circle, FileEdit } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { TodoWidgetProps } from "@/types/widgets";

@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen } from "@/lib/icons";
 import { extractResultContent } from "@/lib/extractResultContent";
 import type { ToolResult } from "@/types/widgets";
 import { LSResultWidget } from "./LSResultWidget";

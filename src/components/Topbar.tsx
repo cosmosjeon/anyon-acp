@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Circle, ExternalLink } from "lucide-react";
+import { Circle, ExternalLink } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
-import { Popover } from "@/components/ui/popover";
+import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type ClaudeVersionStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

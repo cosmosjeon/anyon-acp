@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   AlertCircle, 
   CheckCircle2
-} from "lucide-react";
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -43,7 +43,7 @@ import {
   LayoutList, 
   Rocket, 
   CheckCircle 
-} from "lucide-react";
+} from "@/lib/icons";
 
 // Icon mapping for workflow prompts
 const WorkflowIcon: React.FC<{ icon: PromptIconType | null; className?: string }> = ({ icon, className = "h-4 w-4" }) => {

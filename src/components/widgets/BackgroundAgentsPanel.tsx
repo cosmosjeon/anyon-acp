@@ -1,6 +1,6 @@
 import React from "react";
 
-import { AlertCircle, CheckCircle2, Loader2, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Users } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 
 export const BackgroundAgentsPanel: React.FC<{

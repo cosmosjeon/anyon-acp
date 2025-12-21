@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, Code, FilePlus, FileText, FolderOpen, Info, Search, X } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Code, FilePlus, FileText, FolderOpen, Info, Search, X } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { extractResultContent } from "@/lib/extractResultContent";
 import type { GrepWidgetProps } from "@/types/widgets";

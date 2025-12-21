@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState, useCallback, createContext, useContext } from 'react';
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/lib/icons";
 import { api, type Project } from '@/lib/api';
 import { useTabContext } from '@/contexts/TabContext';
 

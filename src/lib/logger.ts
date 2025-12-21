@@ -5,7 +5,7 @@
  * In development, all log levels are enabled.
  */
 
-type LogLevel = 'log' | 'warn' | 'error' | 'debug' | 'info';
+// type LogLevel = 'log' | 'warn' | 'error' | 'debug' | 'info';
 
 const isDevelopment = import.meta.env.DEV;
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText } from "lucide-react";
+import { FileText } from "@/lib/icons";
 import { extractResultContent } from "@/lib/extractResultContent";
 import type { FilePathWidgetProps } from "@/types/widgets";
 import { ReadResultWidget } from "./ReadResultWidget";

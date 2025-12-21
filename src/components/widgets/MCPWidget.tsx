@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, Code, Package2, Sparkles, Zap } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Code, Package2, Sparkles, Zap } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";

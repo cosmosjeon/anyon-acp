@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlayCircle, Square, AlertCircle, CheckCircle2, Code, Trash2 , Loader2 } from 'lucide-react';
+import { PlayCircle, Square, AlertCircle, CheckCircle2, Code, Trash2 , Loader2 } from '@/lib/icons';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

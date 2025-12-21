@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen , Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen , Loader2 } from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import { api, type FileEntry } from '@/lib/api';
 

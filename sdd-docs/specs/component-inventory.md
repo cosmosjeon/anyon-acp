@@ -6,10 +6,16 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 81 |
+| **React Components** | 98 |
+| **UI Components** | 21 |
+| **Widget Components** | 29 |
+| **Preview Components** | 6 |
+| **Claude Session Components** | 3 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 17 |
-| **Context Providers** | 3 |
+| **Custom Hooks** | 18 |
+| **Context Providers** | 2 |
+
+> Last synced: 2025-12-22
 
 ---
 
@@ -45,59 +51,121 @@
 | Component | Lines | Purpose |
 |-----------|-------|---------|
 | `ClaudeCodeSession` | ~1000 | Main chat interface |
-| `MessageList` | ~200 | Message display |
-| `ChatInput` | ~150 | Prompt input |
-| `SessionHistory` | ~180 | History browser |
+| `MessageList` | ~200 | Message display (claude-code-session/) |
+| `PromptQueue` | ~150 | Queue management (claude-code-session/) |
+| `SessionHeader` | ~120 | Session header (claude-code-session/) |
+| `StreamMessage` | ~300 | Stream message renderer |
+| `StreamingText` | ~100 | Streaming text animation |
+| `SessionList` | ~200 | Session list display |
+| `SessionDropdown` | ~150 | Session selector dropdown |
+| `SessionOutputViewer` | ~180 | Session output viewer |
+| `FloatingPromptInput` | ~150 | Floating prompt input |
+| `RunningClaudeSessions` | ~150 | Running sessions list |
 
 ### Preview
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
 | `EnhancedPreviewPanel` | ~500 | Multi-mode preview |
-| `PreviewIframe` | ~150 | Embedded preview |
-| `CodePreview` | ~120 | Syntax highlighting |
+| `PreviewPanel` | ~150 | Basic preview panel |
+| `ActionHeader` | ~100 | Preview action header |
+| `Console` | ~120 | Console output display |
+| `ErrorBanner` | ~80 | Error message banner |
+| `Problems` | ~100 | Problems list display |
+| `SelectedComponentsDisplay` | ~80 | Selected components info |
 
 ### Agents
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
+| `Agents` | ~400 | Agent browser main view |
 | `AgentExecution` | ~400 | Agent run view |
-| `AgentForm` | ~250 | Agent CRUD form |
-| `AgentCard` | ~100 | Agent list item |
-| `AgentRunHistory` | ~180 | Run history |
+| `AgentsModal` | ~250 | Agent modal dialog |
+| `AgentRunsList` | ~200 | Agent runs list |
+| `AgentRunView` | ~180 | Single agent run view |
+| `AgentRunOutputViewer` | ~150 | Run output viewer |
+| `CreateAgent` | ~250 | Agent creation form |
+| `CCAgents` | ~200 | Claude Code agents |
+| `GitHubAgentBrowser` | ~300 | GitHub agent browser |
 
 ### MCP
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
 | `MCPManager` | ~300 | Server management |
-| `MCPServerCard` | ~100 | Server list item |
-| `MCPConfigEditor` | ~150 | Config editing |
+| `MCPServerList` | ~200 | Server list display |
+| `MCPAddServer` | ~200 | Add MCP server form |
+| `MCPImportExport` | ~150 | Import/Export MCP config |
 
 ---
 
 ## UI Components (Radix-based)
 
-Located in `src/components/ui/`:
+Located in `src/components/ui/` (21 components):
 
 | Component | Base | Purpose |
 |-----------|------|---------|
+| `Badge` | Custom | Status badges |
 | `Button` | Radix Slot | Action buttons |
+| `Card` | Custom | Content cards |
 | `Dialog` | Radix Dialog | Modal dialogs |
 | `DropdownMenu` | Radix Dropdown | Context menus |
+| `Input` | Native | Text inputs |
+| `Label` | Radix Label | Form labels |
+| `Pagination` | Radix/Custom | Page navigation |
+| `PanelHeader` | Custom | Panel headers |
+| `Popover` | Radix Popover | Popovers |
+| `RadioGroup` | Radix Radio | Radio selections |
+| `ScrollArea` | Radix ScrollArea | Scrollable containers |
 | `Select` | Radix Select | Dropdowns |
+| `SelectionCard` | Custom | Selectable cards |
+| `SplitPane` | Custom | Resizable panes |
 | `Switch` | Radix Switch | Toggles |
 | `Tabs` | Radix Tabs | Tab containers |
+| `Textarea` | Native | Multi-line inputs |
 | `Toast` | Radix Toast | Notifications |
 | `Tooltip` | Radix Tooltip | Hover hints |
-| `Popover` | Radix Popover | Popovers |
-| `ScrollArea` | Radix ScrollArea | Scrollable containers |
-| `Label` | Radix Label | Form labels |
-| `Input` | Native | Text inputs |
-| `Textarea` | Native | Multi-line inputs |
-| `Badge` | Custom | Status badges |
-| `Card` | Custom | Content cards |
-| `Separator` | Radix Separator | Visual dividers |
+| `TooltipModern` | Radix Tooltip | Modern tooltip variant |
+
+---
+
+## Widget Components
+
+Located in `src/components/widgets/` (29 components):
+
+Interactive widgets displayed inline in chat messages to visualize tool executions and results.
+
+| Widget | Purpose |
+|--------|---------|
+| `BackgroundAgentsPanel` | Background agent status display |
+| `BashWidget` | Bash command execution display |
+| `CommandOutputWidget` | Command execution output |
+| `CommandWidget` | Slash command display |
+| `EditResultWidget` | File edit result display |
+| `EditWidget` | File edit operation display |
+| `GlobWidget` | Glob pattern search display |
+| `GrepWidget` | Grep search results display |
+| `LSResultWidget` | Directory listing results |
+| `LSWidget` | Directory listing display |
+| `MCPWidget` | MCP server interaction display |
+| `MultiEditResultWidget` | Multiple file edits results |
+| `MultiEditWidget` | Multiple file edits display |
+| `ReadResultWidget` | File read results |
+| `ReadWidget` | File read operation display |
+| `SessionInfoWidget` | Session information display |
+| `SkillPromptWidget` | Skill prompt display |
+| `SummaryWidget` | Session summary display |
+| `SystemInitializedWidget` | System initialization status |
+| `SystemReminderWidget` | System reminder messages |
+| `TaskWidget` | Task execution display |
+| `ThinkingWidget` | AI thinking process display |
+| `TodoReadWidget` | Todo list reader display |
+| `TodoWidget` | Todo list display |
+| `UsageStatsWidget` | Token usage statistics |
+| `WebFetchWidget` | Web fetch operation display |
+| `WebSearchWidget` | Web search results display |
+| `WriteWidget` | File write operation display |
+| `shared` | Shared widget utilities |
 
 ---
 
@@ -229,39 +297,30 @@ interface ThemeContextValue {
 }
 ```
 
-### OutputCacheProvider
-
-```typescript
-// src/contexts/OutputCacheContext.tsx
-
-interface OutputCacheValue {
-  cache: Map<string, string>;
-  getOutput(sessionId: string): string | undefined;
-  setOutput(sessionId: string, output: string): void;
-  clearCache(): void;
-}
-```
-
 ---
 
 ## Custom Hooks
+
+Located in `src/hooks/` (18 hooks):
 
 ### Core Hooks
 
 | Hook | File | Purpose |
 |------|------|---------|
-| `useTabState` | `src/hooks/useTabState.ts` | Tab management |
 | `useAnalytics` | `src/hooks/useAnalytics.ts` | PostHog tracking |
-| `useTranslation` | `src/hooks/useTranslation.ts` | i18n (ko/en) |
+| `useTabState` | `src/hooks/useTabState.ts` | Tab management |
 | `useTheme` | `src/hooks/useTheme.ts` | Theme context |
+| `useTranslation` | `src/hooks/useTranslation.ts` | i18n (ko/en) |
 | `useUpdater` | `src/hooks/useUpdater.ts` | App updates |
 
 ### Feature Hooks
 
 | Hook | File | Purpose |
 |------|------|---------|
+| `useComponentSelectorShortcut` | `src/hooks/useComponentSelectorShortcut.ts` | Component selector shortcuts |
 | `useDevServer` | `src/hooks/useDevServer.ts` | Dev server lifecycle |
 | `useDevWorkflow` | `src/hooks/useDevWorkflow.ts` | PM workflow |
+| `useEventListeners` | `src/hooks/useEventListeners.ts` | Global event listeners |
 | `usePlanningDocs` | `src/hooks/usePlanningDocs.ts` | Planning docs |
 | `usePreviewMessages` | `src/hooks/usePreviewMessages.ts` | Preview iframe |
 | `useWorkflowPreview` | `src/hooks/useWorkflowPreview.ts` | Preview detection |
@@ -270,11 +329,23 @@ interface OutputCacheValue {
 
 | Hook | File | Purpose |
 |------|------|---------|
+| `useApiCall` | `src/hooks/useApiCall.ts` | API wrapper |
 | `useDebounce` | `src/hooks/useDebounce.ts` | Value debouncing |
-| `useDebouncedCallback` | `src/hooks/useDebouncedCallback.ts` | Callback debouncing |
 | `useLoadingState` | `src/hooks/useLoadingState.ts` | Loading state |
 | `usePagination` | `src/hooks/usePagination.ts` | Pagination |
-| `useApiCall` | `src/hooks/useApiCall.ts` | API wrapper |
+| `usePerformanceMonitor` | `src/hooks/usePerformanceMonitor.ts` | Performance monitoring |
+
+### Additional Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `MinimalSidebar` | `src/components/MinimalSidebar.tsx` | Minimal sidebar variant |
+| `WorkspaceSidebar` | `src/components/WorkspaceSidebar.tsx` | Workspace navigation sidebar |
+| `VideoLoader` | `src/components/VideoLoader.tsx` | Video loading component |
+| `FilePicker.optimized` | `src/components/FilePicker.optimized.tsx` | Optimized file picker |
+| `SessionList.optimized` | `src/components/SessionList.optimized.tsx` | Optimized session list |
+| `ToolWidgets.new` | `src/components/ToolWidgets.new.tsx` | New tool widgets implementation |
+| `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
 
 ---
 
@@ -294,6 +365,15 @@ App
     └── TabContent
         ├── ClaudeCodeSession
         │   ├── MessageList
+        │   │   └── StreamMessage
+        │   │       └── ToolWidgets (29 widget types)
+        │   │           ├── BashWidget
+        │   │           ├── ReadWidget
+        │   │           ├── WriteWidget
+        │   │           ├── EditWidget
+        │   │           ├── GrepWidget
+        │   │           ├── TodoWidget
+        │   │           └── ... (23 more)
         │   └── ChatInput
         ├── AgentExecution
         │   ├── AgentCard
@@ -339,10 +419,12 @@ App
 
 | Size Range | Count | Examples |
 |------------|-------|----------|
-| < 100 LOC | 45 | UI primitives, cards |
-| 100-300 LOC | 25 | Forms, lists |
-| 300-500 LOC | 8 | Feature components |
-| > 500 LOC | 3 | ClaudeCodeSession, EnhancedPreviewPanel |
+| < 100 LOC | ~75 | UI primitives, widgets, cards |
+| 100-300 LOC | ~45 | Forms, lists, feature widgets |
+| 300-500 LOC | ~15 | Feature components, complex widgets |
+| > 500 LOC | ~5 | ClaudeCodeSession, EnhancedPreviewPanel, complex features |
+
+**Note**: Distribution is approximate based on 140 total components.
 
 ---
 

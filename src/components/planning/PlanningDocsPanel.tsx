@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText , Loader2 } from 'lucide-react';
+import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText , Loader2 } from '@/lib/icons';
 import prdIcon from '@/assets/prd-icon.png';
 import uiuxIcon from '@/assets/uiux-icon.png';
 import trdIcon from '@/assets/trd-icon.png';

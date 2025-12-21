@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Terminal, AlertCircle , Loader2 } from "lucide-react";
+import { Play, Terminal, AlertCircle , Loader2 } from "@/lib/icons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api, type ProcessInfo, type Session } from "@/lib/api";

@@ -1,6 +1,6 @@
 import React from "react";
 
-import { ChevronRight, GitBranch } from "lucide-react";
+import { ChevronRight, GitBranch } from "@/lib/icons";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { getClaudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";
 import { useTheme } from "@/hooks";

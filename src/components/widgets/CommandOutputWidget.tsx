@@ -1,6 +1,6 @@
 import React from "react";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/lib/icons";
 import { detectLinks, makeLinksClickable } from "@/lib/linkDetector";
 
 export const CommandOutputWidget: React.FC<{ 

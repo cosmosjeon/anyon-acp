@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import { ProjectRoutes } from '@/components/ProjectRoutes';
 import { useTabContext } from '@/contexts/TabContext';

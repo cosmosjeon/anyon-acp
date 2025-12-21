@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { StreamMessage } from '../StreamMessage';
-import { Terminal , Loader2 } from 'lucide-react';
+import { Terminal , Loader2 } from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import type { ClaudeStreamMessage } from '../AgentExecution';
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 
