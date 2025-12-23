@@ -689,16 +689,6 @@ invoke<void>('save_claude_settings', {
 })
 ```
 
-#### get_hooks_config
-
-Gets hook configuration.
-
-```typescript
-invoke<HooksConfig>('get_hooks_config', {
-  projectPath: string
-})
-```
-
 ---
 
 ### Session Management

@@ -251,31 +251,54 @@ AgentDb(Mutex<Connection>)       // Thread-safe SQLite
 | `fetch_github_agent_content` | Get GitHub agent content |
 | `import_agent_from_github` | Import from GitHub |
 
-### claude.rs (~3000 LOC)
+### claude/ (Modular Architecture)
 
-**Purpose**: Claude Code integration
+**Purpose**: Claude Code integration - modular system for project, session, execution, and settings management
+
+**Module Structure**:
+```
+src-tauri/src/commands/claude/
+├── mod.rs           - Re-exports & module documentation
+├── shared.rs        - Common types (Project, Session, ClaudeSettings, etc.)
+├── helpers.rs       - Internal helper functions
+├── projects.rs      - Project management
+├── sessions.rs      - Session management
+├── execution.rs     - Claude process execution
+├── filesystem.rs    - File operations
+├── checkpoints.rs   - Checkpoint management
+└── settings.rs      - Settings and git operations
+```
 
 **Key Commands**:
-| Command | Description |
-|---------|-------------|
-| `list_projects` | Scan ~/.claude/projects |
-| `create_project` | Create new project |
-| `get_project_sessions` | Get session list |
-| `execute_claude_code` | Run Claude prompt |
-| `continue_claude_code` | Continue conversation |
-| `resume_claude_code` | Resume from checkpoint |
-| `cancel_claude_execution` | Stop execution |
-| `load_session_history` | Parse JSONL logs |
-| `create_checkpoint` | Snapshot state |
-| `restore_checkpoint` | Revert to checkpoint |
-| `list_checkpoints` | Get checkpoint timeline |
-| `read_file_content` | Read file |
-| `list_directory_contents` | List directory |
-| `search_files` | Search in files |
-| `get_claude_settings` | Get settings |
-| `save_claude_settings` | Save settings |
-| `git_*` | Git operations |
-| `get_hooks_config` | Hook configuration |
+| Command | Module | Description |
+|---------|--------|-------------|
+| `list_projects` | projects | Scan ~/.claude/projects |
+| `create_project` | projects | Create new project |
+| `get_project_sessions` | projects | Get session list |
+| `open_new_session` | sessions | Open new session |
+| `load_session_history` | sessions | Parse JSONL logs |
+| `get_session_timeline` | sessions | Get session timeline |
+| `execute_claude_code` | execution | Run Claude prompt |
+| `continue_claude_code` | execution | Continue conversation |
+| `resume_claude_code` | execution | Resume from checkpoint |
+| `cancel_claude_execution` | execution | Stop execution |
+| `list_running_claude_sessions` | execution | List running sessions |
+| `list_directory_contents` | filesystem | List directory |
+| `search_files` | filesystem | Search in files |
+| `read_file_content` | filesystem | Read file |
+| `check_file_exists` | filesystem | Check file existence |
+| `create_checkpoint` | checkpoints | Snapshot state |
+| `restore_checkpoint` | checkpoints | Revert to checkpoint |
+| `list_checkpoints` | checkpoints | Get checkpoint timeline |
+| `get_claude_settings` | settings | Get settings |
+| `save_claude_settings` | settings | Save settings |
+| `get_system_prompt` | settings | Get CLAUDE.md |
+| `save_system_prompt` | settings | Save CLAUDE.md |
+| `check_claude_version` | settings | Check Claude CLI version |
+| `find_claude_md_files` | settings | Find CLAUDE.md files |
+| `check_anyon_installed` | settings | Check .anyon installation |
+| `run_npx_anyon_agents` | settings | Run npx anyon-agents |
+| `git_*` | settings | Git operations (init, add, commit, push, status, etc.) |
 
 ### mcp.rs (~726 LOC)
 

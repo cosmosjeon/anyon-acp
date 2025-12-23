@@ -357,7 +357,6 @@ interface Agent {
   enableFileRead: boolean;
   enableFileWrite: boolean;
   enableNetwork: boolean;
-  hooks?: HooksConfig;
   createdAt: string;
   updatedAt: string;
 }
@@ -450,17 +449,6 @@ interface ClaudeSettings {
   systemPrompt?: string;
 }
 
-interface HooksConfig {
-  preMessage?: Hook[];
-  postMessage?: Hook[];
-  onError?: Hook[];
-}
-
-interface Hook {
-  type: 'script' | 'command';
-  value: string;
-  enabled: boolean;
-}
 ```
 
 ### Tab System

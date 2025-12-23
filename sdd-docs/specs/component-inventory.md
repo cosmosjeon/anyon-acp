@@ -334,6 +334,8 @@ Located in `src/hooks/` (12 hooks):
 | `SessionList.optimized` | `src/components/SessionList.optimized.tsx` | Optimized session list |
 | `ToolWidgets.new` | `src/components/ToolWidgets.new.tsx` | New tool widgets implementation |
 | `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
+| `ProjectSettings` | `src/components/ProjectSettings.tsx` | Project-specific settings (Slash Commands) |
+| `SlashCommandsManager` | `src/components/SlashCommandsManager.tsx` | Slash command CRUD interface |
 
 ---
 
