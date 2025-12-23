@@ -39,21 +39,6 @@ const ko = {
   'settings.ai.version': 'AI 버전',
   'settings.ai.versionDesc': '프로젝트에서 사용할 AI 어시스턴트 버전을 선택하세요',
   'settings.ai.versionChanged': '저장 버튼을 누르면 변경사항이 적용됩니다',
-  'settings.ai.permissions': 'AI 권한 설정',
-  'settings.ai.permissionsDesc': 'AI가 자동으로 할 수 있는 작업을 설정해요',
-  'settings.ai.allowRules': '허용할 작업',
-  'settings.ai.allowRulesDesc': 'AI가 확인 없이 바로 실행할 수 있는 작업들이에요',
-  'settings.ai.denyRules': '차단할 작업',
-  'settings.ai.denyRulesDesc': 'AI가 절대 실행하지 못하게 막을 작업들이에요',
-  'settings.ai.noAllowRules': '허용 규칙이 없어요. AI가 모든 작업에 대해 확인을 요청해요.',
-  'settings.ai.noDenyRules': '차단 규칙이 없어요.',
-  'settings.ai.addRule': '규칙 추가',
-  'settings.ai.allowPlaceholder': '예: Bash(npm run build)',
-  'settings.ai.denyPlaceholder': '예: Bash(rm -rf *)',
-  'settings.ai.examples': '사용 예시',
-  'settings.ai.exampleNpm': 'npm 명령어 허용',
-  'settings.ai.exampleRead': 'docs 폴더 읽기 허용',
-  'settings.ai.exampleEdit': 'src 폴더 수정 허용',
   'settings.ai.infoTitle': 'AI 어시스턴트란?',
   'settings.ai.infoDesc': 'AI 어시스턴트는 코드 작성, 파일 수정, 명령어 실행 등을 도와주는 도구예요. 권한 설정으로 AI가 할 수 있는 작업을 세밀하게 조절할 수 있어요.',
 
@@ -287,6 +272,15 @@ const ko = {
   // Language names
   'language.en': 'English',
   'language.ko': '한국어',
+
+  // Analytics Consent Modal
+  'analyticsConsent.title': 'Anyon 개선에 참여',
+  'analyticsConsent.description': '더 나은 경험을 위해 익명 사용 데이터를 수집합니다.',
+  'analyticsConsent.privacyTitle': '개인정보는 보호됩니다',
+  'analyticsConsent.privacyPoints.anonymous': '데이터는 완전히 익명으로 처리됩니다',
+  'analyticsConsent.privacyPoints.noPII': '개인 식별 정보는 수집하지 않습니다',
+  'analyticsConsent.privacyPoints.aggregated': '데이터는 집계 형태로만 사용됩니다',
+  'analyticsConsent.continueButton': '계속',
 } as const;
 
 export default ko;

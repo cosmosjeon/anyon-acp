@@ -39,21 +39,6 @@ const en = {
   'settings.ai.version': 'AI Version',
   'settings.ai.versionDesc': 'Choose the AI assistant version for your projects',
   'settings.ai.versionChanged': 'Click Save to apply changes',
-  'settings.ai.permissions': 'AI Permissions',
-  'settings.ai.permissionsDesc': 'Configure what the AI can do automatically',
-  'settings.ai.allowRules': 'Allowed Actions',
-  'settings.ai.allowRulesDesc': 'Actions the AI can perform without asking for confirmation',
-  'settings.ai.denyRules': 'Blocked Actions',
-  'settings.ai.denyRulesDesc': 'Actions the AI is never allowed to perform',
-  'settings.ai.noAllowRules': 'No allow rules set. The AI will ask for confirmation on all actions.',
-  'settings.ai.noDenyRules': 'No blocked actions set.',
-  'settings.ai.addRule': 'Add Rule',
-  'settings.ai.allowPlaceholder': 'e.g., Bash(npm run build)',
-  'settings.ai.denyPlaceholder': 'e.g., Bash(rm -rf *)',
-  'settings.ai.examples': 'Examples',
-  'settings.ai.exampleNpm': 'Allow npm commands',
-  'settings.ai.exampleRead': 'Allow reading docs folder',
-  'settings.ai.exampleEdit': 'Allow editing src folder',
   'settings.ai.infoTitle': 'What is the AI Assistant?',
   'settings.ai.infoDesc': 'The AI assistant helps you write code, edit files, and run commands. Use permission settings to control exactly what the AI can do.',
 
@@ -287,6 +272,15 @@ const en = {
   // Language names
   'language.en': 'English',
   'language.ko': '한국어',
+
+  // Analytics Consent Modal
+  'analyticsConsent.title': 'Help Improve Anyon',
+  'analyticsConsent.description': 'We collect anonymous usage data to improve your experience.',
+  'analyticsConsent.privacyTitle': 'Your privacy is protected',
+  'analyticsConsent.privacyPoints.anonymous': 'Your data is completely anonymous',
+  'analyticsConsent.privacyPoints.noPII': 'No personal information is collected',
+  'analyticsConsent.privacyPoints.aggregated': 'Data is used in aggregate only',
+  'analyticsConsent.continueButton': 'Continue',
 } as const;
 
 export default en;

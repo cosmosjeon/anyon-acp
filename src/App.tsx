@@ -11,10 +11,10 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CustomTitlebar } from "@/components/CustomTitlebar";
 import { AppLayout } from "@/components/AppLayout";
 import { NFOCredits } from "@/components/NFOCredits";
-import { ClaudeBinaryDialog } from "@/components/ClaudeBinaryDialog";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { StartupIntro } from "@/components/StartupIntro";
 import { UpdateNotification } from "@/components/UpdateNotification";
+import { AnalyticsConsentModal, hasAnalyticsConsent } from "@/components/AnalyticsConsentModal";
 import { useAppLifecycle } from "@/hooks";
 
 /**
@@ -22,7 +22,6 @@ import { useAppLifecycle } from "@/hooks";
  */
 function AppContent() {
   const [showNFO, setShowNFO] = useState(false);
-  const [showClaudeBinaryDialog, setShowClaudeBinaryDialog] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
   // Initialize analytics lifecycle tracking
@@ -31,18 +30,6 @@ function AppContent() {
   // Initialize web mode compatibility on mount
   useEffect(() => {
     initializeWebMode();
-  }, []);
-
-  // Listen for Claude not found events
-  useEffect(() => {
-    const handleClaudeNotFound = () => {
-      setShowClaudeBinaryDialog(true);
-    };
-
-    window.addEventListener('claude-not-found', handleClaudeNotFound as EventListener);
-    return () => {
-      window.removeEventListener('claude-not-found', handleClaudeNotFound as EventListener);
-    };
   }, []);
 
   // Listen for info/about click from sidebar
@@ -70,17 +57,6 @@ function AppContent() {
       {/* NFO Credits Modal */}
       {showNFO && <NFOCredits onClose={() => setShowNFO(false)} />}
 
-      {/* Claude Binary Dialog */}
-      <ClaudeBinaryDialog
-        open={showClaudeBinaryDialog}
-        onOpenChange={setShowClaudeBinaryDialog}
-        onSuccess={() => {
-          setToast({ message: "Claude binary path saved successfully", type: "success" });
-          window.location.reload();
-        }}
-        onError={(message) => setToast({ message, type: "error" })}
-      />
-
       {/* Toast Container */}
       <ToastContainer>
         {toast && (
@@ -101,6 +77,7 @@ function AppContent() {
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
+  const [showConsentModal, setShowConsentModal] = useState(false);
   const [showIntro, setShowIntro] = useState(() => {
     try {
       const cached = typeof window !== 'undefined'
@@ -148,6 +125,16 @@ function App() {
     };
   }, []);
 
+  // Check analytics consent after authentication
+  useEffect(() => {
+    if (isAuthenticated && !isChecking) {
+      // Show consent modal if user hasn't consented yet
+      if (!hasAnalyticsConsent()) {
+        setShowConsentModal(true);
+      }
+    }
+  }, [isAuthenticated, isChecking]);
+
   // Show loading while checking auth
   if (isChecking) {
     return (
@@ -181,6 +168,10 @@ function App() {
             <AppContent />
             <StartupIntro visible={showIntro} />
             <UpdateNotification />
+            <AnalyticsConsentModal
+              open={showConsentModal}
+              onAccept={() => setShowConsentModal(false)}
+            />
           </TabProvider>
         </OutputCacheProvider>
       </ThemeProvider>

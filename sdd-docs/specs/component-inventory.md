@@ -6,16 +6,16 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 98 |
-| **UI Components** | 21 |
+| **React Components** | 74 |
+| **UI Components** | 19 |
 | **Widget Components** | 29 |
 | **Preview Components** | 6 |
-| **Claude Session Components** | 3 |
+| **Claude Session Components** | 1 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 18 |
+| **Custom Hooks** | 8 |
 | **Context Providers** | 2 |
 
-> Last synced: 2025-12-22
+> Last synced: 2025-12-23
 
 ---
 
@@ -25,9 +25,6 @@
 |-----------|----------|---------|-------|
 | `AppLayout` | `src/components/layout/` | Main 3-panel layout | children |
 | `AppSidebar` | `src/components/layout/` | Left navigation sidebar | collapsed, onToggle |
-| `Topbar` | `src/components/layout/` | Window controls, title | title |
-| `TabManager` | `src/components/layout/` | Tab bar management | tabs, onSelect, onClose |
-| `TabContent` | `src/components/layout/` | Dynamic tab content | tabId, type |
 
 ---
 
@@ -38,7 +35,7 @@
 | `LoginPage` | `src/components/` | Authentication gate | Pre-auth |
 | `ProjectList` | `src/components/projects/` | Project browser | /projects |
 | `ProjectRoutes` | `src/components/projects/` | Project workspace | /project/:id |
-| `Settings` | `src/components/settings/` | App configuration | Tab |
+| `Settings` | `src/components/` | App configuration | Tab |
 | `Agents` | `src/components/agents/` | Agent browser | Tab |
 | `UsageDashboard` | `src/components/usage/` | Usage analytics | Tab |
 
@@ -57,7 +54,6 @@
 | `StreamMessage` | ~300 | Stream message renderer |
 | `StreamingText` | ~100 | Streaming text animation |
 | `SessionList` | ~200 | Session list display |
-| `SessionDropdown` | ~150 | Session selector dropdown |
 | `SessionOutputViewer` | ~180 | Session output viewer |
 | `FloatingPromptInput` | ~150 | Floating prompt input |
 | `RunningClaudeSessions` | ~150 | Running sessions list |
@@ -80,7 +76,6 @@
 |-----------|-------|---------|
 | `Agents` | ~400 | Agent browser main view |
 | `AgentExecution` | ~400 | Agent run view |
-| `AgentsModal` | ~250 | Agent modal dialog |
 | `AgentRunsList` | ~200 | Agent runs list |
 | `AgentRunView` | ~180 | Single agent run view |
 | `AgentRunOutputViewer` | ~150 | Run output viewer |
@@ -101,7 +96,7 @@
 
 ## UI Components (Radix-based)
 
-Located in `src/components/ui/` (21 components):
+Located in `src/components/ui/` (19 components):
 
 | Component | Base | Purpose |
 |-----------|------|---------|
@@ -115,7 +110,6 @@ Located in `src/components/ui/` (21 components):
 | `Pagination` | Radix/Custom | Page navigation |
 | `PanelHeader` | Custom | Panel headers |
 | `Popover` | Radix Popover | Popovers |
-| `RadioGroup` | Radix Radio | Radio selections |
 | `ScrollArea` | Radix ScrollArea | Scrollable containers |
 | `Select` | Radix Select | Dropdowns |
 | `SelectionCard` | Custom | Selectable cards |
@@ -125,7 +119,6 @@ Located in `src/components/ui/` (21 components):
 | `Textarea` | Native | Multi-line inputs |
 | `Toast` | Radix Toast | Notifications |
 | `Tooltip` | Radix Tooltip | Hover hints |
-| `TooltipModern` | Radix Tooltip | Modern tooltip variant |
 
 ---
 
@@ -301,7 +294,7 @@ interface ThemeContextValue {
 
 ## Custom Hooks
 
-Located in `src/hooks/` (18 hooks):
+Located in `src/hooks/` (8 hooks):
 
 ### Core Hooks
 
@@ -318,21 +311,12 @@ Located in `src/hooks/` (18 hooks):
 | Hook | File | Purpose |
 |------|------|---------|
 | `useComponentSelectorShortcut` | `src/hooks/useComponentSelectorShortcut.ts` | Component selector shortcuts |
-| `useDevServer` | `src/hooks/useDevServer.ts` | Dev server lifecycle |
-| `useDevWorkflow` | `src/hooks/useDevWorkflow.ts` | PM workflow |
-| `useEventListeners` | `src/hooks/useEventListeners.ts` | Global event listeners |
-| `usePlanningDocs` | `src/hooks/usePlanningDocs.ts` | Planning docs |
-| `usePreviewMessages` | `src/hooks/usePreviewMessages.ts` | Preview iframe |
 | `useWorkflowPreview` | `src/hooks/useWorkflowPreview.ts` | Preview detection |
 
 ### Utility Hooks
 
 | Hook | File | Purpose |
 |------|------|---------|
-| `useApiCall` | `src/hooks/useApiCall.ts` | API wrapper |
-| `useDebounce` | `src/hooks/useDebounce.ts` | Value debouncing |
-| `useLoadingState` | `src/hooks/useLoadingState.ts` | Loading state |
-| `usePagination` | `src/hooks/usePagination.ts` | Pagination |
 | `usePerformanceMonitor` | `src/hooks/usePerformanceMonitor.ts` | Performance monitoring |
 
 ### Additional Components
@@ -355,7 +339,6 @@ Located in `src/hooks/` (18 hooks):
 App
 ├── LoginPage (unauthenticated)
 └── AppLayout (authenticated)
-    ├── Topbar
     ├── AppSidebar
     │   ├── Navigation
     │   ├── ProjectList (mini)

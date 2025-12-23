@@ -111,14 +111,7 @@ class AnalyticsService {
       this.initializePostHog(settings);
     }
   }
-  
-  async disable(): Promise<void> {
-    await this.consentManager.revokeConsent();
-    if (typeof posthog !== 'undefined' && posthog.opt_out_capturing) {
-      posthog.opt_out_capturing();
-    }
-  }
-  
+
   async deleteAllData(): Promise<void> {
     await this.consentManager.deleteAllData();
     if (typeof posthog !== 'undefined' && posthog.reset) {

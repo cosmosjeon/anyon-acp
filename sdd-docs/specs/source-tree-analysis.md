@@ -76,7 +76,6 @@ anyon-claude/
 │   │   │   ├── pagination.tsx
 │   │   │   ├── panel-header.tsx
 │   │   │   ├── popover.tsx
-│   │   │   ├── radio-group.tsx
 │   │   │   ├── scroll-area.tsx
 │   │   │   ├── select.tsx
 │   │   │   ├── selection-card.tsx
@@ -122,9 +121,7 @@ anyon-claude/
 │   │   ├── 📁 claude-code-session/   # Chat session components
 │   │   │   ├── MessageList.tsx
 │   │   │   ├── PromptQueue.tsx
-│   │   │   ├── SessionHeader.tsx
-│   │   │   ├── useClaudeMessages.ts
-│   │   │   └── useCheckpoints.ts
+│   │   │   └── SessionHeader.tsx
 │   │   │
 │   │   ├── 📁 preview/               # Preview panel system
 │   │   │   ├── EnhancedPreviewPanel.tsx
@@ -142,8 +139,6 @@ anyon-claude/
 │   │   │
 │   │   ├── AppLayout.tsx             # ⭐ Main 3-panel layout
 │   │   ├── AppSidebar.tsx            # Left sidebar navigation
-│   │   ├── Topbar.tsx                # Top bar with window controls
-│   │   ├── TabManager.tsx            # Tab bar management
 │   │   ├── ClaudeCodeSession.tsx     # ⭐ Main chat interface (1000+ LOC)
 │   │   ├── LoginPage.tsx             # Authentication page
 │   │   ├── ProjectList.tsx           # Project listing
@@ -160,17 +155,12 @@ anyon-claude/
 │   │   ├── previewStore.ts           # Preview panel state
 │   │   └── languageStore.ts          # i18n preferences
 │   │
-│   ├── 📁 hooks/                     # Custom React Hooks (17)
+│   ├── 📁 hooks/                     # Custom React Hooks (12)
 │   │   ├── index.ts                  # Hook exports
 │   │   ├── useAnalytics.ts           # Event tracking
-│   │   ├── useApiCall.ts             # API wrapper
 │   │   ├── useComponentSelectorShortcut.ts  # Component shortcuts
-│   │   ├── useDebounce.ts            # Debouncing
 │   │   ├── useDevServer.ts           # Dev server control
-│   │   ├── useDevWorkflow.ts         # PM workflow
 │   │   ├── useEventListeners.ts      # Global event listeners
-│   │   ├── useLoadingState.ts        # Loading state
-│   │   ├── usePagination.ts          # Pagination
 │   │   ├── usePerformanceMonitor.ts  # Performance monitoring
 │   │   ├── usePlanningDocs.ts        # Planning docs
 │   │   ├── usePreviewMessages.ts     # Preview iframe
@@ -185,8 +175,7 @@ anyon-claude/
 │   │   └── ThemeContext.tsx          # Theme (dark/light)
 │   │
 │   ├── 📁 services/                  # Persistence Services
-│   │   ├── sessionPersistence.ts     # Session restore
-│   │   └── tabPersistence.ts         # Tab state
+│   │   └── sessionPersistence.ts     # Session restore
 │   │
 │   ├── 📁 lib/                       # Utilities
 │   │   ├── api.ts                    # ⭐ API client + types

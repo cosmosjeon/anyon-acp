@@ -18,7 +18,7 @@ import {
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LegacyPopover as Popover } from "@/components/ui/popover";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { TooltipProvider, TooltipSimple, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip-modern";
 import { FilePicker } from "./FilePicker";
@@ -1025,12 +1025,11 @@ const FloatingPromptInputInner = (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Model:</span>
-                    <Popover
-                      trigger={
+                    <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+                      <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setModelPickerOpen(!modelPickerOpen)}
                           className="gap-2"
                         >
                           <span className={selectedModelData.color}>
@@ -1038,106 +1037,93 @@ const FloatingPromptInputInner = (
                           </span>
                           {selectedModelData.name}
                         </Button>
-                      }
-                      content={
-                        <div className="w-[300px] p-1">
-                          {MODELS.map((model) => (
-                            <button
-                              key={model.id}
-                              onClick={() => {
-                                setSelectedModel(model.id);
-                                setModelPickerOpen(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                                "hover:bg-accent",
-                                selectedModel === model.id && "bg-accent"
-                              )}
-                            >
-                              <div className="mt-0.5">
-                                <span className={model.color}>
-                                  {model.icon}
-                                </span>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" side="top" className="w-[300px] p-1">
+                        {MODELS.map((model) => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setSelectedModel(model.id);
+                              setModelPickerOpen(false);
+                            }}
+                            className={cn(
+                              "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
+                              "hover:bg-accent",
+                              selectedModel === model.id && "bg-accent"
+                            )}
+                          >
+                            <div className="mt-0.5">
+                              <span className={model.color}>
+                                {model.icon}
+                              </span>
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <div className="font-medium text-sm">{model.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {model.description}
                               </div>
-                              <div className="flex-1 space-y-1">
-                                <div className="font-medium text-sm">{model.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {model.description}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      }
-                      open={modelPickerOpen}
-                      onOpenChange={setModelPickerOpen}
-                      align="start"
-                      side="top"
-                    />
+                            </div>
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Thinking:</span>
-                    <Popover
-                      trigger={
-                        <Tooltip>
-                          <TooltipTrigger asChild>
+                    <Popover open={thinkingModePickerOpen} onOpenChange={setThinkingModePickerOpen}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                                size="sm"
-                                onClick={() => setThinkingModePickerOpen(!thinkingModePickerOpen)}
-                                className="gap-2"
-                              >
-                                <span className={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.color}>
-                                  {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.icon}
-                                </span>
-                                <ThinkingModeIndicator 
-                                  level={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.level || 0} 
-                                />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-medium">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
-                              <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                      }
-                      content={
-                        <div className="w-[280px] p-1">
-                          {THINKING_MODES.map((mode) => (
-                            <button
-                              key={mode.id}
-                              onClick={() => {
-                                setSelectedThinkingMode(mode.id);
-                                setThinkingModePickerOpen(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                                "hover:bg-accent",
-                                selectedThinkingMode === mode.id && "bg-accent"
-                              )}
+                              size="sm"
+                              className="gap-2"
                             >
-                              <span className={cn("mt-0.5", mode.color)}>
-                                {mode.icon}
+                              <span className={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.color}>
+                                {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.icon}
                               </span>
-                              <div className="flex-1 space-y-1">
-                                <div className="font-medium text-sm">
-                                  {mode.name}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {mode.description}
-                                </div>
+                              <ThinkingModeIndicator
+                                level={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.level || 0}
+                              />
+                            </Button>
+                          </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
+                          <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <PopoverContent align="start" side="top" className="w-[280px] p-1">
+                        {THINKING_MODES.map((mode) => (
+                          <button
+                            key={mode.id}
+                            onClick={() => {
+                              setSelectedThinkingMode(mode.id);
+                              setThinkingModePickerOpen(false);
+                            }}
+                            className={cn(
+                              "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
+                              "hover:bg-accent",
+                              selectedThinkingMode === mode.id && "bg-accent"
+                            )}
+                          >
+                            <span className={cn("mt-0.5", mode.color)}>
+                              {mode.icon}
+                            </span>
+                            <div className="flex-1 space-y-1">
+                              <div className="font-medium text-sm">
+                                {mode.name}
                               </div>
-                              <ThinkingModeIndicator level={mode.level} />
-                            </button>
-                          ))}
-                        </div>
-                      }
-                      open={thinkingModePickerOpen}
-                      onOpenChange={setThinkingModePickerOpen}
-                      align="start"
-                      side="top"
-                    />
+                              <div className="text-xs text-muted-foreground">
+                                {mode.description}
+                              </div>
+                            </div>
+                            <ThinkingModeIndicator level={mode.level} />
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
@@ -1268,10 +1254,10 @@ const FloatingPromptInputInner = (
               <div className="flex items-center justify-between px-1 pt-1 pb-0">
                 <div className="flex items-center gap-1">
                 {/* Model Selector */}
-                <Popover
-                  trigger={
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
                         <motion.div
                           whileTap={{ scale: 0.97 }}
                           transition={{ duration: 0.15 }}
@@ -1291,14 +1277,14 @@ const FloatingPromptInputInner = (
                             <ChevronUp className="h-3 w-3 opacity-50" />
                           </Button>
                         </motion.div>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p className="text-xs font-medium">{selectedModelData.name}</p>
-                        <p className="text-xs text-muted-foreground">{selectedModelData.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  }
-                  content={
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs font-medium">{selectedModelData.name}</p>
+                      <p className="text-xs text-muted-foreground">{selectedModelData.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <PopoverContent align="start" side="top" className="w-auto p-1">
                     <div className="flex flex-col">
                       {MODELS.map((model, idx) => (
                         <button
@@ -1321,20 +1307,16 @@ const FloatingPromptInputInner = (
                         </button>
                       ))}
                     </div>
-                  }
-                  open={modelPickerOpen}
-                  onOpenChange={setModelPickerOpen}
-                  align="start"
-                  side="top"
-                />
+                  </PopoverContent>
+                </Popover>
 
                 <div className="w-px h-4 bg-border/50 mx-1" />
 
                 {/* Thinking Mode Selector */}
-                <Popover
-                  trigger={
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                <Popover open={thinkingModePickerOpen} onOpenChange={setThinkingModePickerOpen}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
                         <motion.div
                           whileTap={{ scale: 0.97 }}
                           transition={{ duration: 0.15 }}
@@ -1354,14 +1336,14 @@ const FloatingPromptInputInner = (
                             <ChevronUp className="h-3 w-3 opacity-50" />
                           </Button>
                         </motion.div>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p className="text-xs font-medium">Thinking: {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
-                        <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  }
-                  content={
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs font-medium">Thinking: {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
+                      <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <PopoverContent align="start" side="top" className="w-auto p-1">
                     <div className="flex flex-col">
                       {THINKING_MODES.map((mode, idx) => (
                         <button
@@ -1385,21 +1367,17 @@ const FloatingPromptInputInner = (
                         </button>
                       ))}
                     </div>
-                  }
-                  open={thinkingModePickerOpen}
-                  onOpenChange={setThinkingModePickerOpen}
-                  align="start"
-                  side="top"
-                />
+                  </PopoverContent>
+                </Popover>
 
                 {/* Execution Mode Selector (Plan/Execute) - Only shown when showExecutionMode is true */}
                 {showExecutionMode && (
                   <>
                     <div className="w-px h-4 bg-border/50 mx-1" />
-                    <Popover
-                      trigger={
-                        <Tooltip>
-                          <TooltipTrigger asChild>
+                    <Popover open={executionModePickerOpen} onOpenChange={setExecutionModePickerOpen}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <PopoverTrigger asChild>
                             <motion.div
                               whileTap={{ scale: 0.97 }}
                               transition={{ duration: 0.15 }}
@@ -1422,14 +1400,14 @@ const FloatingPromptInputInner = (
                                 <ChevronUp className="h-3 w-3 opacity-50" />
                               </Button>
                             </motion.div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p className="text-xs font-medium">{EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.name}</p>
-                            <p className="text-xs text-muted-foreground">{EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.description}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      }
-                      content={
+                          </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="text-xs font-medium">{EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.name}</p>
+                          <p className="text-xs text-muted-foreground">{EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <PopoverContent align="start" side="top" className="w-auto p-1">
                         <div className="flex flex-col">
                           {EXECUTION_MODES.map((mode, idx) => (
                             <button
@@ -1452,12 +1430,8 @@ const FloatingPromptInputInner = (
                             </button>
                           ))}
                         </div>
-                      }
-                      open={executionModePickerOpen}
-                      onOpenChange={setExecutionModePickerOpen}
-                      align="start"
-                      side="top"
-                    />
+                      </PopoverContent>
+                    </Popover>
                   </>
                 )}
 

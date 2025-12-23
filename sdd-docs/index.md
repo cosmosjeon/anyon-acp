@@ -45,6 +45,17 @@
 
 ---
 
+## Analytics System
+
+> 사용자 데이터 분석 및 트래킹 시스템 (PostHog 기반)
+
+| Document | Description |
+|----------|-------------|
+| [Analytics Overview](analytics/README.md) | 시스템 개요, 아키텍처, 사용법 |
+| [Events Reference](analytics/events-reference.md) | 전체 이벤트 목록 및 속성 |
+
+---
+
 ## Development
 
 | Document | Description |
@@ -197,6 +208,10 @@ sdd-docs/
 ├── audits/                   # 코드 감사 (auto-generated)
 │   ├── code-audit-report.md
 │   └── *.json
+│
+├── analytics/                # 사용자 데이터 분석 시스템
+│   ├── README.md             # 시스템 개요
+│   └── events-reference.md   # 이벤트 레퍼런스
 │
 └── features/                 # 기능별 구현 설명 (manual)
     ├── README.md

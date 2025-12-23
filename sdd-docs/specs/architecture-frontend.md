@@ -142,9 +142,6 @@
 |-----------|---------|--------------|
 | `AppLayout` | Main layout | 3-panel, responsive |
 | `AppSidebar` | Left navigation | Collapsible, status |
-| `Topbar` | Top bar | Window controls |
-| `TabManager` | Tab bar | Drag-drop reorder |
-| `TabContent` | Tab content | Lazy loading |
 
 ### Page Components
 
@@ -444,7 +441,7 @@ interface LanguageState {
 
 ## Custom Hooks
 
-Total: 21 custom hooks for state management, performance, and feature integration.
+Total: 8 custom hooks for state management, performance, and feature integration.
 
 ### Core Hooks
 
@@ -478,7 +475,6 @@ Total: 21 custom hooks for state management, performance, and feature integratio
 | Hook | Purpose | Returns | Usage |
 |------|---------|---------|-------|
 | `useDevServer` | Dev server lifecycle | `{ startDevServer(), stopDevServer(), getDevServerInfo() }` | Project dev server |
-| `useDevWorkflow` | PM workflow tracking | `{ currentPhase, updatePhase() }` | Planning/dev/testing phases |
 | `usePlanningDocs` | Planning doc management | `{ docs, createDoc(), updateDoc() }` | SDD docs CRUD |
 | `usePreviewMessages` | Preview iframe messaging | `{ sendMessage(), messages[] }` | iframe communication |
 | `useWorkflowPreview` | Preview file detection | `{ isPreviewable, getPreviewFile() }` | Workflow file matching |
@@ -487,27 +483,11 @@ Total: 21 custom hooks for state management, performance, and feature integratio
 | `useComponentSelectorShortcut` | Component selector shortcut | `void` | Keyboard shortcut (Cmd/Ctrl+Shift+C) |
 | `useEventListeners` | Window event management | `void` | Global event setup |
 
-### API Layer Hooks
-
-| Hook | Purpose | Returns | Usage |
-|------|---------|---------|-------|
-| `useApiCall` | Generic API call wrapper | `{ data, isLoading, error, call(), reset() }` | API call with state |
-
 ### Workflow Hooks
 
 | Hook | File | Purpose |
 |------|------|---------|
 | `promptHandlers` | `src/components/claude-session/promptHandlers.ts` | Prompt handling utilities |
-
-### Utility Hooks
-
-| Hook | Purpose | Returns | Usage |
-|------|---------|---------|-------|
-| `useLoadingState` | Loading state management | `{ isLoading, startLoading(), stopLoading() }` | Boolean loading state |
-| `useDebounce` | Value debouncing | `debouncedValue` | Debounce input changes |
-| `useDebouncedCallback` | Callback debouncing | `debouncedCallback` | Debounce function calls |
-| `usePagination` | Pagination state | `{ currentPage, totalPages, goToPage(), ... }` | Client-side pagination |
-| `useApiCall` | Generic API wrapper | `{ data, isLoading, error, call(), reset() }` | API call with state
 
 ---
 
