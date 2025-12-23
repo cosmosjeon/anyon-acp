@@ -71,4 +71,3 @@ export const platform = {
     return 'unknown';
   },
 };
-// test: 1766467207
