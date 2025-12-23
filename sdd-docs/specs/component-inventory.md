@@ -6,13 +6,13 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 74 |
-| **UI Components** | 19 |
+| **React Components** | 63 |
+| **UI Components** | 20 |
 | **Widget Components** | 29 |
 | **Preview Components** | 6 |
 | **Claude Session Components** | 1 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 8 |
+| **Custom Hooks** | 12 |
 | **Context Providers** | 2 |
 
 > Last synced: 2025-12-23
@@ -96,7 +96,7 @@
 
 ## UI Components (Radix-based)
 
-Located in `src/components/ui/` (19 components):
+Located in `src/components/ui/` (20 components):
 
 | Component | Base | Purpose |
 |-----------|------|---------|
@@ -294,7 +294,7 @@ interface ThemeContextValue {
 
 ## Custom Hooks
 
-Located in `src/hooks/` (8 hooks):
+Located in `src/hooks/` (12 hooks):
 
 ### Core Hooks
 
@@ -305,6 +305,7 @@ Located in `src/hooks/` (8 hooks):
 | `useTheme` | `src/hooks/useTheme.ts` | Theme context |
 | `useTranslation` | `src/hooks/useTranslation.ts` | i18n (ko/en) |
 | `useUpdater` | `src/hooks/useUpdater.ts` | App updates |
+| `useEventListeners` | `src/hooks/useEventListeners.ts` | Event listener management |
 
 ### Feature Hooks
 
@@ -312,6 +313,9 @@ Located in `src/hooks/` (8 hooks):
 |------|------|---------|
 | `useComponentSelectorShortcut` | `src/hooks/useComponentSelectorShortcut.ts` | Component selector shortcuts |
 | `useWorkflowPreview` | `src/hooks/useWorkflowPreview.ts` | Preview detection |
+| `useDevServer` | `src/hooks/useDevServer.ts` | Dev server management |
+| `usePlanningDocs` | `src/hooks/usePlanningDocs.ts` | Planning docs integration |
+| `usePreviewMessages` | `src/hooks/usePreviewMessages.ts` | Preview message handling |
 
 ### Utility Hooks
 
@@ -343,9 +347,7 @@ App
     │   ├── Navigation
     │   ├── ProjectList (mini)
     │   └── StatusIndicator
-    ├── TabManager
-    │   └── Tab[]
-    └── TabContent
+    └── MainContent
         ├── ClaudeCodeSession
         │   ├── MessageList
         │   │   └── StreamMessage
@@ -357,7 +359,7 @@ App
         │   │           ├── GrepWidget
         │   │           ├── TodoWidget
         │   │           └── ... (23 more)
-        │   └── ChatInput
+        │   └── FloatingPromptInput
         ├── AgentExecution
         │   ├── AgentCard
         │   └── OutputView
