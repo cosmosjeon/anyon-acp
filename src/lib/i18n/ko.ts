@@ -66,14 +66,6 @@ const ko = {
   'settings.ai.proxy': '프록시 설정',
   'settings.ai.proxyDesc': '네트워크 프록시를 통해 AI에 연결할 수 있어요',
 
-  // Advanced
-  'settings.ai.advanced': '고급 설정',
-  'settings.ai.advancedDesc': '전문가를 위한 추가 옵션 (보통은 변경할 필요 없어요)',
-  'settings.ai.apiKeyHelper': 'API 키 도우미 스크립트',
-  'settings.ai.apiKeyHelperDesc': 'API 인증을 위한 커스텀 스크립트 경로',
-  'settings.ai.rawJson': '설정 파일 미리보기',
-  'settings.ai.rawJsonDesc': '저장될 설정 파일의 내용을 확인할 수 있어요',
-
   // Claude Auth 섹션
   'settings.claudeAuth.title': 'Claude 인증',
   'settings.claudeAuth.desc': 'Claude Code CLI 인증 상태를 확인하고 관리합니다',
@@ -192,14 +184,6 @@ const ko = {
   'settings.environment.addVariable': '변수 추가',
   'settings.environment.noVariables': '환경 변수가 없습니다.',
   'settings.environment.commonVariables': '자주 사용하는 변수:',
-
-  // Settings - Advanced Tab
-  'settings.advanced.title': '고급 설정',
-  'settings.advanced.description': '고급 사용자를 위한 추가 설정 옵션',
-  'settings.advanced.apiKeyHelper': 'API 키 헬퍼 스크립트',
-  'settings.advanced.apiKeyHelperDesc': 'API 요청에 대한 인증 값을 생성하는 커스텀 스크립트',
-  'settings.advanced.rawJson': '원본 설정 (JSON)',
-  'settings.advanced.rawJsonDesc': '~/.claude/settings.json에 저장될 원본 JSON입니다',
 
   // Settings - Error messages
   'settings.error.loadFailed': '설정을 불러오지 못했습니다. ~/.claude 디렉토리가 있는지 확인하세요.',

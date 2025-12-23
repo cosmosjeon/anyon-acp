@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -11,7 +11,6 @@ import {
   Languages,
   Palette,
   Wifi,
-  Database,
   Loader2,
   Cpu,
   Key,
@@ -19,11 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import {
-  api,
-  type ClaudeSettings,
-} from "@/lib/api";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { ProxySettings } from "./ProxySettings";
@@ -41,7 +36,6 @@ type SettingsSection =
   | "appearance"
   | "ai-auth"
   | "ai-proxy"
-  | "ai-advanced"
   | "ai-agents"
   | "account"
   | "subscription";
@@ -56,14 +50,9 @@ interface NavItem {
 export const Settings: React.FC<SettingsProps> = ({
   className,
 }) => {
-  const [settings, setSettings] = useState<ClaudeSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  // Debounce timer ref for auto-save
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialLoadRef = useRef(true);
 
   // Theme hook
   const { theme, toggleTheme } = useTheme();
@@ -78,14 +67,13 @@ export const Settings: React.FC<SettingsProps> = ({
   const [startupIntroEnabled, setStartupIntroEnabled] = useState(true);
 
   // Auth store
-  const { user, logout, getUserSettings, saveUserSettings, updateUserSetting } = useAuthStore();
+  const { user, logout, getUserSettings, updateUserSetting } = useAuthStore();
 
   // Navigation items
   const navItems: NavItem[] = [
     { id: "appearance", label: t('settings.simple.appearance'), icon: Palette, category: "general" },
     { id: "ai-auth", label: t('settings.claudeAuth.title'), icon: Key, category: "ai" },
     { id: "ai-proxy", label: t('settings.ai.proxy'), icon: Wifi, category: "ai" },
-    { id: "ai-advanced", label: t('settings.ai.advanced'), icon: Database, category: "ai" },
     { id: "ai-agents", label: "CC Agents", icon: Cpu, category: "ai" },
     { id: "account", label: t('settings.account.title'), icon: User, category: "account" },
     { id: "subscription", label: t('settings.account.subscription'), icon: Crown, category: "account" },
@@ -108,135 +96,18 @@ export const Settings: React.FC<SettingsProps> = ({
       try {
         const userSettings = await getUserSettings();
         if (userSettings && typeof userSettings === 'object') {
-          setSettings(userSettings);
-
-          // Parse environment variables
-          if (userSettings.env && typeof userSettings.env === 'object' && !Array.isArray(userSettings.env)) {
-            setEnvVars(
-              Object.entries(userSettings.env).map(([key, value], index) => ({
-                id: `env-${index}`,
-                key,
-                value: value as string,
-              }))
-            );
-          }
-
           if (userSettings.startup_intro_enabled !== undefined) {
             setStartupIntroEnabled(userSettings.startup_intro_enabled === true);
           }
         }
       } catch (serverError) {
         console.warn('Failed to load from server, trying local:', serverError);
-
-        // Fallback to local settings
-        const loadedSettings = await api.getClaudeSettings();
-        if (loadedSettings && typeof loadedSettings === 'object') {
-          setSettings(loadedSettings);
-
-          if (loadedSettings.env && typeof loadedSettings.env === 'object' && !Array.isArray(loadedSettings.env)) {
-            setEnvVars(
-              Object.entries(loadedSettings.env).map(([key, value], index) => ({
-                id: `env-${index}`,
-                key,
-                value: value as string,
-              }))
-            );
-          }
-        }
       }
     } catch (err) {
       console.error("Failed to load settings:", err);
     } finally {
       setLoading(false);
-      // Mark initial load as done after a short delay
-      setTimeout(() => {
-        isInitialLoadRef.current = false;
-      }, 100);
     }
-  };
-
-  // Auto-save function with debounce
-  const autoSave = useCallback(async (updatedSettings: ClaudeSettings, updatedEnvVars: EnvironmentVariable[]) => {
-    try {
-      const settingsToSave: ClaudeSettings = {
-        ...updatedSettings,
-        env: updatedEnvVars.reduce((acc, { key, value }) => {
-          if (key && String(key).trim() && value && String(value).trim()) {
-            acc[key] = String(value);
-          }
-          return acc;
-        }, {} as Record<string, string>),
-        startup_intro_enabled: startupIntroEnabled,
-      };
-
-      try {
-        await saveUserSettings(settingsToSave);
-      } catch (serverError) {
-        await api.saveClaudeSettings(settingsToSave);
-      }
-    } catch (err) {
-      console.error("Failed to auto-save settings:", err);
-      setToast({ message: t('settings.saveFailed'), type: "error" });
-    }
-  }, [saveUserSettings, startupIntroEnabled, t]);
-
-  // Debounced save trigger
-  const triggerAutoSave = useCallback((newSettings: ClaudeSettings | null, newEnvVars: EnvironmentVariable[]) => {
-    if (isInitialLoadRef.current) return;
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = setTimeout(() => {
-      if (newSettings) {
-        autoSave(newSettings, newEnvVars);
-      }
-    }, 500);
-  }, [autoSave]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, []);
-
-  const updateSetting = (key: string, value: any) => {
-    setSettings(prev => {
-      const newSettings = { ...prev, [key]: value };
-      triggerAutoSave(newSettings, envVars);
-      return newSettings;
-    });
-  };
-
-  const addEnvVar = () => {
-    const newVar: EnvironmentVariable = {
-      id: `env-${Date.now()}`,
-      key: "",
-      value: "",
-    };
-    setEnvVars(prev => [...prev, newVar]);
-  };
-
-  const updateEnvVar = (id: string, field: "key" | "value", value: string) => {
-    setEnvVars(prev => {
-      const newEnvVars = prev.map(envVar =>
-        envVar.id === id ? { ...envVar, [field]: value } : envVar
-      );
-      triggerAutoSave(settings, newEnvVars);
-      return newEnvVars;
-    });
-  };
-
-  const removeEnvVar = (id: string) => {
-    setEnvVars(prev => {
-      const newEnvVars = prev.filter(envVar => envVar.id !== id);
-      triggerAutoSave(settings, newEnvVars);
-      return newEnvVars;
-    });
   };
 
   // Render section content
@@ -360,37 +231,6 @@ export const Settings: React.FC<SettingsProps> = ({
                 }
               }}
             />
-          </div>
-        );
-
-      case "ai-advanced":
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-slate-500/10">
-                <Database className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">{t('settings.ai.advanced')}</h3>
-                <p className="text-sm text-muted-foreground">{t('settings.ai.advancedDesc')}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {/* API Key Helper */}
-              <div className="space-y-2">
-                <Label>{t('settings.ai.apiKeyHelper')}</Label>
-                <Input
-                  placeholder="/path/to/script.sh"
-                  value={settings?.apiKeyHelper || ""}
-                  onChange={(e) => updateSetting("apiKeyHelper", e.target.value || undefined)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.ai.apiKeyHelperDesc')}
-                </p>
-              </div>
-
-            </div>
           </div>
         );
 

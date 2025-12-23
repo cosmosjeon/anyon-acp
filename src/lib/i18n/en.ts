@@ -66,14 +66,6 @@ const en = {
   'settings.ai.proxy': 'Proxy Settings',
   'settings.ai.proxyDesc': 'Connect to the AI through a network proxy',
 
-  // Advanced
-  'settings.ai.advanced': 'Advanced Settings',
-  'settings.ai.advancedDesc': 'Additional options for experts (usually no need to change)',
-  'settings.ai.apiKeyHelper': 'API Key Helper Script',
-  'settings.ai.apiKeyHelperDesc': 'Path to a custom script for API authentication',
-  'settings.ai.rawJson': 'Settings File Preview',
-  'settings.ai.rawJsonDesc': 'View the raw settings file content that will be saved',
-
   // Claude Auth section
   'settings.claudeAuth.title': 'Claude Authentication',
   'settings.claudeAuth.desc': 'Check and manage Claude Code CLI authentication status',
@@ -192,14 +184,6 @@ const en = {
   'settings.environment.addVariable': 'Add Variable',
   'settings.environment.noVariables': 'No environment variables configured.',
   'settings.environment.commonVariables': 'Common variables:',
-
-  // Settings - Advanced Tab
-  'settings.advanced.title': 'Advanced Settings',
-  'settings.advanced.description': 'Additional configuration options for advanced users',
-  'settings.advanced.apiKeyHelper': 'API Key Helper Script',
-  'settings.advanced.apiKeyHelperDesc': 'Custom script to generate auth values for API requests',
-  'settings.advanced.rawJson': 'Raw Settings (JSON)',
-  'settings.advanced.rawJsonDesc': 'This shows the raw JSON that will be saved to ~/.claude/settings.json',
 
   // Settings - Error messages
   'settings.error.loadFailed': 'Failed to load settings. Please ensure ~/.claude directory exists.',
