@@ -10,12 +10,8 @@ import {
   Sun,
   Languages,
   Palette,
-  Plus,
-  Trash2,
-  Settings2,
   Wifi,
   Database,
-  Zap,
   Loader2,
   Cpu,
   Key,
@@ -30,7 +26,6 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Toast, ToastContainer } from "@/components/ui/toast";
-import { HooksEditor } from "./HooksEditor";
 import { ProxySettings } from "./ProxySettings";
 import { CCAgents } from "./CCAgents";
 import { ClaudeAuthSettings } from "./ClaudeAuthSettings";
@@ -45,7 +40,6 @@ interface SettingsProps {
 type SettingsSection =
   | "appearance"
   | "ai-auth"
-  | "ai-hooks"
   | "ai-proxy"
   | "ai-advanced"
   | "ai-agents"
@@ -90,7 +84,6 @@ export const Settings: React.FC<SettingsProps> = ({
   const navItems: NavItem[] = [
     { id: "appearance", label: t('settings.simple.appearance'), icon: Palette, category: "general" },
     { id: "ai-auth", label: t('settings.claudeAuth.title'), icon: Key, category: "ai" },
-    { id: "ai-hooks", label: t('settings.ai.hooks'), icon: Zap, category: "ai" },
     { id: "ai-proxy", label: t('settings.ai.proxy'), icon: Wifi, category: "ai" },
     { id: "ai-advanced", label: t('settings.ai.advanced'), icon: Database, category: "ai" },
     { id: "ai-agents", label: "CC Agents", icon: Cpu, category: "ai" },
@@ -340,37 +333,6 @@ export const Settings: React.FC<SettingsProps> = ({
           <ClaudeAuthSettings
             setToast={setToast}
           />
-        );
-
-      case "ai-hooks":
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-yellow-500/10">
-                <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">{t('settings.ai.hooks')}</h3>
-                <p className="text-sm text-muted-foreground">{t('settings.ai.hooksDesc')}</p>
-              </div>
-            </div>
-
-            <HooksEditor
-              scope="user"
-              className="border-0"
-              hideActions={true}
-              onChange={async (hasChanges, getHooks) => {
-                if (hasChanges && getHooks) {
-                  try {
-                    const hooks = getHooks();
-                    await api.updateHooksConfig('user', hooks);
-                  } catch (err) {
-                    console.error("Failed to auto-save hooks:", err);
-                  }
-                }
-              }}
-            />
-          </div>
         );
 
       case "ai-proxy":

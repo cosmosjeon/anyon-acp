@@ -1,6 +1,5 @@
 import { apiCall } from '../apiAdapter';
 import type { ClaudeSettings, ClaudeVersionStatus, ClaudeMdFile, ClaudeInstallation, FileEntry, SlashCommand } from './types';
-import type { HooksConfiguration } from '@/types/hooks';
 
 /**
  * Claude authentication status
@@ -246,76 +245,6 @@ export const claudeApi = {
     return apiCall("read_file_content", { filePath });
   },
 
-  /**
-   * Get hooks configuration for a specific scope
-   * @param scope - The configuration scope: 'user', 'project', or 'local'
-   * @param projectPath - Project path (required for project and local scopes)
-   * @returns Promise resolving to the hooks configuration
-   */
-  async getHooksConfig(scope: 'user' | 'project' | 'local', projectPath?: string): Promise<HooksConfiguration> {
-    try {
-      return await apiCall<HooksConfiguration>("get_hooks_config", { scope, projectPath });
-    } catch (error) {
-      console.error("Failed to get hooks config:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Update hooks configuration for a specific scope
-   * @param scope - The configuration scope: 'user', 'project', or 'local'
-   * @param hooks - The hooks configuration to save
-   * @param projectPath - Project path (required for project and local scopes)
-   * @returns Promise resolving to success message
-   */
-  async updateHooksConfig(
-    scope: 'user' | 'project' | 'local',
-    hooks: HooksConfiguration,
-    projectPath?: string
-  ): Promise<string> {
-    try {
-      return await apiCall<string>("update_hooks_config", { scope, projectPath, hooks });
-    } catch (error) {
-      console.error("Failed to update hooks config:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Validate a hook command syntax
-   * @param command - The shell command to validate
-   * @returns Promise resolving to validation result
-   */
-  async validateHookCommand(command: string): Promise<{ valid: boolean; message: string }> {
-    try {
-      return await apiCall<{ valid: boolean; message: string }>("validate_hook_command", { command });
-    } catch (error) {
-      console.error("Failed to validate hook command:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get merged hooks configuration (respecting priority)
-   * @param projectPath - The project path
-   * @returns Promise resolving to merged hooks configuration
-   */
-  async getMergedHooksConfig(projectPath: string): Promise<HooksConfiguration> {
-    try {
-      const [userHooks, projectHooks, localHooks] = await Promise.all([
-        this.getHooksConfig('user'),
-        this.getHooksConfig('project', projectPath),
-        this.getHooksConfig('local', projectPath)
-      ]);
-
-      // Import HooksManager for merging
-      const { HooksManager } = await import('@/lib/hooksManager');
-      return HooksManager.mergeConfigs(userHooks, projectHooks, localHooks);
-    } catch (error) {
-      console.error("Failed to get merged hooks config:", error);
-      throw error;
-    }
-  },
 
   /**
    * Lists all available slash commands

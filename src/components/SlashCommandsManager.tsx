@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { api, type SlashCommand } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { COMMON_TOOL_MATCHERS } from "@/types/hooks";
+import { COMMON_TOOL_MATCHERS } from "@/types/toolMatchers";
 import { useTrackEvent } from "@/hooks";
 
 interface SlashCommandsManagerProps {

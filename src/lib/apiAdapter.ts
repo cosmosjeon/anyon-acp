@@ -257,12 +257,7 @@ function mapCommandToEndpoint(command: string, _params?: any): string {
     'storage_insert_row': '/api/storage/tables/{tableName}/rows',
     'storage_execute_sql': '/api/storage/sql',
     'storage_reset_database': '/api/storage/reset',
-    
-    // Hooks configuration
-    'get_hooks_config': '/api/hooks/config',
-    'update_hooks_config': '/api/hooks/config',
-    'validate_hook_command': '/api/hooks/validate',
-    
+
     // Slash commands
     'slash_commands_list': '/api/slash-commands',
     'slash_command_get': '/api/slash-commands/{commandId}',

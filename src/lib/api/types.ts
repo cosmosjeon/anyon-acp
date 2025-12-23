@@ -157,7 +157,6 @@ export interface Agent {
   system_prompt: string;
   default_task?: string;
   model: string;
-  hooks?: string; // JSON string of HooksConfiguration
   created_at: string;
   updated_at: string;
 }
@@ -171,7 +170,6 @@ export interface AgentExport {
     system_prompt: string;
     default_task?: string;
     model: string;
-    hooks?: string;
   };
 }
 

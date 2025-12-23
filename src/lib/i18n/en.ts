@@ -62,10 +62,6 @@ const en = {
   'settings.ai.commonEnvVars': 'Common variables',
   'settings.ai.envModelDesc': 'Specify a custom AI model name',
 
-  // Hooks
-  'settings.ai.hooks': 'Automation Scripts',
-  'settings.ai.hooksDesc': 'Run commands automatically before or after certain actions',
-
   // Proxy
   'settings.ai.proxy': 'Proxy Settings',
   'settings.ai.proxyDesc': 'Connect to the AI through a network proxy',
@@ -204,10 +200,6 @@ const en = {
   'settings.advanced.apiKeyHelperDesc': 'Custom script to generate auth values for API requests',
   'settings.advanced.rawJson': 'Raw Settings (JSON)',
   'settings.advanced.rawJsonDesc': 'This shows the raw JSON that will be saved to ~/.claude/settings.json',
-
-  // Settings - Hooks Tab
-  'settings.hooks.title': 'User Hooks',
-  'settings.hooks.description': 'Configure hooks that apply to all Claude Code sessions for your user account. These are stored in',
 
   // Settings - Error messages
   'settings.error.loadFailed': 'Failed to load settings. Please ensure ~/.claude directory exists.',

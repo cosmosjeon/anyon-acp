@@ -62,10 +62,6 @@ const ko = {
   'settings.ai.commonEnvVars': '자주 사용하는 변수',
   'settings.ai.envModelDesc': 'AI 모델 이름을 직접 지정할 수 있어요',
 
-  // Hooks
-  'settings.ai.hooks': '자동 실행 스크립트',
-  'settings.ai.hooksDesc': '특정 작업 전후에 자동으로 실행할 명령어를 설정해요',
-
   // Proxy
   'settings.ai.proxy': '프록시 설정',
   'settings.ai.proxyDesc': '네트워크 프록시를 통해 AI에 연결할 수 있어요',
@@ -204,10 +200,6 @@ const ko = {
   'settings.advanced.apiKeyHelperDesc': 'API 요청에 대한 인증 값을 생성하는 커스텀 스크립트',
   'settings.advanced.rawJson': '원본 설정 (JSON)',
   'settings.advanced.rawJsonDesc': '~/.claude/settings.json에 저장될 원본 JSON입니다',
-
-  // Settings - Hooks Tab
-  'settings.hooks.title': '사용자 훅',
-  'settings.hooks.description': '사용자 계정의 모든 Claude Code 세션에 적용되는 훅을 설정합니다. 저장 위치:',
 
   // Settings - Error messages
   'settings.error.loadFailed': '설정을 불러오지 못했습니다. ~/.claude 디렉토리가 있는지 확인하세요.',
