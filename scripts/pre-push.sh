@@ -177,9 +177,17 @@ If no issues found, return: {"summary":{"critical":0,"warning":0,"info":0,"pass"
 EOF
 )
 
-# Claude 실행
+# Claude 실행 (실시간 출력 표시)
 echo "Claude에 감사 요청 중... (타임아웃: 5분)"
-AUDIT_OUTPUT=$(timeout 300 claude -p "$AUDIT_PROMPT" --dangerously-skip-permissions 2>&1 || echo '{"summary":{"critical":0,"warning":0,"info":0,"pass":true},"issues":[]}')
+echo ""
+TEMP_OUTPUT=$(mktemp)
+if timeout 300 claude -p "$AUDIT_PROMPT" --dangerously-skip-permissions 2>&1 | tee "$TEMP_OUTPUT"; then
+    AUDIT_OUTPUT=$(cat "$TEMP_OUTPUT")
+else
+    AUDIT_OUTPUT='{"summary":{"critical":0,"warning":0,"info":0,"pass":true},"issues":[]}'
+fi
+rm -f "$TEMP_OUTPUT"
+echo ""
 
 # JSON 추출 (마크다운 코드블록 제거)
 AUDIT_JSON=$(echo "$AUDIT_OUTPUT" | sed -n '/^{/,/^}/p' | head -1)
@@ -273,7 +281,15 @@ EOF
     )
 
     echo "Claude에 수정 요청 중..."
-    REFACTOR_OUTPUT=$(timeout 300 claude -p "$REFACTOR_PROMPT" --dangerously-skip-permissions 2>&1 || echo "FIX_FAILED")
+    echo ""
+    TEMP_REFACTOR=$(mktemp)
+    if timeout 300 claude -p "$REFACTOR_PROMPT" --dangerously-skip-permissions 2>&1 | tee "$TEMP_REFACTOR"; then
+        REFACTOR_OUTPUT=$(cat "$TEMP_REFACTOR")
+    else
+        REFACTOR_OUTPUT="FIX_FAILED"
+    fi
+    rm -f "$TEMP_REFACTOR"
+    echo ""
 
     # 수정 결과 확인
     FIXED_COUNT=$(echo "$REFACTOR_OUTPUT" | grep -c "^FIXED:" || echo 0)
@@ -382,7 +398,15 @@ $CHANGED_FILES
 마지막 줄에 반드시: SYNC_DONE"
 
     echo "Claude에 문서 동기화 요청 중... (타임아웃: 120초)"
-    SYNC_OUTPUT=$(timeout 120 claude -p "$SYNC_PROMPT" --dangerously-skip-permissions 2>&1 || echo "SYNC_TIMEOUT")
+    echo ""
+    TEMP_SYNC=$(mktemp)
+    if timeout 120 claude -p "$SYNC_PROMPT" --dangerously-skip-permissions 2>&1 | tee "$TEMP_SYNC"; then
+        SYNC_OUTPUT=$(cat "$TEMP_SYNC")
+    else
+        SYNC_OUTPUT="SYNC_TIMEOUT"
+    fi
+    rm -f "$TEMP_SYNC"
+    echo ""
 
     # 변경된 문서 스테이징
     if git diff --name-only sdd-docs/specs/ 2>/dev/null | grep -q .; then
