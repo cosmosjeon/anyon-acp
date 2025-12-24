@@ -146,19 +146,20 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const handleSourceModeChange = (mode: 'port' | 'file') => {
     if (mode === sourceMode) return;
     setSourceMode(mode);
-    // 모드 변경 시 적절한 URL 설정
-    if (mode === 'port') {
-      // 서버 모드: 서버 URL 사용
-      if (devServerProxyUrl) {
-        setCurrentUrl(devServerProxyUrl + urlPath);
-      }
-    } else {
-      // 파일 모드: 현재 파일이 있으면 유지, 없으면 초기화
+
+    // 모드 전환 시 각 모드는 독립적으로 동작
+    // - 서버 모드: devServerProxyUrl 사용 (previewStore에서 관리)
+    // - 파일 모드: currentUrl (로컬 상태) 사용
+    if (mode === 'file') {
+      // 파일 모드로 전환: 이전에 로드한 파일이 있으면 다시 로드
       setSelectedPort(null);
-      if (!currentFilePath) {
+      if (currentFilePath) {
+        loadHtmlFile(currentFilePath);
+      } else {
         setCurrentUrl('');
       }
     }
+    // 서버 모드로 전환 시 devServerProxyUrl이 있으면 effectiveUrl에서 자동으로 사용됨
   };
 
   // iframe ref 등록
@@ -513,7 +514,12 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
   // 프리뷰 iframe 렌더링
   const renderPreview = () => {
-    if (!currentUrl) {
+    // 모드별 URL 분리: 서버 모드와 파일 모드가 서로 영향을 주지 않도록 함
+    const effectiveUrl = sourceMode === 'port'
+      ? (devServerProxyUrl ? devServerProxyUrl + urlPath : '')  // 서버 모드: 프록시 URL만 사용
+      : currentUrl;  // 파일 모드: data URL 사용
+
+    if (!effectiveUrl) {
       return (
         <div className="relative flex items-center justify-center h-full">
           <ErrorBanner
@@ -638,7 +644,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
             >
               <iframe
                 ref={iframeRef}
-                src={currentUrl}
+                src={effectiveUrl}
                 className="border-0 bg-white rounded-lg"
                 style={{ width: `${width}px`, height: `${height}px`, display: 'block' }}
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -659,7 +665,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
         <iframe
           ref={iframeRef}
-          src={currentUrl}
+          src={effectiveUrl}
           className="w-full h-full border-0"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         />

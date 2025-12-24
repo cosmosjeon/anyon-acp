@@ -45,14 +45,77 @@ export function useDevServer(
     setPreviewError,
   } = usePreviewStore();
 
-  // Dev server 시작
+  // 이미 실행 중인 서버에 연결
+  const connectToExistingServer = useCallback(async (port: number) => {
+    if (!projectPath || !isTauri) return false;
+
+    try {
+      setIsLoading(true);
+
+      let proxyUrl: string | null = null;
+
+      // 프록시 서버 시작 (Element Selector 스크립트 주입용)
+      try {
+        proxyUrl = await invoke<string>('connect_to_existing_server', {
+          projectPath,
+          port,
+        });
+        console.log('[DevServer] Proxy server started:', proxyUrl);
+      } catch (proxyErr) {
+        console.log('[DevServer] Proxy setup failed, using direct connection:', proxyErr);
+        // 프록시 실패 시 직접 연결 (요소 선택 기능 불가)
+        proxyUrl = `http://localhost:${port}`;
+      }
+
+      // 프록시 URL 또는 직접 URL로 연결 설정
+      setDevServerRunning(true);
+      setDevServerPort(port);
+      setDevServerProxyUrl(proxyUrl);
+
+      addAppOutput({
+        type: 'info',
+        message: proxyUrl.includes(`:${port}`)
+          ? `[anyon] Connected to existing server at localhost:${port} (direct)`
+          : `[anyon] Connected to existing server at localhost:${port} via proxy`,
+        timestamp: Date.now(),
+        projectPath,
+      });
+      return true;
+    } catch (err) {
+      console.error('Failed to connect to existing server:', err);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectPath, setDevServerRunning, setDevServerPort, setDevServerProxyUrl, setIsLoading, addAppOutput]);
+
+  // Dev server 시작 (먼저 기존 서버 확인)
   const startDevServer = useCallback(async () => {
     if (!projectPath || !isTauri) return;
 
     try {
       setIsLoading(true);
 
-      // 패키지 매니저 감지
+      // 먼저 이미 실행 중인 dev 서버가 있는지 확인 (포트 스캔)
+      const ports = await invoke<Array<{ port: number; alive: boolean; url: string }>>('scan_ports');
+      const runningServer = ports.find(p => p.alive && p.port >= 3000 && p.port <= 9000);
+
+      if (runningServer) {
+        // 이미 실행 중인 서버에 연결
+        addAppOutput({
+          type: 'info',
+          message: `[anyon] Found existing server at localhost:${runningServer.port}, connecting...`,
+          timestamp: Date.now(),
+          projectPath,
+        });
+
+        const connected = await connectToExistingServer(runningServer.port);
+        if (connected) {
+          return;
+        }
+      }
+
+      // 기존 서버가 없으면 새로 시작
       const pm = await invoke<string>('detect_package_manager', { projectPath });
       setPackageManager(pm);
 
@@ -82,7 +145,7 @@ export function useDevServer(
     } finally {
       setIsLoading(false);
     }
-  }, [projectPath, projectId, setDevServerRunning, setPackageManager, setIsLoading, addAppOutput]);
+  }, [projectPath, projectId, connectToExistingServer, setDevServerRunning, setPackageManager, setIsLoading, addAppOutput]);
 
   // Dev server 중지
   const stopDevServer = useCallback(async () => {
@@ -109,6 +172,9 @@ export function useDevServer(
     }
   }, [projectPath]);
 
+  // 경로 정규화 함수 (Windows 경로 호환)
+  const normalizePath = (path: string) => path.replace(/\\/g, '/').toLowerCase();
+
   // Dev server output 이벤트 리스너
   useEffect(() => {
     if (!projectPath || !isTauri) return;
@@ -117,8 +183,8 @@ export function useDevServer(
       const unlisten = await listen<DevServerOutput>('dev-server-output', (event) => {
         const data = event.payload;
 
-        // 현재 프로젝트의 이벤트만 처리
-        if (data.project_path !== projectPath) return;
+        // 현재 프로젝트의 이벤트만 처리 (경로 정규화하여 비교)
+        if (normalizePath(data.project_path) !== normalizePath(projectPath)) return;
 
         // 콘솔에 출력 추가
         addAppOutput({
@@ -192,6 +258,7 @@ export function useDevServer(
     startDevServer,
     stopDevServer,
     getDevServerInfo,
+    connectToExistingServer,
   };
 }
 

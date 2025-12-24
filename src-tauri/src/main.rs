@@ -482,6 +482,7 @@ macro_rules! create_handlers {
             commands::dev_server::stop_dev_server,
             commands::dev_server::get_dev_server_info,
             commands::dev_server::detect_package_manager,
+            commands::dev_server::connect_to_existing_server,
             // Claude Auth
             claude_auth_check,
             claude_auth_open_terminal,

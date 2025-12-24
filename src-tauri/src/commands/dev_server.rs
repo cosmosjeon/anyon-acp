@@ -815,3 +815,67 @@ pub async fn get_dev_server_info(project_path: String) -> Result<Option<DevServe
     let servers = DEV_SERVERS.lock().unwrap();
     Ok(servers.servers.get(&project_path).map(|e| e.info.clone()))
 }
+
+/// Connect to an already running external dev server
+/// Returns the proxy URL on success
+#[tauri::command]
+pub async fn connect_to_existing_server(
+    app: AppHandle,
+    project_path: String,
+    port: u16,
+) -> Result<String, String> {
+    log::info!("Connecting to existing server at port {} for: {}", port, project_path);
+
+    // Check if port is actually in use
+    if TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok() {
+        return Err(format!("No server running on port {}", port));
+    }
+
+    // Find available proxy port
+    let proxy_port = find_available_port(port + 10000)
+        .ok_or_else(|| "Could not find available port for proxy".to_string())?;
+
+    let stop_flag = Arc::new(Mutex::new(false));
+
+    let info = DevServerInfo {
+        project_path: project_path.clone(),
+        pid: 0, // No process, external server
+        detected_port: Some(port),
+        original_url: Some(format!("http://localhost:{}", port)),
+        proxy_port: Some(proxy_port),
+        proxy_url: Some(format!("http://localhost:{}", proxy_port)),
+    };
+
+    let entry = DevServerEntry {
+        process: None, // No process to manage
+        proxy_handle: None,
+        info: info.clone(),
+        stop_flag: stop_flag.clone(),
+    };
+
+    // Store in global state
+    {
+        let mut servers = DEV_SERVERS.lock().unwrap();
+        servers.servers.insert(project_path.clone(), entry);
+    }
+
+    // Start proxy server
+    let proxy_stop = stop_flag.clone();
+    thread::spawn(move || {
+        run_proxy_server(proxy_port, "localhost".to_string(), port, proxy_stop);
+    });
+
+    let proxy_url = format!("http://localhost:{}", proxy_port);
+
+    // Notify frontend
+    let _ = app.emit("dev-server-output", DevServerOutput {
+        project_path: project_path.clone(),
+        output_type: "port-detected".to_string(),
+        message: format!("Connected to existing server at localhost:{}", port),
+        port: Some(port),
+        proxy_url: Some(proxy_url.clone()),
+    });
+
+    // Return proxy URL for immediate use
+    Ok(proxy_url)
+}
