@@ -45,6 +45,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { TooltipProvider, TooltipSimple } from "@/components/ui/tooltip-modern";
 import { SplitPane } from "@/components/ui/split-pane";
 import { WebviewPreview } from "./WebviewPreview";
+import { PreviewPromptDialog } from "./PreviewPromptDialog";
 import type { ClaudeStreamMessage } from "./AgentExecution";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
@@ -1093,6 +1094,18 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     }
   };
 
+  // Handle opening preview from the prompt dialog
+  const handleOpenPreviewFromPrompt = () => {
+    setShowPreviewPrompt(false);
+    setShowPreview(true);
+  };
+
+  // Handle dismissing the preview prompt dialog
+  const handleDismissPreviewPrompt = () => {
+    setShowPreviewPrompt(false);
+    setPreviewUrl("");
+  };
+
   // Cleanup event listeners and track mount state
   useEffect(() => {
     isMountedRef.current = true;
@@ -1694,6 +1707,14 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Preview Prompt Dialog - verifies localhost server before opening preview */}
+      <PreviewPromptDialog
+        url={previewUrl}
+        isOpen={showPreviewPrompt}
+        onOpenPreview={handleOpenPreviewFromPrompt}
+        onDismiss={handleDismissPreviewPrompt}
+      />
       </div>
     </TooltipProvider>
   );

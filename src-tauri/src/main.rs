@@ -44,7 +44,7 @@ use commands::claude_auth::{
     claude_auth_delete_api_key, claude_auth_validate_api_key, claude_auth_logout,
 };
 
-use commands::preview::scan_ports;
+use commands::preview::{scan_ports, check_port_alive};
 use commands::proxy::{apply_proxy_settings, get_proxy_settings, save_proxy_settings};
 use commands::storage::{
     storage_delete_row, storage_execute_sql, storage_insert_row, storage_list_tables,
@@ -477,6 +477,7 @@ macro_rules! create_handlers {
             commands::dev_workflow::get_dev_workflow_status,
             // Preview (Port Scanning)
             scan_ports,
+            check_port_alive,
             // Dev Server with HTML injection proxy
             commands::dev_server::start_dev_server,
             commands::dev_server::stop_dev_server,

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { isLocalhostUrl, extractPortFromUrl } from "@/hooks/usePortVerification";
 
 interface WebviewPreviewProps {
   /**
@@ -106,12 +108,35 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
   // In the full implementation, this would create a Tauri webview window
   useEffect(() => {
     if (currentUrl) {
-      // This is where we'd create the actual webview
-      // For now, using iframe for demonstration
       setIsLoading(true);
       setHasError(false);
-      
-      // Simulate loading
+
+      // For localhost URLs, verify the port is reachable
+      if (isLocalhostUrl(currentUrl)) {
+        const port = extractPortFromUrl(currentUrl);
+        if (port) {
+          // Quick check if port is alive (single attempt, no polling)
+          invoke<{ port: number; alive: boolean }>('check_port_alive', {
+            port,
+            maxAttempts: 1,
+          })
+            .then((result) => {
+              if (!result.alive) {
+                setHasError(true);
+                setErrorMessage(`Server not responding on port ${port}`);
+              }
+              setIsLoading(false);
+            })
+            .catch((err) => {
+              console.warn('[WebviewPreview] Port check failed:', err);
+              // Don't block loading if port check fails
+              setIsLoading(false);
+            });
+          return;
+        }
+      }
+
+      // For non-localhost or if port check not needed, just simulate loading
       const timer = setTimeout(() => {
         setIsLoading(false);
       }, 1000);
@@ -172,10 +197,38 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
     console.log("Go forward");
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsLoading(true);
-    // In real implementation, this would call webview.reload()
-    setTimeout(() => setIsLoading(false), 1000);
+    setHasError(false);
+
+    // For localhost URLs, verify the port is reachable before refreshing
+    if (isLocalhostUrl(currentUrl)) {
+      const port = extractPortFromUrl(currentUrl);
+      if (port) {
+        try {
+          const result = await invoke<{ port: number; alive: boolean }>('check_port_alive', {
+            port,
+            maxAttempts: 3, // Try a few times on refresh
+            pollIntervalMs: 300,
+          });
+
+          if (!result.alive) {
+            setHasError(true);
+            setErrorMessage(`Server not responding on port ${port}`);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[WebviewPreview] Port check on refresh failed:', err);
+        }
+      }
+    }
+
+    // Reload the iframe
+    if (iframeRef.current) {
+      iframeRef.current.src = currentUrl;
+    }
+    setIsLoading(false);
   };
 
   const handleGoHome = () => {
