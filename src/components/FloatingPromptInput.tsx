@@ -27,6 +27,7 @@ import { ImagePreview } from "./ImagePreview";
 import { SelectedComponentsDisplay } from "./preview/SelectedComponentsDisplay";
 import { usePreviewStore } from "@/stores/previewStore";
 import { type FileEntry, type SlashCommand } from "@/lib/api";
+import type { SelectedElement } from "@/types/preview";
 
 // Conditional import for Tauri webview window
 let tauriGetCurrentWebviewWindow: any;
@@ -50,7 +51,13 @@ interface FloatingPromptInputProps {
   /**
    * Callback when prompt is sent
    */
-  onSend: (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode) => void;
+  onSend: (
+    prompt: string,
+    model: "haiku" | "sonnet" | "opus",
+    executionMode?: ExecutionMode,
+    hiddenContext?: string,
+    selectedElement?: SelectedElement | null
+  ) => void;
   /**
    * Whether the input is loading
    */
@@ -310,6 +317,8 @@ const FloatingPromptInputInner = (
     selectedElement,
     clearSelectedComponents,
     setSelectedElement,
+    currentRoute,
+    appUrl,
   } = usePreviewStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -800,53 +809,70 @@ const FloatingPromptInputInner = (
       return;
     }
 
-    let finalPrompt = trimmedPrompt;
+    let visiblePrompt = trimmedPrompt;
 
     // Check for @plan prefix to override execution mode
     let effectiveExecutionMode = selectedExecutionMode;
-    if (finalPrompt.toLowerCase().startsWith('@plan ')) {
+    if (visiblePrompt.toLowerCase().startsWith('@plan ')) {
       effectiveExecutionMode = 'plan';
-      finalPrompt = finalPrompt.substring(6).trim(); // Remove @plan prefix
+      visiblePrompt = visiblePrompt.substring(6).trim(); // Remove @plan prefix
     }
 
     // Final validation after prefix removal
-    if (!finalPrompt) {
+    if (!visiblePrompt) {
       console.warn('[FloatingPromptInput] Empty prompt after processing');
       return;
     }
 
-    // 선택된 UI 요소 정보를 프롬프트에 추가
+    // Build hidden context for AI (not shown in chat)
+    let hiddenContext: string | undefined;
     if (selectedElement) {
-      finalPrompt += `\n\n---\n**선택된 UI 요소:**\n`;
-      finalPrompt += `- 태그: \`<${selectedElement.tag}>\`\n`;
+      hiddenContext = `\n\n---\n**[Hidden Context - Selected UI Element]**\n`;
+      hiddenContext += `- Tag: \`<${selectedElement.tag}>\`\n`;
       if (selectedElement.id) {
-        finalPrompt += `- ID: \`${selectedElement.id}\`\n`;
+        hiddenContext += `- ID: \`${selectedElement.id}\`\n`;
+      }
+      if (selectedElement.classes) {
+        hiddenContext += `- Classes: \`${selectedElement.classes}\`\n`;
       }
       if (selectedElement.selector) {
-        finalPrompt += `- CSS Selector: \`${selectedElement.selector}\`\n`;
+        hiddenContext += `- CSS Selector: \`${selectedElement.selector}\`\n`;
       }
       if (selectedElement.text) {
         const truncatedText = selectedElement.text.length > 100
           ? selectedElement.text.substring(0, 100) + '...'
           : selectedElement.text;
-        finalPrompt += `- 텍스트: "${truncatedText}"\n`;
+        hiddenContext += `- Text: "${truncatedText}"\n`;
       }
       if (selectedElement.html) {
         const truncatedHtml = selectedElement.html.length > 500
           ? selectedElement.html.substring(0, 500) + '...'
           : selectedElement.html;
-        finalPrompt += `- HTML:\n\`\`\`html\n${truncatedHtml}\n\`\`\`\n`;
+        hiddenContext += `- HTML:\n\`\`\`html\n${truncatedHtml}\n\`\`\`\n`;
+      }
+      // Add route context to help AI find the file
+      if (currentRoute) {
+        hiddenContext += `- Current Route: \`${currentRoute}\`\n`;
+      }
+      if (appUrl) {
+        hiddenContext += `- App URL: \`${appUrl}\`\n`;
       }
     }
 
-    // Append thinking phrase if not auto mode
+    // Append thinking phrase to visible prompt only
     const thinkingMode = THINKING_MODES.find(m => m.id === selectedThinkingMode);
     if (thinkingMode?.phrase) {
-      finalPrompt = `${finalPrompt}.\n\n${thinkingMode.phrase}.`;
+      visiblePrompt = `${visiblePrompt}.\n\n${thinkingMode.phrase}.`;
     }
 
     try {
-      onSend(finalPrompt, selectedModel, showExecutionMode ? effectiveExecutionMode : undefined);
+      onSend(
+        visiblePrompt,
+        selectedModel,
+        showExecutionMode ? effectiveExecutionMode : undefined,
+        hiddenContext,
+        selectedElement
+      );
       setPrompt("");
       setEmbeddedImages([]);
       setTextareaHeight(48); // Reset height after sending

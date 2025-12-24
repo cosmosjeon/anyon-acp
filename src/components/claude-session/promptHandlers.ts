@@ -6,6 +6,7 @@
 import type { ClaudeStreamMessage } from "../AgentExecution";
 import { SessionPersistenceService, type TabType } from "@/services/sessionPersistence";
 import type { Session } from "@/lib/api";
+import type { SelectedElement } from "@/types/preview";
 import { listen as tauriListen } from "@tauri-apps/api/event";
 
 type UnlistenFn = () => void;
@@ -702,6 +703,7 @@ export async function executePromptCommand(options: CommandExecutionOptions): Pr
 export interface UserMessageOptions {
   prompt: string;
   setMessages: React.Dispatch<React.SetStateAction<ClaudeStreamMessage[]>>;
+  selectedElement?: SelectedElement;
 }
 
 export function addUserMessageToUI(options: UserMessageOptions): void {
@@ -714,7 +716,9 @@ export function addUserMessageToUI(options: UserMessageOptions): void {
           text: options.prompt
         }
       ]
-    }
+    },
+    // Include selectedElement metadata for badge display in UI
+    selectedElement: options.selectedElement
   };
   options.setMessages(prev => [...prev, userMessage]);
 }

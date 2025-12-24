@@ -47,6 +47,7 @@ import { SplitPane } from "@/components/ui/split-pane";
 import { WebviewPreview } from "./WebviewPreview";
 import { PreviewPromptDialog } from "./PreviewPromptDialog";
 import type { ClaudeStreamMessage } from "./AgentExecution";
+import type { SelectedElement } from "@/types/preview";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
 import { SessionPersistenceService, type TabType } from "@/services/sessionPersistence";
@@ -656,13 +657,20 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       }
 
       // Send the backend prompt (full workflow prompt) to Claude
-      handleSendPrompt(backendPrompt, "sonnet", undefined, userMessage ? true : false);
+      handleSendPrompt(backendPrompt, "sonnet", undefined, undefined, undefined, userMessage ? true : false);
     },
     isLoading,
   }), [isLoading]);
 
-  const handleSendPrompt = async (prompt: string, model: "haiku" | "sonnet" | "opus", executionMode?: ExecutionMode, skipAddUserMessage?: boolean) => {
-    logger.log('handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession });
+  const handleSendPrompt = async (
+    prompt: string,
+    model: "haiku" | "sonnet" | "opus",
+    executionMode?: ExecutionMode,
+    hiddenContext?: string,
+    selectedElement?: SelectedElement | null,
+    skipAddUserMessage?: boolean
+  ) => {
+    logger.log('handleSendPrompt called with:', { prompt, model, executionMode, projectPath, claudeSessionId, effectiveSession, hasHiddenContext: !!hiddenContext });
 
     // 1. Validate input
     const validation = validatePromptInput(prompt, projectPath);
@@ -756,8 +764,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       }
 
       // 6. Add user message to UI (skip if already added by startNewSession)
+      // Pass selectedElement for badge display, but don't show hiddenContext
       if (!skipAddUserMessage) {
-        addUserMessageToUI({ prompt, setMessages });
+        addUserMessageToUI({ prompt, setMessages, selectedElement: selectedElement ?? undefined });
       }
 
       // 7. Update first message if needed
@@ -780,11 +789,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       });
 
       // 9. Execute the command
+      // Combine visible prompt with hidden context for AI
+      const fullPrompt = hiddenContext ? `${prompt}${hiddenContext}` : prompt;
       await executePromptCommand({
         effectiveSession,
         isFirstPrompt,
         projectPath,
-        prompt,
+        prompt: fullPrompt,
         model,
         executionMode,
         setIsFirstPrompt,

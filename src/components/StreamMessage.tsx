@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { 
-  AlertCircle, 
-  CheckCircle2
+import {
+  AlertCircle,
+  CheckCircle2,
+  Target
 } from "@/lib/icons";
+import { TooltipSimple } from "@/components/ui/tooltip-modern";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -383,12 +386,29 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       }
       
       if (!hasContent) return null;
-      
+
+      // Check for selected element metadata
+      const selectedElement = message.selectedElement;
+
       return (
         <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
           <div className="space-y-2">
             {contentParts}
           </div>
+          {/* Selected element badge */}
+          {selectedElement && (
+            <div className="mt-2 flex items-center">
+              <TooltipSimple
+                content={`선택: <${selectedElement.tag}>${selectedElement.id ? ` #${selectedElement.id}` : ''}${selectedElement.classes ? ` .${selectedElement.classes.split(' ')[0]}` : ''}`}
+                side="top"
+              >
+                <Badge variant="outline" className="text-xs gap-1 cursor-default">
+                  <Target className="h-3 w-3" />
+                  요소 선택됨
+                </Badge>
+              </TooltipSimple>
+            </div>
+          )}
         </div>
       );
     }

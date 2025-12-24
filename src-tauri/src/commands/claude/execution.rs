@@ -25,9 +25,8 @@ pub async fn execute_claude_code(
 
     let claude_path = find_claude_binary(&app)?;
 
+    // Build args without -p prompt (prompt will be sent via stdin to avoid Windows batch file escaping issues)
     let mut args = vec![
-        "-p".to_string(),
-        prompt.clone(),
         "--model".to_string(),
         model.clone(),
         "--output-format".to_string(),
@@ -65,10 +64,9 @@ pub async fn continue_claude_code(
 
     let claude_path = find_claude_binary(&app)?;
 
+    // Build args without -p prompt (prompt will be sent via stdin to avoid Windows batch file escaping issues)
     let mut args = vec![
         "-c".to_string(), // Continue flag
-        "-p".to_string(),
-        prompt.clone(),
         "--model".to_string(),
         model.clone(),
         "--output-format".to_string(),
@@ -108,11 +106,10 @@ pub async fn resume_claude_code(
 
     let claude_path = find_claude_binary(&app)?;
 
+    // Build args without -p prompt (prompt will be sent via stdin to avoid Windows batch file escaping issues)
     let mut args = vec![
         "--resume".to_string(),
         session_id.clone(),
-        "-p".to_string(),
-        prompt.clone(),
         "--model".to_string(),
         model.clone(),
         "--output-format".to_string(),
@@ -294,12 +291,22 @@ async fn spawn_claude_process(
     project_path: String,
 ) -> Result<(), String> {
     use std::sync::Mutex;
-    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
     // Spawn the process
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn Claude: {}", e))?;
+
+    // Write prompt to stdin (avoids Windows batch file escaping issues with special characters)
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(prompt.as_bytes()).await
+            .map_err(|e| format!("Failed to write prompt to stdin: {}", e))?;
+        stdin.flush().await
+            .map_err(|e| format!("Failed to flush stdin: {}", e))?;
+        drop(stdin);  // Close stdin to signal EOF
+        log::debug!("Wrote prompt to Claude stdin and closed it");
+    }
 
     // Get stdout and stderr
     let stdout = child.stdout.take().ok_or("Failed to get stdout")?;

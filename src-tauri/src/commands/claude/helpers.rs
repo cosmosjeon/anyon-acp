@@ -111,7 +111,7 @@ pub(crate) fn create_system_command(claude_path: &str, args: Vec<String>, projec
     }
 
     cmd.current_dir(project_path)
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())  // Use piped stdin to avoid Windows batch file argument escaping issues
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
