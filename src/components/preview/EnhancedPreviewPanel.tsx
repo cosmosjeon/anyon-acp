@@ -41,7 +41,7 @@ import { ActionHeader } from './ActionHeader';
 import { ErrorBanner } from './ErrorBanner';
 import { Problems } from './Problems';
 import { Console } from './Console';
-import { FileExplorer } from '@/components/FileExplorer';
+import { CodePanel } from '@/components/CodePanel';
 import { injectSelectorScript } from '@/lib/previewSelector';
 import type { PortInfo, DeviceSize, SelectedElement, ElementAction } from '@/types/preview';
 
@@ -503,7 +503,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         return <Console />;
       case 'code':
         return (
-          <FileExplorer rootPath={projectPath} />
+          <CodePanel projectPath={projectPath} />
         );
       case 'preview':
       default:

@@ -236,6 +236,35 @@ pub async fn read_file_content(file_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub async fn write_file_content(file_path: String, content: String) -> Result<(), String> {
+    log::info!("Writing file content: '{}'", file_path);
+
+    // Check if path is empty
+    if file_path.trim().is_empty() {
+        log::error!("File path is empty or whitespace");
+        return Err("File path cannot be empty".to_string());
+    }
+
+    let path = PathBuf::from(&file_path);
+    log::debug!("Resolved path: {:?}", path);
+
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create parent directory: {}", e))?;
+        }
+    }
+
+    // Write the file content
+    fs::write(&path, &content)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    log::info!("Successfully wrote {} bytes to file", content.len());
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn check_file_exists(file_path: String) -> Result<bool, String> {
     let path = PathBuf::from(&file_path);
     Ok(path.exists() && path.is_file())

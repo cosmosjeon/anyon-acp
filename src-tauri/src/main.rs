@@ -372,6 +372,7 @@ macro_rules! create_handlers {
             commands::claude::filesystem::list_directory_contents,
             commands::claude::filesystem::search_files,
             commands::claude::filesystem::read_file_content,
+            commands::claude::filesystem::write_file_content,
             commands::claude::filesystem::check_file_exists,
             commands::claude::filesystem::list_anyon_docs,
             // Claude & Project Management - Checkpoints

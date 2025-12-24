@@ -61,6 +61,7 @@ pub use filesystem::{
     list_directory_contents,
     search_files,
     read_file_content,
+    write_file_content,
     check_file_exists,
     list_anyon_docs,
 };
