@@ -58,6 +58,8 @@ tempfile = "3"
 which = "7"
 sha2 = "0.10"
 zstd = "0.13"
+flate2 = "1.0"
+brotli = "7"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 walkdir = "2"
 serde_yaml = "0.9"

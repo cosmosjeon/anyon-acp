@@ -25,6 +25,7 @@ import { FilePicker } from "./FilePicker";
 import { SlashCommandPicker } from "./SlashCommandPicker";
 import { ImagePreview } from "./ImagePreview";
 import { SelectedComponentsDisplay } from "./preview/SelectedComponentsDisplay";
+import { usePreviewStore } from "@/stores/previewStore";
 import { type FileEntry, type SlashCommand } from "@/lib/api";
 
 // Conditional import for Tauri webview window
@@ -303,6 +304,13 @@ const FloatingPromptInputInner = (
   const [cursorPosition, setCursorPosition] = useState(0);
   const [embeddedImages, setEmbeddedImages] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
+
+  // Preview store - 선택된 요소 연동
+  const {
+    selectedElement,
+    clearSelectedComponents,
+    setSelectedElement,
+  } = usePreviewStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -807,6 +815,30 @@ const FloatingPromptInputInner = (
       return;
     }
 
+    // 선택된 UI 요소 정보를 프롬프트에 추가
+    if (selectedElement) {
+      finalPrompt += `\n\n---\n**선택된 UI 요소:**\n`;
+      finalPrompt += `- 태그: \`<${selectedElement.tag}>\`\n`;
+      if (selectedElement.id) {
+        finalPrompt += `- ID: \`${selectedElement.id}\`\n`;
+      }
+      if (selectedElement.selector) {
+        finalPrompt += `- CSS Selector: \`${selectedElement.selector}\`\n`;
+      }
+      if (selectedElement.text) {
+        const truncatedText = selectedElement.text.length > 100
+          ? selectedElement.text.substring(0, 100) + '...'
+          : selectedElement.text;
+        finalPrompt += `- 텍스트: "${truncatedText}"\n`;
+      }
+      if (selectedElement.html) {
+        const truncatedHtml = selectedElement.html.length > 500
+          ? selectedElement.html.substring(0, 500) + '...'
+          : selectedElement.html;
+        finalPrompt += `- HTML:\n\`\`\`html\n${truncatedHtml}\n\`\`\`\n`;
+      }
+    }
+
     // Append thinking phrase if not auto mode
     const thinkingMode = THINKING_MODES.find(m => m.id === selectedThinkingMode);
     if (thinkingMode?.phrase) {
@@ -818,6 +850,12 @@ const FloatingPromptInputInner = (
       setPrompt("");
       setEmbeddedImages([]);
       setTextareaHeight(48); // Reset height after sending
+
+      // 전송 후 선택된 요소 초기화
+      if (selectedElement) {
+        clearSelectedComponents();
+        setSelectedElement(null);
+      }
     } catch (err) {
       console.error('[FloatingPromptInput] Failed to send prompt:', err);
     }

@@ -18,15 +18,18 @@ declare global {
   }
 }
 
-// Environment detection
+// Environment detection - check on each call since Tauri IPC may not be ready immediately
 let isTauriEnvironment: boolean | null = null;
+let detectionAttempts = 0;
 
 /**
  * Detect if we're running in Tauri environment
+ * Re-checks if previous detection returned false (IPC might not be ready yet)
  */
 function detectEnvironment(): boolean {
-  if (isTauriEnvironment !== null) {
-    return isTauriEnvironment;
+  // If we already detected Tauri, return true
+  if (isTauriEnvironment === true) {
+    return true;
   }
 
   // Check if we're in a browser environment first
@@ -49,15 +52,24 @@ function detectEnvironment(): boolean {
      window.location.protocol.startsWith('tauri'))
   );
 
-  console.log('[detectEnvironment] isTauri:', isTauri);
-  console.log('[detectEnvironment] __TAURI__:', !!window.__TAURI__);
-  console.log('[detectEnvironment] __TAURI_METADATA__:', !!window.__TAURI_METADATA__);
-  console.log('[detectEnvironment] __TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__);
-  console.log('[detectEnvironment] userAgent:', navigator.userAgent);
-  console.log('[detectEnvironment] protocol:', window.location.protocol);
-  console.log('[detectEnvironment] hostname:', window.location.hostname);
+  // Only log on first few attempts to avoid console spam
+  if (detectionAttempts < 3) {
+    console.log('[detectEnvironment] isTauri:', isTauri);
+    console.log('[detectEnvironment] __TAURI__:', !!window.__TAURI__);
+    console.log('[detectEnvironment] __TAURI_METADATA__:', !!window.__TAURI_METADATA__);
+    console.log('[detectEnvironment] __TAURI_INTERNALS__:', !!window.__TAURI_INTERNALS__);
+    console.log('[detectEnvironment] userAgent:', navigator.userAgent);
+    console.log('[detectEnvironment] protocol:', window.location.protocol);
+    console.log('[detectEnvironment] hostname:', window.location.hostname);
+    detectionAttempts++;
+  }
 
-  isTauriEnvironment = isTauri;
+  // Only cache if we detected Tauri - otherwise re-check next time
+  // This handles the case where Tauri IPC isn't ready on first page load
+  if (isTauri) {
+    isTauriEnvironment = true;
+  }
+
   return isTauri;
 }
 
@@ -143,28 +155,36 @@ async function restApiCall<T>(endpoint: string, params?: any): Promise<T> {
  * Unified API adapter that works in both Tauri and web environments
  */
 export async function apiCall<T>(command: string, params?: any): Promise<T> {
-  const isWeb = !detectEnvironment();
-  
-  if (!isWeb) {
-    // Tauri environment - try invoke
+  const isTauri = detectEnvironment();
+
+  // Special handling for commands that use streaming/events
+  const streamingCommands = ['execute_claude_code', 'continue_claude_code', 'resume_claude_code'];
+  const isStreamingCommand = streamingCommands.includes(command);
+
+  if (isTauri) {
+    // Tauri environment - use invoke
     console.log(`[Tauri] Calling: ${command}`, params);
     try {
       return await invoke<T>(command, params);
     } catch (error) {
+      // For streaming commands, don't fall back to WebSocket in Tauri mode
+      // WebSocket server only exists in pure web mode (web_server.rs)
+      if (isStreamingCommand) {
+        console.error(`[Tauri] Streaming command failed:`, error);
+        throw error;
+      }
       console.warn(`[Tauri] invoke failed, falling back to web mode:`, error);
-      // Fall through to web mode
+      // Fall through to web mode for non-streaming commands
     }
   }
-  
+
   // Web environment - use REST API
   console.log(`[Web] Calling: ${command}`, params);
-  
-  // Special handling for commands that use streaming/events
-  const streamingCommands = ['execute_claude_code', 'continue_claude_code', 'resume_claude_code'];
-  if (streamingCommands.includes(command)) {
+
+  if (isStreamingCommand) {
     return handleStreamingCommand<T>(command, params);
   }
-  
+
   // Map Tauri commands to REST endpoints
   const endpoint = mapCommandToEndpoint(command, params);
   return await restApiCall<T>(endpoint, params);

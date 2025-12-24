@@ -26,6 +26,7 @@ import {
 } from '@/lib/icons';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,7 +120,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   // 메시지 훅
   usePreviewMessages();
   const { isSelectorActive, isComponentSelectorInitialized } = useComponentSelectorShortcut();
-  const { startDevServer, stopDevServer } = useDevServer(projectPath, projectId);
+  const { startDevServer, stopDevServer, connectToExistingServer } = useDevServer(projectPath, projectId);
 
   // 로컬 상태
   const [sourceMode, setSourceMode] = useState<'port' | 'file'>(htmlFilePath ? 'file' : 'port');
@@ -128,8 +129,18 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const [urlPath] = useState('/');
   const [currentFilePath, setCurrentFilePath] = useState<string>(htmlFilePath || '');
   const [currentUrl, setCurrentUrl] = useState('');
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [manualPort, setManualPort] = useState<string>('');
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Ref callback - iframe 마운트/언마운트 시 항상 호출됨 (서버 모드 호환)
+  const handleIframeRef = useCallback((iframe: HTMLIFrameElement | null) => {
+    iframeRef.current = iframe;
+    setIframeRef(iframe);
+    if (iframe) {
+      console.log('[Preview] iframe ref set to store');
+    }
+  }, [setIframeRef]);
 
   // 디바이스 모드 상태
   const [isDeviceMode, setIsDeviceMode] = useState(false);
@@ -162,13 +173,6 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     // 서버 모드로 전환 시 devServerProxyUrl이 있으면 effectiveUrl에서 자동으로 사용됨
   };
 
-  // iframe ref 등록
-  useEffect(() => {
-    if (iframeRef.current) {
-      setIframeRef(iframeRef.current);
-    }
-    return () => setIframeRef(null);
-  }, [setIframeRef]);
 
   // HTML 파일 로드
   useEffect(() => {
@@ -478,6 +482,29 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     clearPreviewError();
   }, [onAIFix, clearPreviewError]);
 
+  // 수동 포트 연결 핸들러
+  const handleConnectManualPort = useCallback(async (port: number) => {
+    if (!port || port < 1 || port > 65535) {
+      addAppOutput({
+        type: 'stderr',
+        message: '[anyon] 유효한 포트 번호를 입력해주세요 (1-65535)',
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+      return;
+    }
+
+    const success = await connectToExistingServer(port);
+    if (!success) {
+      addAppOutput({
+        type: 'stderr',
+        message: `[anyon] 포트 ${port}에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.`,
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+    }
+  }, [connectToExistingServer, addAppOutput, projectPath]);
+
   const { width, height } = getDeviceDimensions();
   const hasContent = currentUrl || (sourceMode === 'port' && ports.some((p) => p.alive));
   const problemCount = problemReport?.problems?.length || 0;
@@ -577,15 +604,45 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
             {/* CTA 버튼 */}
             {sourceMode === 'port' && !devServerRunning && !isLoading && (
-              <Button
-                onClick={startDevServer}
-                disabled={!projectPath}
-                size="lg"
-                className="gap-2"
-              >
-                <Play className="w-4 h-4" />
-                {previewError ? '다시 시도' : '서버 시작'}
-              </Button>
+              <div className="flex flex-col gap-3">
+                {/* 자동 서버 시작 버튼 */}
+                <Button
+                  onClick={startDevServer}
+                  disabled={!projectPath}
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  {previewError ? '다시 시도' : '서버 시작'}
+                </Button>
+
+                {/* 구분선 */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-px flex-1 bg-border" />
+                  <span>또는</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                {/* 수동 포트 연결 */}
+                <div className="flex gap-2 justify-center">
+                  <Input
+                    type="number"
+                    placeholder="포트 (예: 3000)"
+                    value={manualPort}
+                    onChange={(e) => setManualPort(e.target.value)}
+                    className="w-28 text-center"
+                    min={1}
+                    max={65535}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => handleConnectManualPort(parseInt(manualPort))}
+                    disabled={!manualPort || !projectPath}
+                  >
+                    연결
+                  </Button>
+                </div>
+              </div>
             )}
 
             {sourceMode === 'file' && !isLoading && (
@@ -643,7 +700,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
               }}
             >
               <iframe
-                ref={iframeRef}
+                ref={handleIframeRef}
                 src={effectiveUrl}
                 className="border-0 bg-white rounded-lg"
                 style={{ width: `${width}px`, height: `${height}px`, display: 'block' }}
@@ -664,7 +721,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         />
 
         <iframe
-          ref={iframeRef}
+          ref={handleIframeRef}
           src={effectiveUrl}
           className="w-full h-full border-0"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

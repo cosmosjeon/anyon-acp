@@ -56,15 +56,24 @@ export function useDevServer(
 
       // 프록시 서버 시작 (Element Selector 스크립트 주입용)
       try {
+        console.log('[DevServer] Attempting to start proxy for port:', port);
         proxyUrl = await invoke<string>('connect_to_existing_server', {
           projectPath,
           port,
         });
-        console.log('[DevServer] Proxy server started:', proxyUrl);
+        console.log('[DevServer] Proxy server started successfully:', proxyUrl);
       } catch (proxyErr) {
-        console.log('[DevServer] Proxy setup failed, using direct connection:', proxyErr);
+        console.error('[DevServer] Proxy setup failed:', proxyErr);
+        console.error('[DevServer] Error details:', JSON.stringify(proxyErr));
         // 프록시 실패 시 직접 연결 (요소 선택 기능 불가)
         proxyUrl = `http://localhost:${port}`;
+
+        addAppOutput({
+          type: 'stderr',
+          message: `[anyon] Proxy setup failed: ${proxyErr}. Element selector will not work.`,
+          timestamp: Date.now(),
+          projectPath: projectPath || '',
+        });
       }
 
       // 프록시 URL 또는 직접 URL로 연결 설정

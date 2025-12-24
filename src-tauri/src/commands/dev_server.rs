@@ -351,16 +351,282 @@ const ELEMENT_SELECTOR_SCRIPT: &str = r####"
 "####;
 
 // ============================================================================
-// Proxy Server Implementation
+// Proxy Server Implementation (Rewritten for chunked/compression support)
 // ============================================================================
 
+use std::io::{BufRead, BufReader};
+use flate2::read::{GzDecoder, DeflateDecoder};
+use brotli::Decompressor;
+
+/// Parsed HTTP response with full support for chunked encoding and compression
+struct HttpResponse {
+    status_code: u16,
+    headers: HashMap<String, String>,
+    body: Vec<u8>,
+    is_chunked: bool,
+    content_encoding: Option<String>,
+}
+
+impl HttpResponse {
+    fn get_header(&self, name: &str) -> Option<&String> {
+        let lower_name = name.to_lowercase();
+        self.headers.iter()
+            .find(|(k, _)| k.to_lowercase() == lower_name)
+            .map(|(_, v)| v)
+    }
+}
+
+/// Read complete HTTP response with chunked encoding support
+fn read_full_response(stream: &mut TcpStream) -> std::io::Result<HttpResponse> {
+    stream.set_read_timeout(Some(Duration::from_secs(30)))?;
+
+    let mut reader = BufReader::new(stream.try_clone()?);
+
+    // 1. Read status line
+    let mut status_line = String::new();
+    reader.read_line(&mut status_line)?;
+
+    let status_code = status_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(200);
+
+    // 2. Read headers until empty line
+    let mut headers = HashMap::new();
+    let mut is_chunked = false;
+    let mut content_length: Option<usize> = None;
+    let mut content_encoding: Option<String> = None;
+
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+
+        if let Some(colon_pos) = trimmed.find(':') {
+            let key = trimmed[..colon_pos].trim().to_string();
+            let value = trimmed[colon_pos + 1..].trim().to_string();
+            let lower_key = key.to_lowercase();
+
+            if lower_key == "transfer-encoding" && value.to_lowercase().contains("chunked") {
+                is_chunked = true;
+            }
+            if lower_key == "content-length" {
+                content_length = value.parse().ok();
+            }
+            if lower_key == "content-encoding" {
+                content_encoding = Some(value.to_lowercase());
+            }
+
+            headers.insert(key, value);
+        }
+    }
+
+    // 3. Read body based on transfer encoding
+    let body = if is_chunked {
+        read_chunked_body(&mut reader)?
+    } else if let Some(len) = content_length {
+        let mut body = vec![0u8; len];
+        reader.read_exact(&mut body)?;
+        body
+    } else {
+        // No content-length, read until connection closes (with limit)
+        let mut body = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            match reader.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(n) => {
+                    body.extend_from_slice(&chunk[..n]);
+                    if body.len() > 5_000_000 { // 5MB limit
+                        break;
+                    }
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => break,
+                Err(e) => return Err(e),
+            }
+        }
+        body
+    };
+
+    log::debug!("Proxy: Read response - status={}, chunked={}, encoding={:?}, body_len={}",
+        status_code, is_chunked, content_encoding, body.len());
+
+    Ok(HttpResponse {
+        status_code,
+        headers,
+        body,
+        is_chunked,
+        content_encoding,
+    })
+}
+
+/// Read chunked transfer encoding body
+fn read_chunked_body(reader: &mut BufReader<TcpStream>) -> std::io::Result<Vec<u8>> {
+    let mut body = Vec::new();
+
+    loop {
+        // Read chunk size line
+        let mut size_line = String::new();
+        reader.read_line(&mut size_line)?;
+
+        let chunk_size = usize::from_str_radix(size_line.trim(), 16).unwrap_or(0);
+
+        if chunk_size == 0 {
+            // Read trailing CRLF after last chunk
+            let mut trailer = String::new();
+            let _ = reader.read_line(&mut trailer);
+            break;
+        }
+
+        // Read chunk data
+        let mut chunk = vec![0u8; chunk_size];
+        reader.read_exact(&mut chunk)?;
+        body.extend_from_slice(&chunk);
+
+        // Read CRLF after chunk
+        let mut crlf = [0u8; 2];
+        reader.read_exact(&mut crlf)?;
+
+        // Safety limit
+        if body.len() > 5_000_000 {
+            break;
+        }
+    }
+
+    Ok(body)
+}
+
+/// Decompress response body if compressed
+fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
+    let Some(enc) = encoding else {
+        return body.to_vec();
+    };
+
+    match enc {
+        "gzip" | "x-gzip" => {
+            let mut decoder = GzDecoder::new(body);
+            let mut decompressed = Vec::new();
+            if decoder.read_to_end(&mut decompressed).is_ok() {
+                log::debug!("Proxy: Decompressed gzip {} -> {} bytes", body.len(), decompressed.len());
+                decompressed
+            } else {
+                log::warn!("Proxy: Failed to decompress gzip, using raw body");
+                body.to_vec()
+            }
+        }
+        "deflate" => {
+            let mut decoder = DeflateDecoder::new(body);
+            let mut decompressed = Vec::new();
+            if decoder.read_to_end(&mut decompressed).is_ok() {
+                log::debug!("Proxy: Decompressed deflate {} -> {} bytes", body.len(), decompressed.len());
+                decompressed
+            } else {
+                log::warn!("Proxy: Failed to decompress deflate, using raw body");
+                body.to_vec()
+            }
+        }
+        "br" => {
+            let mut decoder = Decompressor::new(body, 4096);
+            let mut decompressed = Vec::new();
+            if decoder.read_to_end(&mut decompressed).is_ok() {
+                log::debug!("Proxy: Decompressed brotli {} -> {} bytes", body.len(), decompressed.len());
+                decompressed
+            } else {
+                log::warn!("Proxy: Failed to decompress brotli, using raw body");
+                body.to_vec()
+            }
+        }
+        _ => {
+            log::debug!("Proxy: Unknown encoding '{}', using raw body", enc);
+            body.to_vec()
+        }
+    }
+}
+
+/// Check if response should have script injected
+fn should_inject_script(response: &HttpResponse, path: &str) -> bool {
+    // Only inject into 200 OK responses
+    if response.status_code != 200 {
+        log::debug!("Proxy: Skipping injection - status code {}", response.status_code);
+        return false;
+    }
+
+    // Check Content-Type header (case-insensitive)
+    if let Some(ct) = response.get_header("content-type") {
+        let ct_lower = ct.to_lowercase();
+        if ct_lower.contains("text/html") {
+            log::debug!("Proxy: Injection needed - Content-Type is text/html");
+            return true;
+        }
+        // Skip if explicitly not HTML
+        if ct_lower.contains("application/json")
+            || ct_lower.contains("text/css")
+            || ct_lower.contains("text/javascript")
+            || ct_lower.contains("application/javascript")
+            || ct_lower.contains("image/")
+            || ct_lower.contains("font/")
+        {
+            log::debug!("Proxy: Skipping injection - Content-Type is {}", ct);
+            return false;
+        }
+    }
+
+    // Path-based inference
+    if path.ends_with('/') || path.ends_with(".html") || path.ends_with(".htm") {
+        log::debug!("Proxy: Injection likely needed - path suggests HTML: {}", path);
+        return true;
+    }
+
+    // Skip known non-HTML paths
+    let skip_extensions = [".js", ".css", ".json", ".map", ".png", ".jpg", ".jpeg",
+                          ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot"];
+    for ext in &skip_extensions {
+        if path.ends_with(ext) {
+            log::debug!("Proxy: Skipping injection - path extension: {}", ext);
+            return false;
+        }
+    }
+
+    // For paths without extension, check body content (after decompression)
+    !path.contains('.') || path.ends_with('/')
+}
+
+/// Inject script into HTML, preferring </body> position
 fn inject_html(html: &str) -> String {
     let script_tag = format!("<script>{}</script>", ELEMENT_SELECTOR_SCRIPT);
+    let html_lower = html.to_lowercase();
 
-    // Try to inject after <head>
-    if let Some(pos) = html.to_lowercase().find("<head") {
+    // Prefer injecting before </body> - ensures document.body exists
+    if let Some(pos) = html_lower.find("</body>") {
+        log::debug!("Proxy: Injecting script before </body>");
+        let mut result = String::with_capacity(html.len() + script_tag.len());
+        result.push_str(&html[..pos]);
+        result.push_str(&script_tag);
+        result.push_str(&html[pos..]);
+        return result;
+    }
+
+    // Fallback: before </html>
+    if let Some(pos) = html_lower.find("</html>") {
+        log::debug!("Proxy: Injecting script before </html>");
+        let mut result = String::with_capacity(html.len() + script_tag.len());
+        result.push_str(&html[..pos]);
+        result.push_str(&script_tag);
+        result.push_str(&html[pos..]);
+        return result;
+    }
+
+    // Fallback: after <head>
+    if let Some(pos) = html_lower.find("<head") {
         if let Some(end_pos) = html[pos..].find('>') {
             let inject_pos = pos + end_pos + 1;
+            log::debug!("Proxy: Injecting script after <head>");
             let mut result = String::with_capacity(html.len() + script_tag.len());
             result.push_str(&html[..inject_pos]);
             result.push_str(&script_tag);
@@ -369,12 +635,41 @@ fn inject_html(html: &str) -> String {
         }
     }
 
-    // Fallback: prepend to entire document
-    format!("{}\n{}", script_tag, html)
+    // Last resort: append to end
+    log::debug!("Proxy: Injecting script at end of document");
+    format!("{}{}", html, script_tag)
 }
 
-fn is_html_response(headers: &str) -> bool {
-    headers.to_lowercase().contains("content-type: text/html")
+/// Build HTTP response bytes with proper headers
+fn build_response(status_code: u16, headers: &HashMap<String, String>, body: &[u8]) -> Vec<u8> {
+    let status_text = match status_code {
+        200 => "OK",
+        304 => "Not Modified",
+        404 => "Not Found",
+        500 => "Internal Server Error",
+        _ => "OK",
+    };
+
+    let mut response = format!("HTTP/1.1 {} {}\r\n", status_code, status_text);
+
+    // Add headers (excluding content-length and transfer-encoding, we'll set our own)
+    for (key, value) in headers {
+        let lower_key = key.to_lowercase();
+        if lower_key != "content-length"
+            && lower_key != "transfer-encoding"
+            && lower_key != "content-encoding" // Remove compression since we decompressed
+        {
+            response.push_str(&format!("{}: {}\r\n", key, value));
+        }
+    }
+
+    // Set new content-length
+    response.push_str(&format!("Content-Length: {}\r\n", body.len()));
+    response.push_str("\r\n");
+
+    let mut bytes = response.into_bytes();
+    bytes.extend_from_slice(body);
+    bytes
 }
 
 fn handle_proxy_connection(
@@ -386,7 +681,7 @@ fn handle_proxy_connection(
     client_stream.set_write_timeout(Some(Duration::from_secs(30)))?;
 
     // Read client request
-    let mut request_buffer = vec![0u8; 8192];
+    let mut request_buffer = vec![0u8; 16384]; // Increased buffer for larger requests
     let bytes_read = client_stream.read(&mut request_buffer)?;
     if bytes_read == 0 {
         return Ok(());
@@ -396,72 +691,102 @@ fn handle_proxy_connection(
     // Parse request to get path
     let first_line = request.lines().next().unwrap_or("");
     let parts: Vec<&str> = first_line.split_whitespace().collect();
-    let path = parts.get(1).unwrap_or(&"/");
+    let path = parts.get(1).unwrap_or(&"/").to_string();
+
+    log::debug!("Proxy: Handling request for path: {}", path);
 
     // Connect to target server
     let target_addr = format!("{}:{}", target_host, target_port);
-    let mut target_stream = TcpStream::connect(&target_addr)?;
+    let mut target_stream = match TcpStream::connect(&target_addr) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Proxy: Failed to connect to target {}:{} - {}", target_host, target_port, e);
+            // Send 502 Bad Gateway
+            let error_response = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n";
+            let _ = client_stream.write_all(error_response.as_bytes());
+            return Ok(());
+        }
+    };
     target_stream.set_read_timeout(Some(Duration::from_secs(30)))?;
     target_stream.set_write_timeout(Some(Duration::from_secs(30)))?;
 
-    // Forward request (modify Host header)
+    // Forward request (modify Host header for proper routing)
     let modified_request = request.replace(
         &format!("Host: localhost:{}", target_port + 10000),
         &format!("Host: {}:{}", target_host, target_port),
     );
-    target_stream.write_all(modified_request.as_bytes())?;
 
-    // Read response
-    let mut response_buffer = Vec::new();
-    let mut chunk = [0u8; 4096];
-    loop {
-        match target_stream.read(&mut chunk) {
-            Ok(0) => break,
-            Ok(n) => response_buffer.extend_from_slice(&chunk[..n]),
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
-            Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => break,
-            Err(e) => return Err(e),
+    // Also request no compression so we don't need to decompress (simpler approach)
+    // But we still support decompression as a fallback
+    let request_with_encoding = if modified_request.to_lowercase().contains("accept-encoding:") {
+        // Remove accept-encoding to avoid compressed responses
+        let re = regex::Regex::new(r"(?i)accept-encoding:[^\r\n]*\r\n").unwrap();
+        re.replace(&modified_request, "Accept-Encoding: identity\r\n").to_string()
+    } else {
+        modified_request.to_string()
+    };
+
+    target_stream.write_all(request_with_encoding.as_bytes())?;
+
+    // Read complete response using new chunked-aware parser
+    let response = match read_full_response(&mut target_stream) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("Proxy: Failed to read response for {} - {}", path, e);
+            // Send 502 Bad Gateway
+            let error_response = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n";
+            let _ = client_stream.write_all(error_response.as_bytes());
+            return Ok(());
         }
-        // Check if we have complete response
-        if response_buffer.len() > 1000000 {
-            break; // Limit response size
-        }
-    }
+    };
 
-    // Check if this is an HTML response that needs injection
-    let response_str = String::from_utf8_lossy(&response_buffer);
-    let needs_injection = path.ends_with('/')
-        || path.ends_with(".html")
-        || !path.contains('.')
-        || is_html_response(&response_str);
+    // Check if we should inject script
+    if should_inject_script(&response, &path) {
+        // Decompress body if needed
+        let decompressed_body = decompress_body(
+            &response.body,
+            response.content_encoding.as_deref(),
+        );
 
-    if needs_injection && response_str.contains("<!DOCTYPE") || response_str.contains("<html") {
-        // Parse headers and body
-        if let Some(header_end) = response_str.find("\r\n\r\n") {
-            let headers = &response_str[..header_end];
-            let body = &response_str[header_end + 4..];
+        // Convert to string for HTML manipulation
+        let body_str = String::from_utf8_lossy(&decompressed_body);
 
-            // Inject script into body
-            let modified_body = inject_html(body);
+        // Verify it's actually HTML by checking content
+        let body_lower = body_str.to_lowercase();
+        if body_lower.contains("<!doctype") || body_lower.contains("<html") || body_lower.contains("<head") {
+            log::info!("Proxy: Injecting element selector script into HTML response for path: {}", path);
 
-            // Rebuild response with correct content-length
-            let new_length = modified_body.len();
-            let modified_headers = if headers.to_lowercase().contains("content-length") {
-                // Replace content-length
-                let re = regex::Regex::new(r"(?i)content-length:\s*\d+").unwrap();
-                re.replace(headers, format!("Content-Length: {}", new_length)).to_string()
-            } else {
-                format!("{}\r\nContent-Length: {}", headers, new_length)
-            };
+            // Inject script
+            let modified_body = inject_html(&body_str);
+            let modified_bytes = modified_body.as_bytes();
 
-            let final_response = format!("{}\r\n\r\n{}", modified_headers, modified_body);
-            client_stream.write_all(final_response.as_bytes())?;
+            log::debug!("Proxy: Script injection complete, body size: {} -> {}", decompressed_body.len(), modified_bytes.len());
+
+            // Build and send response
+            let final_response = build_response(response.status_code, &response.headers, modified_bytes);
+            client_stream.write_all(&final_response)?;
         } else {
-            client_stream.write_all(&response_buffer)?;
+            // Not HTML content, forward decompressed body
+            log::debug!("Proxy: Path suggested HTML but content is not HTML: {}", path);
+            let final_response = build_response(response.status_code, &response.headers, &decompressed_body);
+            client_stream.write_all(&final_response)?;
         }
     } else {
-        // Forward response as-is
-        client_stream.write_all(&response_buffer)?;
+        // Forward response as-is (but handle potential decompression for consistency)
+        if response.content_encoding.is_some() {
+            // Decompress and forward without compression
+            let decompressed = decompress_body(&response.body, response.content_encoding.as_deref());
+            let final_response = build_response(response.status_code, &response.headers, &decompressed);
+            client_stream.write_all(&final_response)?;
+        } else if response.is_chunked {
+            // Was chunked, rebuild as content-length
+            let final_response = build_response(response.status_code, &response.headers, &response.body);
+            client_stream.write_all(&final_response)?;
+        } else {
+            // Forward original response as-is (already have Content-Length)
+            let final_response = build_response(response.status_code, &response.headers, &response.body);
+            client_stream.write_all(&final_response)?;
+        }
     }
 
     Ok(())
@@ -824,16 +1149,34 @@ pub async fn connect_to_existing_server(
     project_path: String,
     port: u16,
 ) -> Result<String, String> {
-    log::info!("Connecting to existing server at port {} for: {}", port, project_path);
+    log::info!("connect_to_existing_server: port={}, project_path={}", port, project_path);
 
-    // Check if port is actually in use
-    if TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok() {
-        return Err(format!("No server running on port {}", port));
+    // Check if port is actually in use by trying to connect to it
+    // If connect succeeds, a server is running on that port
+    match TcpStream::connect_timeout(
+        &format!("127.0.0.1:{}", port).parse().unwrap(),
+        Duration::from_millis(500),
+    ) {
+        Ok(_) => {
+            log::info!("connect_to_existing_server: Port {} is in use (connect succeeded)", port);
+        }
+        Err(e) => {
+            log::warn!("connect_to_existing_server: Port {} is NOT in use (connect failed: {})", port, e);
+            return Err(format!("No server running on port {}", port));
+        }
     }
 
     // Find available proxy port
-    let proxy_port = find_available_port(port + 10000)
-        .ok_or_else(|| "Could not find available port for proxy".to_string())?;
+    let proxy_port = match find_available_port(port + 10000) {
+        Some(p) => {
+            log::info!("connect_to_existing_server: Found proxy port {}", p);
+            p
+        }
+        None => {
+            log::error!("connect_to_existing_server: Could not find available proxy port");
+            return Err("Could not find available port for proxy".to_string());
+        }
+    };
 
     let stop_flag = Arc::new(Mutex::new(false));
 
@@ -860,12 +1203,14 @@ pub async fn connect_to_existing_server(
     }
 
     // Start proxy server
+    log::info!("connect_to_existing_server: Starting proxy server on port {} -> {}", proxy_port, port);
     let proxy_stop = stop_flag.clone();
     thread::spawn(move || {
         run_proxy_server(proxy_port, "localhost".to_string(), port, proxy_stop);
     });
 
     let proxy_url = format!("http://localhost:{}", proxy_port);
+    log::info!("connect_to_existing_server: Proxy URL = {}", proxy_url);
 
     // Notify frontend
     let _ = app.emit("dev-server-output", DevServerOutput {
@@ -877,5 +1222,6 @@ pub async fn connect_to_existing_server(
     });
 
     // Return proxy URL for immediate use
+    log::info!("connect_to_existing_server: Success, returning proxy URL");
     Ok(proxy_url)
 }
