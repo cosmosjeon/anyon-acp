@@ -11,6 +11,16 @@ import type {
   ParsedRoute,
 } from '@/types/preview';
 
+// 연결 상태 타입 정의
+export type ConnectionState =
+  | 'disconnected'      // 연결 안됨
+  | 'starting'          // 서버 시작 중
+  | 'port-detected'     // 포트 감지됨
+  | 'connecting'        // 프록시 연결 중
+  | 'verifying'         // 연결 검증 중
+  | 'connected'         // 실제 연결됨 ✓
+  | 'error';            // 연결 실패
+
 interface PreviewState {
   // 프리뷰 모드
   previewMode: PreviewMode;
@@ -57,6 +67,13 @@ interface PreviewState {
   devServerPort: number | null;
   devServerProxyUrl: string | null;
   packageManager: string | null;
+
+  // 채팅에서 감지된 포트들
+  detectedPorts: Array<{ port: number; timestamp: number; source: string }>;
+
+  // 연결 상태 (세분화)
+  connectionState: ConnectionState;
+  connectionError: string | null;
 
   // Actions
   setPreviewMode: (mode: PreviewMode) => void;
@@ -105,6 +122,16 @@ interface PreviewState {
   setDevServerProxyUrl: (url: string | null) => void;
   setPackageManager: (pm: string | null) => void;
 
+  // 감지된 포트 관련
+  addDetectedPort: (port: number, source: string) => void;
+  getLatestDetectedPort: () => number | null;
+  clearDetectedPorts: () => void;
+
+  // 연결 상태 관련
+  setConnectionState: (state: ConnectionState) => void;
+  setConnectionError: (error: string | null) => void;
+  resetConnection: () => void;
+
   // iframe 메시지 전송
   postMessageToIframe: (message: { type: string; [key: string]: unknown }) => void;
 
@@ -140,6 +167,9 @@ const previewStore: StateCreator<
   devServerPort: null,
   devServerProxyUrl: null,
   packageManager: null,
+  detectedPorts: [],
+  connectionState: 'disconnected',
+  connectionError: null,
 
   // 프리뷰 모드 설정
   setPreviewMode: (mode) => set({ previewMode: mode }),
@@ -215,6 +245,46 @@ const previewStore: StateCreator<
   setDevServerProxyUrl: (url) => set({ devServerProxyUrl: url, appUrl: url }),
   setPackageManager: (pm) => set({ packageManager: pm }),
 
+  // 감지된 포트 관련
+  addDetectedPort: (port, source) =>
+    set((state) => {
+      // 이미 같은 포트가 있으면 타임스탬프만 업데이트
+      const existingIndex = state.detectedPorts.findIndex((p) => p.port === port);
+      if (existingIndex >= 0) {
+        const updated = [...state.detectedPorts];
+        updated[existingIndex] = { port, timestamp: Date.now(), source };
+        return { detectedPorts: updated };
+      }
+      // 새 포트 추가 (최대 10개 유지)
+      return {
+        detectedPorts: [
+          ...state.detectedPorts,
+          { port, timestamp: Date.now(), source },
+        ].slice(-10),
+      };
+    }),
+
+  getLatestDetectedPort: () => {
+    const { detectedPorts } = get();
+    if (detectedPorts.length === 0) return null;
+    // 가장 최근 타임스탬프의 포트 반환
+    const sorted = [...detectedPorts].sort((a, b) => b.timestamp - a.timestamp);
+    return sorted[0].port;
+  },
+
+  clearDetectedPorts: () => set({ detectedPorts: [] }),
+
+  // 연결 상태 관련
+  setConnectionState: (connectionState) => set({ connectionState }),
+  setConnectionError: (connectionError) => set({ connectionError }),
+  resetConnection: () => set({
+    connectionState: 'disconnected',
+    connectionError: null,
+    devServerRunning: false,
+    devServerPort: null,
+    devServerProxyUrl: null,
+  }),
+
   // iframe 메시지 전송
   postMessageToIframe: (message) => {
     const { iframeRef } = get();
@@ -261,3 +331,5 @@ export const selectPreviewError = (state: PreviewState) => state.previewError;
 export const selectSelectedComponents = (state: PreviewState) => state.selectedComponents;
 export const selectProblemReport = (state: PreviewState) => state.problemReport;
 export const selectIsSelectorActive = (state: PreviewState) => state.isSelectorActive;
+export const selectConnectionState = (state: PreviewState) => state.connectionState;
+export const selectConnectionError = (state: PreviewState) => state.connectionError;

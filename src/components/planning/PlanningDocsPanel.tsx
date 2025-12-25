@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
 import { WORKFLOW_SEQUENCE, type WorkflowStep, getWorkflowPrompt } from '@/constants/planning';
 import { PlanningDocViewer } from './PlanningDocViewer';
+import { UXPreviewPanel } from './UXPreviewPanel';
 
 interface PlanningDocsPanelProps {
   projectPath: string | undefined;
@@ -32,6 +33,9 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   const [activeDocId, setActiveDocId] = useState<string>('prd');
   const [activeWorkflows, setActiveWorkflows] = useState<Set<string>>(new Set());
 
+  // 이전 문서 상태 추적용 ref (자동 탭 전환용)
+  const prevDocsRef = React.useRef<typeof documents>([]);
+
   // Clear active workflows when documents are created
   React.useEffect(() => {
     setActiveWorkflows(prev => {
@@ -43,6 +47,28 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       });
       return updated;
     });
+  }, [documents]);
+
+  // 새 문서 생성 시 자동 탭 전환
+  React.useEffect(() => {
+    // 초기 로드 시 스킵
+    if (prevDocsRef.current.length === 0) {
+      prevDocsRef.current = documents;
+      return;
+    }
+
+    // 이전에 없었는데 새로 생긴 문서 찾기
+    const newlyCreatedDoc = documents.find(doc => {
+      const prevDoc = prevDocsRef.current.find(p => p.id === doc.id);
+      return doc.exists && (!prevDoc || !prevDoc.exists);
+    });
+
+    if (newlyCreatedDoc) {
+      console.log('[PlanningDocsPanel] Auto-switching to newly created doc:', newlyCreatedDoc.id);
+      setActiveDocId(newlyCreatedDoc.id);
+    }
+
+    prevDocsRef.current = documents;
   }, [documents]);
 
   const activeDoc = documents.find(d => d.id === activeDocId);
@@ -217,8 +243,16 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       {/* 문서 콘텐츠 영역 */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {activeDoc?.exists && activeDoc.content ? (
-          // 문서 내용 표시
-          <PlanningDocViewer content={activeDoc.content} filename={activeDoc.filename} />
+          // UX Design step uses UXPreviewPanel with element selection
+          activeDocId === 'ux-design' && activeDoc.filename.endsWith('.html') ? (
+            <UXPreviewPanel
+              content={activeDoc.content}
+              projectPath={projectPath}
+            />
+          ) : (
+            // Other documents use simple PlanningDocViewer
+            <PlanningDocViewer content={activeDoc.content} filename={activeDoc.filename} />
+          )
         ) : (
           // 작성 시작 프롬프트
           <div className="flex-1 flex items-center justify-center p-8">

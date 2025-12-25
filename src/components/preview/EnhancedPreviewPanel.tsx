@@ -115,6 +115,9 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     packageManager,
     isLoading,
     setSelectorActive,
+    connectionState,
+    setConnectionState,
+    connectionError,
   } = usePreviewStore();
 
   // 메시지 훅
@@ -151,7 +154,74 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   // 요소 선택 상태
   const [_selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
 
+  // HTML 파일 로드 함수 (useCallback으로 정의)
+  const loadHtmlFile = useCallback(async (filePath: string) => {
+    console.log('[Preview] loadHtmlFile called:', { filePath, isTauri, projectPath });
 
+    if (!filePath?.trim()) {
+      console.warn('[Preview] loadHtmlFile called with empty filePath');
+      return;
+    }
+
+    if (!isTauri) {
+      console.warn('[Preview] Not in Tauri environment, cannot load HTML file directly');
+      addAppOutput({
+        type: 'info',
+        message: `[preview] Tauri 앱에서만 HTML 파일 미리보기가 가능합니다: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+      return;
+    }
+
+    try {
+      const content = await invoke<string>('read_file_content', { filePath });
+
+      if (!content) {
+        console.warn('[Preview] Empty content received from file:', filePath);
+        addAppOutput({
+          type: 'stderr',
+          message: `[preview] File is empty: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
+          timestamp: Date.now(),
+          projectPath: projectPath || '',
+        });
+        return;
+      }
+
+      console.log('[Preview] File content loaded, length:', content.length);
+
+      const injectedContent = injectSelectorScript(content);
+      console.log('[Preview] Selector script injected, new length:', injectedContent.length);
+
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(injectedContent)}`;
+      setCurrentUrl(dataUrl);
+      setConnectionState('connected');
+
+      addAppOutput({
+        type: 'info',
+        message: `[preview] Loaded ${filePath.split(/[/\\]/).pop() || 'file'}`,
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+    } catch (err) {
+      console.error('[Preview] Failed to load HTML file:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setConnectionState('error');
+      addAppOutput({
+        type: 'stderr',
+        message: `[preview] Failed to load HTML file: ${errorMessage}`,
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+    }
+  }, [isTauri, projectPath, addAppOutput]);
+
+  // 파일 연결 해제
+  const disconnectFile = useCallback(() => {
+    setCurrentUrl('');
+    setCurrentFilePath('');
+    setConnectionState('disconnected');
+  }, []);
 
   // 소스 모드 변경 핸들러
   const handleSourceModeChange = (mode: 'port' | 'file') => {
@@ -174,76 +244,15 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   };
 
 
-  // HTML 파일 로드
+  // HTML 파일 자동 로드 (htmlFilePath prop 변경 시)
   useEffect(() => {
-    if (htmlFilePath && htmlFilePath !== currentFilePath) {
+    if (htmlFilePath) {
+      console.log('[Preview] Auto-loading HTML file:', htmlFilePath);
       setCurrentFilePath(htmlFilePath);
       setSourceMode('file');
       loadHtmlFile(htmlFilePath);
     }
-  }, [htmlFilePath]);
-
-  const loadHtmlFile = async (filePath: string) => {
-    console.log('[Preview] loadHtmlFile called:', { filePath, isTauri, projectPath });
-
-    if (!filePath?.trim()) {
-      console.warn('[Preview] loadHtmlFile called with empty filePath');
-      return;
-    }
-
-    if (!isTauri) {
-      console.warn('[Preview] Not in Tauri environment, cannot load HTML file directly');
-      addAppOutput({
-        type: 'info',
-        message: `[preview] Tauri 앱에서만 HTML 파일 미리보기가 가능합니다: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
-        timestamp: Date.now(),
-        projectPath: projectPath || '',
-      });
-      return;
-    }
-
-    try {
-      // 파일 내용 직접 읽기
-      const content = await invoke<string>('read_file_content', { filePath });
-      
-      if (!content) {
-        console.warn('[Preview] Empty content received from file:', filePath);
-        addAppOutput({
-          type: 'stderr',
-          message: `[preview] File is empty: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
-          timestamp: Date.now(),
-          projectPath: projectPath || '',
-        });
-        return;
-      }
-      
-      console.log('[Preview] File content loaded, length:', content.length);
-
-      // 요소 선택기 스크립트 주입
-      const injectedContent = injectSelectorScript(content);
-      console.log('[Preview] Selector script injected, new length:', injectedContent.length);
-
-      // data URL로 변환하여 iframe에서 직접 렌더링
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(injectedContent)}`;
-      setCurrentUrl(dataUrl);
-
-      addAppOutput({
-        type: 'info',
-        message: `[preview] Loading ${filePath.split(/[/\\]/).pop() || 'file'}`,
-        timestamp: Date.now(),
-        projectPath: projectPath || '',
-      });
-    } catch (err) {
-      console.error('[Preview] Failed to load HTML file:', err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      addAppOutput({
-        type: 'stderr',
-        message: `[preview] Failed to load HTML file: ${errorMessage}`,
-        timestamp: Date.now(),
-        projectPath: projectPath || '',
-      });
-    }
-  };
+  }, [htmlFilePath, loadHtmlFile]);
 
   // Dev server 프록시 URL 사용
   useEffect(() => {
@@ -509,12 +518,58 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const hasContent = currentUrl || (sourceMode === 'port' && ports.some((p) => p.alive));
   const problemCount = problemReport?.problems?.length || 0;
 
-  // 서버 상태 텍스트
+  // 서버 상태 텍스트 (connectionState 기반)
   const getServerStatusText = () => {
-    if (isLoading) return '시작 중...';
-    if (devServerRunning && devServerPort) return `localhost:${devServerPort}`;
-    if (sourceMode === 'file' && currentFilePath) return currentFilePath.split(/[/\\]/).pop() || '';
-    return '연결 안됨';
+    if (sourceMode === 'file' && currentFilePath) {
+      return currentFilePath.split(/[/\\]/).pop() || '';
+    }
+
+    switch (connectionState) {
+      case 'starting':
+        return '서버 시작 중...';
+      case 'port-detected':
+        return devServerPort ? `포트 ${devServerPort} 감지됨` : '포트 감지 중...';
+      case 'connecting':
+        return '프록시 연결 중...';
+      case 'verifying':
+        return '연결 확인 중...';
+      case 'connected':
+        return devServerPort ? `localhost:${devServerPort}` : '연결됨';
+      case 'error':
+        return connectionError ? connectionError.substring(0, 30) : '연결 실패';
+      case 'disconnected':
+      default:
+        return '연결 안됨';
+    }
+  };
+
+  // 연결 상태에 따른 배지 표시
+  const getConnectionBadge = () => {
+    if (sourceMode === 'file') {
+      return currentFilePath ? (
+        <StatusBadge variant="success">파일</StatusBadge>
+      ) : (
+        <StatusBadge variant="muted">파일 없음</StatusBadge>
+      );
+    }
+
+    switch (connectionState) {
+      case 'starting':
+        return <StatusBadge variant="warning" pulse>시작중</StatusBadge>;
+      case 'port-detected':
+        return <StatusBadge variant="warning" pulse>포트 감지</StatusBadge>;
+      case 'connecting':
+        return <StatusBadge variant="warning" pulse>연결중</StatusBadge>;
+      case 'verifying':
+        return <StatusBadge variant="warning" pulse>검증중</StatusBadge>;
+      case 'connected':
+        return <StatusBadge variant="success">연결됨</StatusBadge>;
+      case 'error':
+        return <StatusBadge variant="error">에러</StatusBadge>;
+      case 'disconnected':
+      default:
+        return <StatusBadge variant="muted">오프라인</StatusBadge>;
+    }
   };
 
   // 현재 활성 컨텐츠 렌더링
@@ -556,54 +611,68 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
           />
 
           <div className="text-center max-w-sm px-6">
-            {/* 아이콘 컨테이너 */}
+            {/* 아이콘 컨테이너 - connectionState 기반 */}
             <div className={cn(
               "w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center",
-              isLoading 
-                ? "bg-amber-100 dark:bg-amber-900/30" 
-                : previewError
-                  ? "bg-red-100 dark:bg-red-900/30"
-                  : "bg-muted"
+              connectionState === 'error'
+                ? "bg-red-100 dark:bg-red-900/30"
+                : connectionState === 'disconnected'
+                  ? "bg-muted"
+                  : "bg-amber-100 dark:bg-amber-900/30"
             )}>
-              {isLoading ? (
+              {connectionState !== 'disconnected' && connectionState !== 'error' ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
-              ) : previewError ? (
+              ) : connectionState === 'error' ? (
                 <Monitor className="w-8 h-8 text-red-500" />
               ) : (
                 <Monitor className="w-8 h-8 text-muted-foreground" />
               )}
             </div>
 
-            {/* 제목 */}
+            {/* 제목 - connectionState 기반 */}
             <h3 className="text-base font-medium mb-2">
               {sourceMode === 'port'
-                ? isLoading
-                  ? '개발 서버 시작 중...'
-                  : devServerRunning
-                    ? '연결 중...'
-                    : previewError
-                      ? '연결 실패'
-                      : '프리뷰 준비'
+                ? (() => {
+                    switch (connectionState) {
+                      case 'starting': return '개발 서버 시작 중...';
+                      case 'port-detected': return '포트 감지됨';
+                      case 'connecting': return '프록시 연결 중...';
+                      case 'verifying': return '연결 확인 중...';
+                      case 'error': return '연결 실패';
+                      case 'disconnected':
+                      default: return '프리뷰 준비';
+                    }
+                  })()
                 : 'HTML 파일 선택'}
             </h3>
 
-            {/* 설명 */}
+            {/* 설명 - connectionState 기반 */}
             <p className="text-sm text-muted-foreground mb-5">
               {sourceMode === 'port'
-                ? isLoading
-                  ? packageManager 
-                    ? `${packageManager}로 서버를 시작하고 있습니다...`
-                    : '패키지 매니저를 감지하고 있습니다...'
-                  : devServerRunning
-                    ? '개발 서버에 연결하고 있습니다...'
-                    : previewError
-                      ? '개발 서버 시작에 실패했습니다. 다시 시도해주세요.'
-                      : '개발 서버를 시작하면 앱을 미리 볼 수 있습니다.'
+                ? (() => {
+                    switch (connectionState) {
+                      case 'starting':
+                        return packageManager
+                          ? `${packageManager}로 서버를 시작하고 있습니다...`
+                          : '패키지 매니저를 감지하고 있습니다...';
+                      case 'port-detected':
+                        return `포트 ${devServerPort || ''}에서 서버를 감지했습니다.`;
+                      case 'connecting':
+                        return '프록시 서버에 연결하고 있습니다...';
+                      case 'verifying':
+                        return '연결 가능 여부를 확인하고 있습니다...';
+                      case 'error':
+                        return connectionError || '개발 서버 시작에 실패했습니다. 다시 시도해주세요.';
+                      case 'disconnected':
+                      default:
+                        return '개발 서버를 시작하면 앱을 미리 볼 수 있습니다.';
+                    }
+                  })()
                 : '프로젝트의 HTML 파일을 선택하여 미리보기를 시작하세요.'}
             </p>
 
-            {/* CTA 버튼 */}
-            {sourceMode === 'port' && !devServerRunning && !isLoading && (
+            {/* CTA 버튼 - connectionState 기반 */}
+            {sourceMode === 'port' && (connectionState === 'disconnected' || connectionState === 'error') && (
               <div className="flex flex-col gap-3">
                 {/* 자동 서버 시작 버튼 */}
                 <Button
@@ -613,7 +682,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
                   className="gap-2"
                 >
                   <Play className="w-4 h-4" />
-                  {previewError ? '다시 시도' : '서버 시작'}
+                  {connectionState === 'error' ? '다시 시도' : '서버 시작'}
                 </Button>
 
                 {/* 구분선 */}
@@ -645,7 +714,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
               </div>
             )}
 
-            {sourceMode === 'file' && !isLoading && (
+            {sourceMode === 'file' && connectionState === 'disconnected' && (
               <Button
                 onClick={async () => {
                   if (!isTauri) return;
@@ -737,17 +806,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         icon={<Eye className="w-4 h-4" />}
         title="프리뷰"
         subtitle={getServerStatusText()}
-        badge={
-          isLoading ? (
-            <StatusBadge variant="warning" pulse>시작중</StatusBadge>
-          ) : devServerRunning ? (
-            <StatusBadge variant="success">연결됨</StatusBadge>
-          ) : previewError ? (
-            <StatusBadge variant="error">에러</StatusBadge>
-          ) : (
-            <StatusBadge variant="muted">오프라인</StatusBadge>
-          )
-        }
+        badge={getConnectionBadge()}
         actions={
           <div className="flex items-center gap-1">
             {/* 소스 모드 토글 */}
@@ -803,6 +862,19 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
                   시작
                 </Button>
               )
+            )}
+
+            {/* 파일 연결 해제 버튼 */}
+            {sourceMode === 'file' && connectionState === 'connected' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={disconnectFile}
+                className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <Square className="w-3 h-3 mr-1" />
+                연결 해제
+              </Button>
             )}
           </div>
         }

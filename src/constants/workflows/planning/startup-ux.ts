@@ -22,13 +22,6 @@ input_prd: "{output_folder}/prd.md"
 communication_language: "Korean"
 document_output_language: "Korean"
 
-# Skill Requirements
-required_skills:
-  - skill: "frontend-design"
-    trigger: "creating HTML wireframes"
-    mandatory: true
-    description: "와이어프레임 생성 시 반드시 사용 (그레이스케일, 이모지 금지 모드)"
-
 standalone: true
 `;
 
@@ -134,10 +127,39 @@ PRD 기반으로 함께 만들어갈 수 있어요.
 "
 </action>
 
-<action>사용자 응답에 따라:
-- 상세하게 적었으면 → Step 3으로
-- '없어요' 또는 간단하면 → PRD 기반으로 AI가 초안 제시 후 함께 구체화
+<action>사용자 응답 패턴별 처리:
+
+**패턴 1: 상세한 플로우 제공됨**
+→ Store as {{user_core_flow}}
+→ Step 3으로 진행
+
+**패턴 2: '없어요', '모르겠어요', '잘 모르겠어요'**
+→ PRD 기반으로 AI가 핵심 플로우 초안 작성
+→ "PRD를 바탕으로 핵심 플로우를 정리해봤어요:" 형식으로 제시
+→ 사용자 확인 후 Step 4로
+
+**패턴 3: '알아서 해줘', '니가 해줘', '만들어줘', '제작해줘' 등 위임 표현**
+→ PRD에서 핵심 기능 추출
+→ AI가 핵심 플로우 초안 작성:
+  "알겠어요! PRD를 바탕으로 핵심 플로우를 정리해봤어요:
+
+  **{{project_name}} 핵심 유저 플로우:**
+  [PRD core_features 기반으로 플로우 생성]
+
+  이 플로우로 화면을 만들까요?
+  수정하고 싶은 부분이 있으면 말씀해주세요!"
+→ 사용자 확인 후 Step 4로
+
+**패턴 4: 질문/선택지에 대한 답변**
+→ 해당 정보 저장 후 다음 단계 진행
 </action>
+
+<critical>
+절대로 "무엇을 만들어드릴까요?", "어떤 것을 원하시나요?" 등의 질문을 하지 마세요.
+이 워크플로우는 UX Design 단계이며, PRD가 이미 존재합니다.
+사용자가 위임하면 PRD 기반으로 직접 진행하세요.
+현재 Step: UX 설계 진행 중
+</critical>
 
 <action>Store as {{user_core_flow}}</action>
 </step>
@@ -207,12 +229,12 @@ PRD 기반으로 함께 만들어갈 수 있어요.
 - 로딩 상태
 </action>
 
-<critical>USE SKILL: frontend-design (WIREFRAME MODE)
-- NO EMOJIS
-- GRAYSCALE ONLY
-- Simple borders
-- System fonts only
-- Focus on clickable flow
+<critical>WIREFRAME GENERATION RULES:
+- NO EMOJIS anywhere in the HTML
+- GRAYSCALE ONLY: #000, #fff, #333, #666, #999, #ccc, #eee
+- Simple 1px solid borders
+- System fonts only (font-family: -apple-system, BlinkMacSystemFont, sans-serif)
+- Focus on clickable flow and structure
 </critical>
 
 <action>Generate HTML with these requirements:
@@ -327,7 +349,11 @@ ${CHECKLIST}
 - 먼저 mkdir -p 명령으로 출력 폴더를 생성하세요.
 - PRD 문서를 먼저 읽어서 프로젝트 정보를 파악하세요.
 
-지금 바로 Step 1부터 시작하세요.
+<session_awareness>
+이 워크플로우가 처음 시작되면 Step 1부터 진행하세요.
+이미 대화가 진행 중이라면 (이전 assistant 응답이 있다면) 현재 진행 중인 Step을 이어서 계속하세요.
+절대로 처음부터 다시 시작하지 마세요.
+</session_awareness>
 `;
 
 /**

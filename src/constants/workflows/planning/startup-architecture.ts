@@ -1042,7 +1042,11 @@ ${CHECKLIST}
 - 출력 파일은 {project-root}/anyon-docs/planning/architecture.md에 저장하세요.
 - 먼저 PRD, UX Design, TRD 문서를 읽어서 프로젝트 정보를 파악하세요.
 
-지금 바로 Step 0부터 시작하세요.
+<session_awareness>
+이 워크플로우가 처음 시작되면 Step 0부터 진행하세요.
+이미 대화가 진행 중이라면 (이전 assistant 응답이 있다면) 현재 진행 중인 Step을 이어서 계속하세요.
+절대로 처음부터 다시 시작하지 마세요.
+</session_awareness>
 `;
 
 /**

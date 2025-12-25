@@ -29,7 +29,7 @@ use commands::claude::{
     get_project_sessions, get_recently_modified_files, get_session_timeline,
     get_system_prompt, list_checkpoints, list_directory_contents, list_projects,
     list_running_claude_sessions, load_session_history, open_new_session, read_claude_md_file,
-    read_file_content, check_file_exists, list_anyon_docs, restore_checkpoint, resume_claude_code,
+    read_file_content, check_file_exists, get_file_metadata, list_anyon_docs, restore_checkpoint, resume_claude_code,
     run_npx_anyon_agents, check_is_git_repo, init_git_repo, git_add_all, git_commit, git_set_remote, git_push, git_status, git_current_branch, save_claude_md_file, save_claude_settings,
     save_system_prompt, search_files, track_checkpoint_message, track_session_messages,
     update_checkpoint_settings, ClaudeProcessState,
@@ -374,6 +374,7 @@ macro_rules! create_handlers {
             commands::claude::filesystem::read_file_content,
             commands::claude::filesystem::write_file_content,
             commands::claude::filesystem::check_file_exists,
+            commands::claude::filesystem::get_file_metadata,
             commands::claude::filesystem::list_anyon_docs,
             // Claude & Project Management - Checkpoints
             commands::claude::checkpoints::create_checkpoint,
@@ -484,6 +485,8 @@ macro_rules! create_handlers {
             commands::dev_server::get_dev_server_info,
             commands::dev_server::detect_package_manager,
             commands::dev_server::connect_to_existing_server,
+            commands::dev_server::verify_server_connection,
+            commands::dev_server::wait_for_server_ready,
             // Claude Auth
             claude_auth_check,
             claude_auth_open_terminal,

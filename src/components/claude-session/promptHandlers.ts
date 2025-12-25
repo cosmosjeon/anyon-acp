@@ -8,6 +8,8 @@ import { SessionPersistenceService, type TabType } from "@/services/sessionPersi
 import type { Session } from "@/lib/api";
 import type { SelectedElement } from "@/types/preview";
 import { listen as tauriListen } from "@tauri-apps/api/event";
+import { usePreviewStore } from "@/stores/previewStore";
+import { detectPortFromMessage } from "@/lib/portDetection";
 
 type UnlistenFn = () => void;
 
@@ -180,10 +182,20 @@ export function createStreamMessageHandler(
               stack_trace_hash: undefined
             });
           }
+
+          // Detect ports from tool result content (e.g., dev server output)
+          const resultContent = typeof result.content === 'string'
+            ? result.content
+            : (result.content?.text || JSON.stringify(result.content || ''));
+          const detectedPort = detectPortFromMessage(resultContent);
+          if (detectedPort) {
+            console.log('[PortDetection] Detected port from tool result:', detectedPort);
+            usePreviewStore.getState().addDetectedPort(detectedPort, 'claude-tool-result');
+          }
         });
       }
 
-      // Track code blocks generated
+      // Track code blocks generated and detect ports in assistant text
       if (message.type === 'assistant' && message.message?.content) {
         const codeBlocks = message.message.content.filter((c: any) =>
           c.type === 'text' && c.text?.includes('```')
@@ -195,6 +207,17 @@ export function createStreamMessageHandler(
             options.sessionMetrics.current.codeBlocksGenerated += Math.floor(matches / 2);
           });
         }
+
+        // Also detect ports from assistant text (e.g., "Server running at http://localhost:3000")
+        message.message.content.forEach((c: any) => {
+          if (c.type === 'text' && c.text) {
+            const detectedPort = detectPortFromMessage(c.text);
+            if (detectedPort) {
+              console.log('[PortDetection] Detected port from assistant text:', detectedPort);
+              usePreviewStore.getState().addDetectedPort(detectedPort, 'claude-assistant-text');
+            }
+          }
+        });
       }
 
       // Track errors in system messages

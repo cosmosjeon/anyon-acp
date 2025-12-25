@@ -270,6 +270,36 @@ pub async fn check_file_exists(file_path: String) -> Result<bool, String> {
     Ok(path.exists() && path.is_file())
 }
 
+/// 파일 메타데이터 반환 (존재 여부 + 수정 시간)
+#[derive(serde::Serialize)]
+pub struct FileMetadata {
+    pub exists: bool,
+    pub modified: u64,
+}
+
+#[tauri::command]
+pub async fn get_file_metadata(file_path: String) -> Result<Option<FileMetadata>, String> {
+    let path = PathBuf::from(&file_path);
+    if !path.exists() || !path.is_file() {
+        return Ok(None);
+    }
+
+    let metadata = fs::metadata(&path)
+        .map_err(|e| format!("Failed to get metadata: {}", e))?;
+
+    let modified = metadata
+        .modified()
+        .map_err(|e| format!("Failed to get modified time: {}", e))?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("Time error: {}", e))?
+        .as_millis() as u64;
+
+    Ok(Some(FileMetadata {
+        exists: true,
+        modified,
+    }))
+}
+
 #[tauri::command]
 pub async fn list_anyon_docs(project_path: String) -> Result<Vec<String>, String> {
     let docs_path = PathBuf::from(&project_path).join("anyon-docs").join("planning");

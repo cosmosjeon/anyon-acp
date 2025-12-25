@@ -53,8 +53,8 @@ export function useWorkflowPreview({
   const [hasNewPreview, setHasNewPreview] = useState(false);
   const [detectedWorkflowId, setDetectedWorkflowId] = useState<string | null>(null);
 
-  // 이미 감지된 파일들을 추적 (중복 알림 방지)
-  const detectedFilesRef = useRef<Set<string>>(new Set());
+  // 파일별 마지막 수정 시간 추적 (생성 및 업데이트 모두 감지)
+  const fileModifiedRef = useRef<Map<string, number>>(new Map());
   const callbackRef = useRef(onPreviewFileDetected);
 
   // 콜백 ref 업데이트
@@ -70,13 +70,20 @@ export function useWorkflowPreview({
       for (const [workflowId, relativePath] of Object.entries(WORKFLOW_PREVIEW_FILES)) {
         const fullPath = `${projectPath}/${relativePath}`;
 
-        // 파일 존재 여부 확인
-        const exists = await invoke<boolean>('check_file_exists', { filePath: fullPath });
+        // 파일 메타데이터 가져오기 (존재 여부 + 수정 시간)
+        const metadata = await invoke<{ exists: boolean; modified: number } | null>(
+          'get_file_metadata',
+          { filePath: fullPath }
+        );
 
-        if (exists && !detectedFilesRef.current.has(fullPath)) {
-          // 새로 생성된 파일 감지
-          console.log('[useWorkflowPreview] New preview file detected:', fullPath);
-          detectedFilesRef.current.add(fullPath);
+        if (!metadata?.exists) continue;
+
+        const lastModified = fileModifiedRef.current.get(fullPath);
+
+        // 새 파일이거나 수정 시간이 변경됨
+        if (!lastModified || metadata.modified > lastModified) {
+          console.log('[useWorkflowPreview] File changed:', fullPath, 'modified:', metadata.modified);
+          fileModifiedRef.current.set(fullPath, metadata.modified);
 
           setPreviewFilePath(fullPath);
           setDetectedWorkflowId(workflowId);
@@ -102,7 +109,7 @@ export function useWorkflowPreview({
       setPreviewFilePath(null);
       setHasNewPreview(false);
       setDetectedWorkflowId(null);
-      detectedFilesRef.current = new Set();
+      fileModifiedRef.current = new Map();
       return;
     }
 

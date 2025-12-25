@@ -63,6 +63,7 @@ pub use filesystem::{
     read_file_content,
     write_file_content,
     check_file_exists,
+    get_file_metadata,
     list_anyon_docs,
 };
 

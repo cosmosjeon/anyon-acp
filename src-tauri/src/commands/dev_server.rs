@@ -873,8 +873,102 @@ fn detect_dev_server_port(output: &str) -> Option<u16> {
 }
 
 // ============================================================================
+// Health Check Functions
+// ============================================================================
+
+/// Wait for a port to accept TCP connections with timeout
+/// Returns Ok(()) when the port is ready, or Err if timeout is reached
+pub async fn wait_for_port_open(port: u16, timeout_secs: u64) -> Result<(), String> {
+    let start = std::time::Instant::now();
+    let timeout = Duration::from_secs(timeout_secs);
+
+    log::info!("wait_for_port_open: Waiting for port {} to open (timeout: {}s)", port, timeout_secs);
+
+    while start.elapsed() < timeout {
+        match TcpStream::connect_timeout(
+            &format!("127.0.0.1:{}", port).parse().unwrap(),
+            Duration::from_millis(500),
+        ) {
+            Ok(_) => {
+                log::info!("wait_for_port_open: Port {} is now open after {:?}", port, start.elapsed());
+                return Ok(());
+            }
+            Err(_) => {
+                // Port not ready yet, wait and retry
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        }
+    }
+
+    Err(format!("Port {} did not open within {} seconds", port, timeout_secs))
+}
+
+/// Verify HTTP connection by making a GET request
+/// Returns Ok(status_code) on success, Err on failure
+pub async fn verify_http_connection(url: &str, timeout_secs: u64) -> Result<u16, String> {
+    log::info!("verify_http_connection: Checking {}", url);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(timeout_secs))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    match client.get(url).send().await {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            log::info!("verify_http_connection: {} returned status {}", url, status);
+            // Accept any response (even 404) as "server is responding"
+            Ok(status)
+        }
+        Err(e) => {
+            log::warn!("verify_http_connection: {} failed - {}", url, e);
+            Err(format!("Connection to {} failed: {}", url, e))
+        }
+    }
+}
+
+/// Full connection verification: wait for port + verify HTTP
+/// Returns Ok((port, proxy_url)) when fully verified
+pub async fn verify_full_connection(
+    target_port: u16,
+    proxy_url: Option<&str>,
+    port_timeout_secs: u64,
+    http_timeout_secs: u64,
+) -> Result<(), String> {
+    // Step 1: Wait for target port to open
+    wait_for_port_open(target_port, port_timeout_secs).await?;
+
+    // Step 2: Verify HTTP connection through proxy (if available) or directly
+    let check_url = proxy_url
+        .map(|u| u.to_string())
+        .unwrap_or_else(|| format!("http://localhost:{}", target_port));
+
+    // Give a small delay for proxy to be fully ready
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    verify_http_connection(&check_url, http_timeout_secs).await?;
+
+    Ok(())
+}
+
+// ============================================================================
 // Tauri Commands
 // ============================================================================
+
+/// Verify that a server is actually responding
+/// This command can be called from frontend to validate connection
+#[tauri::command]
+pub async fn verify_server_connection(url: String, timeout_secs: Option<u64>) -> Result<u16, String> {
+    let timeout = timeout_secs.unwrap_or(5);
+    verify_http_connection(&url, timeout).await
+}
+
+/// Wait for a port to be ready and return when it's accepting connections
+#[tauri::command]
+pub async fn wait_for_server_ready(port: u16, timeout_secs: Option<u64>) -> Result<(), String> {
+    let timeout = timeout_secs.unwrap_or(30);
+    wait_for_port_open(port, timeout).await
+}
 
 #[tauri::command]
 pub async fn detect_package_manager(project_path: String) -> Result<String, String> {
