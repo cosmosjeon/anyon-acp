@@ -344,7 +344,13 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
   const projectName = project?.path.split('/').pop() || 'Project';
 
-  if (loading) {
+  // Show loading if:
+  // 1. projects are being fetched (loading)
+  // 2. OR projects are loaded but project state hasn't been set yet (race condition fix)
+  //    This prevents ClaudeCodeSession from receiving undefined projectPath on first render
+  const isProjectLoading = loading || (projectId && projects.length > 0 && !project);
+
+  if (isProjectLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -352,7 +358,8 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     );
   }
 
-  if (!project && !loading) {
+  // At this point: loading = false, projects loaded, and project state has been set
+  if (!project) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-muted-foreground">Project not found</p>

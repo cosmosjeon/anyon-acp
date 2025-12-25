@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from "react";
+import { flushSync } from "react-dom";
 
 // Extend window for debug logging
 declare global {
@@ -647,34 +648,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   // Project path selection handled by parent tab controls
 
-  // Expose sendPrompt via ref for external components (e.g., PlanningDocsPanel)
-  useImperativeHandle(ref, () => ({
-    sendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus" = "sonnet") => {
-      handleSendPrompt(prompt, model);
-    },
-    startNewSession: (backendPrompt: string, userMessage?: string) => {
-      // Clear current session and start a new one
-      setMessages([]);
-      setError(null);
-      setIsFirstPrompt(true);
-      setTotalTokens(0);
-
-      // Add display message to UI if provided (for workflow prompts)
-      // userMessage는 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
-      if (userMessage) {
-        addUserMessageToUI({
-          prompt: userMessage,
-          displayText: userMessage,  // displayText로도 저장하여 세션 복원 시 사용
-          setMessages
-        });
-      }
-
-      // Send the backend prompt (full workflow prompt) to Claude
-      handleSendPrompt(backendPrompt, "sonnet", undefined, undefined, undefined, userMessage ? true : false);
-    },
-    isLoading,
-  }), [isLoading]);
-
   const handleSendPrompt = async (
     prompt: string,
     model: "haiku" | "sonnet" | "opus",
@@ -817,6 +790,39 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       hasActiveSessionRef.current = false;
     }
   };
+
+  // Expose sendPrompt via ref for external components (e.g., PlanningDocsPanel)
+  // NOTE: This must be defined AFTER handleSendPrompt to avoid stale closure issues
+  useImperativeHandle(ref, () => ({
+    sendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus" = "sonnet") => {
+      handleSendPrompt(prompt, model);
+    },
+    startNewSession: (backendPrompt: string, userMessage?: string) => {
+      // Clear current session and start a new one
+      // Use flushSync to ensure state updates are applied before calling handleSendPrompt
+      // This prevents race condition where handleSendPrompt sees stale isFirstPrompt value
+      flushSync(() => {
+        setMessages([]);
+        setError(null);
+        setIsFirstPrompt(true);
+        setTotalTokens(0);
+      });
+
+      // Add display message to UI if provided (for workflow prompts)
+      // userMessage는 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
+      if (userMessage) {
+        addUserMessageToUI({
+          prompt: userMessage,
+          displayText: userMessage,  // displayText로도 저장하여 세션 복원 시 사용
+          setMessages
+        });
+      }
+
+      // Send the backend prompt (full workflow prompt) to Claude
+      handleSendPrompt(backendPrompt, "sonnet", undefined, undefined, undefined, userMessage ? true : false);
+    },
+    isLoading,
+  }), [isLoading, handleSendPrompt]);
 
   const handleCancelExecution = async () => {
     if (!claudeSessionId) {

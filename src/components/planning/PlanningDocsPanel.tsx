@@ -271,7 +271,11 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
         <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
           <div
             className="h-full bg-primary rounded-full transition-all duration-300"
-            style={{ width: `${(progress.completed / progress.total) * 100}%` }}
+            style={{
+              width: progress.completed === 0
+                ? '0%'
+                : `${((progress.completed - 1) / (progress.total - 1)) * 100}%`
+            }}
           />
         </div>
       </div>

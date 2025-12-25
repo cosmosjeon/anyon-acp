@@ -668,6 +668,15 @@ export interface CommandExecutionOptions {
 }
 
 export async function executePromptCommand(options: CommandExecutionOptions): Promise<void> {
+  // Log decision-making values for debugging session management
+  console.log('[ClaudeCodeSession] executePromptCommand decision:', {
+    hasEffectiveSession: !!options.effectiveSession,
+    effectiveSessionId: options.effectiveSession?.id,
+    isFirstPrompt: options.isFirstPrompt,
+    executionMode: options.executionMode,
+    decision: (options.effectiveSession && !options.isFirstPrompt) ? 'RESUME' : 'NEW_SESSION'
+  });
+
   // Execute the appropriate command
   // Pass executionMode to use --permission-mode plan when plan mode is selected
   if (options.effectiveSession && !options.isFirstPrompt) {
