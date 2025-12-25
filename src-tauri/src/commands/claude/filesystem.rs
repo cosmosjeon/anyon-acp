@@ -265,9 +265,9 @@ pub async fn write_file_content(file_path: String, content: String) -> Result<()
 }
 
 #[tauri::command]
-pub async fn check_file_exists(file_path: String) -> Result<bool, String> {
-    let path = PathBuf::from(&file_path);
-    Ok(path.exists() && path.is_file())
+pub async fn check_file_exists(path: String) -> Result<bool, String> {
+    let file_path = PathBuf::from(&path);
+    Ok(file_path.exists() && file_path.is_file())
 }
 
 /// 파일 메타데이터 반환 (존재 여부 + 수정 시간)

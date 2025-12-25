@@ -158,8 +158,8 @@
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
-| `ClaudeCodeSession` | ~1000 | Main chat interface |
-| `EnhancedPreviewPanel` | ~500 | Preview with modes |
+| `ClaudeCodeSession` | ~1383 | Main chat interface |
+| `EnhancedPreviewPanel` | ~1041 | Preview with modes, dev server, routing |
 | `AgentExecution` | ~400 | Agent run view |
 | `MCPManager` | ~300 | MCP server management |
 
