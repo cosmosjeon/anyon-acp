@@ -716,7 +716,23 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
     info!("Preparing environment config for: {}", program);
 
     // Collect inherited environment variables
-    let env_vars = get_inherited_env_vars();
+    let mut env_vars = get_inherited_env_vars();
+
+    // First, try to load env vars from ~/.claude/settings.local.json
+    if let Some(claude_env_vars) = get_claude_settings_env_vars() {
+        for (key, value) in claude_env_vars {
+            info!("Injecting env var from Claude settings: {}", key);
+            env_vars.push((key, value));
+        }
+    }
+
+    // If ANTHROPIC_API_KEY is still not set, try to get from keychain
+    if !env_vars.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY") {
+        if let Some(api_key) = get_api_key_from_keychain() {
+            info!("Injecting ANTHROPIC_API_KEY from keychain");
+            env_vars.push(("ANTHROPIC_API_KEY".to_string(), api_key));
+        }
+    }
 
     // Log proxy settings for debugging
     info!("Command will use proxy settings:");
@@ -734,6 +750,71 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
     CommandEnvConfig {
         env_vars,
         modified_path,
+    }
+}
+
+/// Service name for ANYON keychain entries
+const ANYON_SERVICE_NAME: &str = "anyon-claude";
+/// Account name for API key in keychain
+const API_KEY_ACCOUNT: &str = "anthropic_api_key";
+
+/// Get environment variables from ~/.claude/settings.local.json
+fn get_claude_settings_env_vars() -> Option<Vec<(String, String)>> {
+    use std::fs;
+
+    let home = dirs::home_dir()?;
+    let settings_path = home.join(".claude").join("settings.local.json");
+
+    if !settings_path.exists() {
+        debug!("No Claude settings file found at {:?}", settings_path);
+        return None;
+    }
+
+    let content = fs::read_to_string(&settings_path).ok()?;
+    let settings: serde_json::Value = serde_json::from_str(&content).ok()?;
+
+    let env_obj = settings.get("env")?.as_object()?;
+    let mut env_vars = Vec::new();
+
+    for (key, value) in env_obj {
+        if let Some(val_str) = value.as_str() {
+            debug!("Found env var in Claude settings: {}={}", key, &val_str[..val_str.len().min(20)]);
+            env_vars.push((key.clone(), val_str.to_string()));
+        }
+    }
+
+    if env_vars.is_empty() {
+        None
+    } else {
+        Some(env_vars)
+    }
+}
+
+/// Get API key from system keychain
+fn get_api_key_from_keychain() -> Option<String> {
+    match keyring::Entry::new(ANYON_SERVICE_NAME, API_KEY_ACCOUNT) {
+        Ok(entry) => match entry.get_password() {
+            Ok(key) if key.starts_with("sk-ant-") => {
+                debug!("Retrieved API key from keychain");
+                Some(key)
+            }
+            Ok(_) => {
+                warn!("Invalid API key format in keychain");
+                None
+            }
+            Err(keyring::Error::NoEntry) => {
+                debug!("No API key found in keychain");
+                None
+            }
+            Err(e) => {
+                warn!("Failed to read API key from keychain: {}", e);
+                None
+            }
+        },
+        Err(e) => {
+            warn!("Failed to access keychain: {}", e);
+            None
+        }
     }
 }
 
