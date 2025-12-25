@@ -14,6 +14,7 @@ import {
   File,
   Command,
   Check,
+  Image as ImageIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -132,15 +133,15 @@ type ExecutionModeConfig = {
 export const EXECUTION_MODES: ExecutionModeConfig[] = [
   {
     id: "execute",
-    name: "실행",
-    description: "바로 실행",
+    name: "개발 모드",
+    description: "바로 개발 시작",
     icon: <Play className="h-4 w-4" />,
     color: "text-emerald-500",
   },
   {
     id: "plan",
-    name: "Plan",
-    description: "계획 먼저",
+    name: "계획 세우기",
+    description: "먼저 계획을 세워요",
     icon: <FileText className="h-4 w-4" />,
     color: "text-violet-500",
   },
@@ -179,6 +180,8 @@ interface ToolsMenuProps {
   disabled?: boolean;
   onFilePickerTrigger?: () => void;
   onSlashCommandTrigger?: () => void;
+  onImageAttach?: () => void;
+  extraMenuItems?: React.ReactNode;
 }
 
 export const ToolsMenu: React.FC<ToolsMenuProps> = ({
@@ -192,6 +195,8 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
   disabled = false,
   onFilePickerTrigger,
   onSlashCommandTrigger,
+  onImageAttach,
+  extraMenuItems,
 }) => {
   const [open, setOpen] = React.useState(false);
   const [subMenu, setSubMenu] = React.useState<"model" | "thinking" | "execution" | null>(null);
@@ -329,6 +334,23 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
                 <kbd className="px-2 py-0.5 bg-muted rounded-md text-[10px] text-muted-foreground font-mono">@</kbd>
               </button>
 
+              {/* Image Attach Trigger */}
+              <button
+                onClick={() => {
+                  handleClose();
+                  onImageAttach?.();
+                }}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                  "hover:bg-muted/80 transition-colors"
+                )}
+              >
+                <span className="p-1.5 rounded-lg bg-muted/80">
+                  <ImageIcon className="h-4 w-4 text-green-500" />
+                </span>
+                <span className="flex-1 text-left text-sm">사진 첨부</span>
+              </button>
+
               {/* Slash Command Trigger */}
               <button
                 onClick={() => {
@@ -346,6 +368,9 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
                 <span className="flex-1 text-left text-sm">명령어</span>
                 <kbd className="px-2 py-0.5 bg-muted rounded-md text-[10px] text-muted-foreground font-mono">/</kbd>
               </button>
+
+              {/* Extra Menu Items */}
+              {extraMenuItems}
             </motion.div>
           ) : subMenu === "model" ? (
             <motion.div

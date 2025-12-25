@@ -14,26 +14,30 @@ import {
   User,
   Info,
   LogOut,
+  Zap,
+  TrendingUp,
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { claudeAuthApi, type ClaudeAuthStatus } from "@/lib/api";
+import { claudeAuthApi, type ClaudeAuthStatus, type AnyonApiUsage } from "@/lib/api";
 import { useTranslation } from "@/hooks";
+import { useAuthStore } from "@/stores/authStore";
 
 interface ClaudeAuthSettingsProps {
   className?: string;
   setToast?: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
-type AuthMethod = "oauth" | "api-key";
+type AuthMethod = "oauth" | "api-key" | "anyon-api";
 
 export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
   className,
   setToast,
 }) => {
   const { t } = useTranslation();
+  const { accessToken, isAuthenticated } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [authStatus, setAuthStatus] = useState<ClaudeAuthStatus | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<AuthMethod>("oauth");
@@ -44,6 +48,16 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
   const [loggingOut, setLoggingOut] = useState(false);
   const [isWebMode, setIsWebMode] = useState(false);
   const [isWindows, setIsWindows] = useState(false);
+
+  // ANYON API mode state
+  const [anyonApiEnabled, setAnyonApiEnabled] = useState(false);
+  const [anyonApiUsage, setAnyonApiUsage] = useState<AnyonApiUsage | null>(null);
+  const [anyonApiAvailable, setAnyonApiAvailable] = useState(false);
+  const [loadingAnyonStatus, setLoadingAnyonStatus] = useState(false);
+  const [enablingAnyon, setEnablingAnyon] = useState(false);
+
+  // Server URL from environment
+  const ANYON_SERVER_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
 
   // Check platform
   useEffect(() => {
@@ -102,6 +116,78 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
   useEffect(() => {
     loadAuthStatus();
   }, [loadAuthStatus]);
+
+  // Load ANYON API status
+  const loadAnyonApiStatus = useCallback(async () => {
+    try {
+      setLoadingAnyonStatus(true);
+
+      // Check if ANYON API mode is enabled in Claude settings
+      const serverUrl = await claudeAuthApi.getAnyonApiStatus();
+      setAnyonApiEnabled(!!serverUrl);
+
+      // Check ANYON API availability
+      const status = await claudeAuthApi.checkAnyonApiAvailability(ANYON_SERVER_URL);
+      setAnyonApiAvailable(status.available);
+
+      // If authenticated and ANYON API is enabled, get usage
+      if (isAuthenticated && accessToken && serverUrl) {
+        try {
+          const usage = await claudeAuthApi.getAnyonApiUsage(serverUrl, accessToken);
+          setAnyonApiUsage(usage);
+        } catch (err) {
+          console.error('Failed to fetch ANYON API usage:', err);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load ANYON API status:', err);
+    } finally {
+      setLoadingAnyonStatus(false);
+    }
+  }, [isAuthenticated, accessToken, ANYON_SERVER_URL]);
+
+  useEffect(() => {
+    loadAnyonApiStatus();
+  }, [loadAnyonApiStatus]);
+
+  // Handle ANYON API enable
+  const handleEnableAnyonApi = async () => {
+    if (!accessToken) {
+      setToast?.({ message: 'ANYON 계정에 로그인이 필요합니다', type: 'error' });
+      return;
+    }
+
+    try {
+      setEnablingAnyon(true);
+      await claudeAuthApi.enableAnyonApi(ANYON_SERVER_URL, accessToken);
+      setAnyonApiEnabled(true);
+      setToast?.({ message: 'ANYON API 모드가 활성화되었습니다', type: 'success' });
+      await loadAnyonApiStatus();
+      await loadAuthStatus();
+    } catch (err) {
+      console.error('Failed to enable ANYON API:', err);
+      setToast?.({ message: 'ANYON API 활성화 실패', type: 'error' });
+    } finally {
+      setEnablingAnyon(false);
+    }
+  };
+
+  // Handle ANYON API disable
+  const handleDisableAnyonApi = async () => {
+    try {
+      setEnablingAnyon(true);
+      await claudeAuthApi.disableAnyonApi();
+      setAnyonApiEnabled(false);
+      setAnyonApiUsage(null);
+      setToast?.({ message: 'ANYON API 모드가 비활성화되었습니다', type: 'success' });
+      await loadAuthStatus();
+    } catch (err) {
+      console.error('Failed to disable ANYON API:', err);
+      setToast?.({ message: 'ANYON API 비활성화 실패', type: 'error' });
+    } finally {
+      setEnablingAnyon(false);
+    }
+  };
 
   // Handle terminal login
   const handleTerminalLogin = async () => {
@@ -385,6 +471,18 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
       {/* Auth Method Tabs */}
       <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
         <button
+          onClick={() => setSelectedMethod("anyon-api")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+            selectedMethod === "anyon-api"
+              ? "bg-background shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Zap className="h-4 w-4" />
+          ANYON API
+        </button>
+        <button
           onClick={() => setSelectedMethod("oauth")}
           className={cn(
             "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
@@ -412,7 +510,162 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
 
       {/* Method Content */}
       <AnimatePresence mode="wait">
-        {selectedMethod === "oauth" ? (
+        {selectedMethod === "anyon-api" && (
+          <motion.div
+            key="anyon-api"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4"
+          >
+            {/* ANYON API Status */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-violet-500/20">
+                    <Zap className="h-5 w-5 text-violet-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold">ANYON API</h4>
+                    <p className="text-xs text-muted-foreground">
+                      ANYON 계정으로 Claude API를 무료로 사용하세요
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {loadingAnyonStatus ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : anyonApiEnabled ? (
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      <span className="text-xs font-medium text-green-600 dark:text-green-400">활성화됨</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted border border-border">
+                      <XCircle className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">비활성화</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Usage Stats */}
+              {anyonApiEnabled && anyonApiUsage && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">오늘 사용량</span>
+                    <span className="font-mono font-medium">
+                      ${anyonApiUsage.usedUSD.toFixed(4)} / ${anyonApiUsage.limitUSD.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        anyonApiUsage.percentUsed >= 90
+                          ? "bg-red-500"
+                          : anyonApiUsage.percentUsed >= 70
+                          ? "bg-amber-500"
+                          : "bg-violet-500"
+                      )}
+                      style={{ width: `${Math.min(100, anyonApiUsage.percentUsed)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    남은 한도: ${anyonApiUsage.remainingUSD.toFixed(4)} ({(100 - anyonApiUsage.percentUsed).toFixed(1)}%)
+                  </p>
+                </div>
+              )}
+
+              {/* Enable/Disable Button */}
+              {isAuthenticated ? (
+                anyonApiEnabled ? (
+                  <Button
+                    onClick={handleDisableAnyonApi}
+                    variant="outline"
+                    disabled={enablingAnyon}
+                    className="w-full"
+                  >
+                    {enablingAnyon ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        비활성화 중...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 mr-2" />
+                        ANYON API 비활성화
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleEnableAnyonApi}
+                    disabled={enablingAnyon || !anyonApiAvailable}
+                    className="w-full bg-violet-600 hover:bg-violet-700"
+                  >
+                    {enablingAnyon ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        활성화 중...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 mr-2" />
+                        ANYON API 활성화
+                      </>
+                    )}
+                  </Button>
+                )
+              ) : (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    ANYON 계정에 먼저 로그인해주세요
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Benefits */}
+            <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-violet-500" />
+                ANYON API 혜택
+              </h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>하루 $5 한도 내 무료 사용</span>
+                </li>
+                <li className="flex gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>별도의 Anthropic 계정 불필요</span>
+                </li>
+                <li className="flex gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>Claude Code CLI와 완벽 호환</span>
+                </li>
+                <li className="flex gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>사용량 자동 추적 및 리셋 (UTC 자정)</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Server Status */}
+            {!anyonApiAvailable && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <p className="text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  ANYON API 서버에 연결할 수 없습니다
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {selectedMethod === "oauth" && (
           <motion.div
             key="oauth"
             initial={{ opacity: 0, y: 10 }}
@@ -483,7 +736,9 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
               ✨ {t('settings.claudeAuth.recommended')}
             </p>
           </motion.div>
-        ) : (
+        )}
+
+        {selectedMethod === "api-key" && (
           <motion.div
             key="api-key"
             initial={{ opacity: 0, y: 10 }}

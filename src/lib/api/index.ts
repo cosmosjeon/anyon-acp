@@ -14,6 +14,10 @@ import { mcpApi } from './mcp';
 import { storageApi } from './storage';
 import { usageApi } from './usage';
 import { claudeApi, claudeAuthApi as _claudeAuthApi, planningApi as _planningApi } from './claude';
+import { gitApi } from './git';
+
+// Re-export ANYON API types
+export type { AnyonApiUsage } from './claude';
 
 // Re-export individual APIs for granular imports
 export { projectsApi } from './projects';
@@ -23,6 +27,8 @@ export { mcpApi } from './mcp';
 export { storageApi } from './storage';
 export { usageApi } from './usage';
 export { claudeApi } from './claude';
+export { gitApi } from './git';
+export type { GitDiffSummary } from './git';
 
 // Compose the main api object for backward compatibility
 // This maintains the same interface as the original api.ts
@@ -47,6 +53,9 @@ export const api = {
 
   // Claude (settings, files, hooks, commands)
   ...claudeApi,
+
+  // Git operations
+  ...gitApi,
 
   // Registered Projects (uses storage internally)
   async getRegisteredProjects(): Promise<string[]> {

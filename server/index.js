@@ -107,7 +107,8 @@ const SUPPORT_SYSTEM_PROMPT = `당신은 Anyon 서비스의 AI 서포트입니�
 
 // CORS Configuration - only allow specific origins
 const allowedOrigins = [
-  'http://localhost:5173',  // Vite dev server
+  'http://localhost:5173',  // Vite dev server (legacy)
+  'http://localhost:1420',  // Tauri dev server
   'http://localhost:4000',  // Self (dev)
   'https://auth.any-on.com', // Production server
   'tauri://localhost',      // Tauri app
@@ -506,16 +507,48 @@ app.post('/api/support/chat', async (req, res) => {
 const usageTracking = new Map(); // userId -> { date: 'YYYY-MM-DD', totalCost: number }
 const DAILY_LIMIT_USD = 5.0;
 
-// 모델별 토큰당 비용 (USD) - 2025년 1월 기준
+// 모델명 별칭 매핑 (Claude Code 모델명 -> Anthropic API 모델명)
+const MODEL_ALIASES = {
+  // Claude Code 단축 별칭
+  'sonnet': 'claude-sonnet-4-5-20250929',
+  'opus': 'claude-opus-4-5-20251101',
+  'haiku': 'claude-haiku-4-5-20251001',
+
+  // API 별칭 -> 정확한 버전
+  'claude-sonnet-4-5': 'claude-sonnet-4-5-20250929',
+  'claude-opus-4-5': 'claude-opus-4-5-20251101',
+  'claude-haiku-4-5': 'claude-haiku-4-5-20251001',
+
+  // 레거시 모델
+  'claude-sonnet-4': 'claude-sonnet-4-20250514',
+  'claude-opus-4-1': 'claude-opus-4-1-20250805',
+  'claude-opus-4': 'claude-opus-4-20250514',
+  'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
+  'claude-3-haiku': 'claude-3-haiku-20240307',
+};
+
+// 모델별 토큰당 비용 (USD) - 2025년 12월 기준
 const MODEL_PRICING = {
+  // Claude 4.5 (최신)
+  'claude-sonnet-4-5-20250929': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'claude-opus-4-5-20251101': { input: 5.0 / 1_000_000, output: 25.0 / 1_000_000 },
+  'claude-haiku-4-5-20251001': { input: 1.0 / 1_000_000, output: 5.0 / 1_000_000 },
+
+  // Claude 4 레거시
   'claude-sonnet-4-20250514': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'claude-opus-4-1-20250805': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
   'claude-opus-4-20250514': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
-  'claude-3-5-sonnet-20241022': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
-  'claude-3-5-haiku-20241022': { input: 0.8 / 1_000_000, output: 4.0 / 1_000_000 },
-  'claude-3-opus-20240229': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
-  // 기본값 (알 수 없는 모델)
+  'claude-3-7-sonnet-20250219': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'claude-3-haiku-20240307': { input: 0.25 / 1_000_000, output: 1.25 / 1_000_000 },
+
+  // 기본값
   'default': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
 };
+
+// 모델명 정규화 (별칭 -> 실제 모델명)
+function normalizeModelName(model) {
+  return MODEL_ALIASES[model] || model;
+}
 
 // UTC 기준 오늘 날짜
 function getTodayUTC() {
@@ -560,12 +593,18 @@ function authenticateAnthropicStyle(req, res, next) {
   const apiKey = req.headers['x-api-key'];
   const authHeader = req.headers.authorization;
 
+  console.log('[Auth Debug] Headers:', {
+    'x-api-key': apiKey ? `${apiKey.substring(0, 20)}...` : 'missing',
+    'authorization': authHeader ? `${authHeader.substring(0, 30)}...` : 'missing'
+  });
+
   let token = apiKey;
   if (!token && authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.substring(7);
   }
 
   if (!token) {
+    console.log('[Auth Debug] No token found');
     return res.status(401).json({
       type: 'error',
       error: {
@@ -577,6 +616,7 @@ function authenticateAnthropicStyle(req, res, next) {
 
   const decoded = verifyToken(token);
   if (!decoded) {
+    console.log('[Auth Debug] Token verification failed');
     return res.status(401).json({
       type: 'error',
       error: {
@@ -603,7 +643,7 @@ function authenticateAnthropicStyle(req, res, next) {
 
 // Anthropic API 호환 /v1/messages 엔드포인트
 app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
-  const { model, messages, max_tokens, system, temperature, stream } = req.body;
+  let { model, messages, max_tokens, system, temperature, stream } = req.body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({
@@ -618,6 +658,9 @@ app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
       error: { type: 'invalid_request_error', message: 'model is required' }
     });
   }
+
+  // 모델명 정규화 (sonnet -> claude-sonnet-4-20250514)
+  model = normalizeModelName(model);
 
   if (!anthropic) {
     return res.status(503).json({
@@ -639,11 +682,17 @@ app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
     });
   }
 
-  console.log(`[Claude Proxy] User: ${req.user.email}, Model: ${model}, Current Usage: $${currentUsage.toFixed(4)}`);
+  console.log(`[Claude Proxy] ===== NEW REQUEST =====`);
+  console.log(`[Claude Proxy] User: ${req.user.email} (${req.user.id})`);
+  console.log(`[Claude Proxy] Model: ${model}`);
+  console.log(`[Claude Proxy] Stream: ${stream ? 'YES' : 'NO'}`);
+  console.log(`[Claude Proxy] Messages: ${messages.length} messages`);
+  console.log(`[Claude Proxy] Current Usage: $${currentUsage.toFixed(4)} / $${DAILY_LIMIT_USD}`);
 
   try {
     if (stream) {
       // SSE 스트리밍 응답
+      console.log(`[Claude Proxy] Starting SSE stream...`);
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -656,6 +705,7 @@ app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
         temperature: temperature ?? undefined,
         messages,
       });
+      console.log(`[Claude Proxy] Stream created successfully`);
 
       // Anthropic의 SSE 이벤트를 그대로 전달
       for await (const event of messageStream) {
@@ -667,12 +717,17 @@ app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
       const cost = calculateCost(model, finalMessage.usage.input_tokens, finalMessage.usage.output_tokens);
       addUsage(req.user.id, cost);
 
-      console.log(`[Claude Proxy] Complete - User: ${req.user.email}, Cost: $${cost.toFixed(6)}, Total Today: $${getUserDailyUsage(req.user.id).toFixed(4)}`);
+      console.log(`[Claude Proxy] ✅ STREAM COMPLETE`);
+      console.log(`[Claude Proxy] Input tokens: ${finalMessage.usage.input_tokens}`);
+      console.log(`[Claude Proxy] Output tokens: ${finalMessage.usage.output_tokens}`);
+      console.log(`[Claude Proxy] Cost: $${cost.toFixed(6)}`);
+      console.log(`[Claude Proxy] Total today: $${getUserDailyUsage(req.user.id).toFixed(4)}`);
 
       res.write(`event: message_stop\ndata: {"type":"message_stop"}\n\n`);
       res.end();
     } else {
       // 일반 JSON 응답
+      console.log(`[Claude Proxy] Starting non-stream request...`);
       const message = await anthropic.messages.create({
         model,
         max_tokens: max_tokens || 4096,
@@ -685,12 +740,17 @@ app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
       const cost = calculateCost(model, message.usage.input_tokens, message.usage.output_tokens);
       addUsage(req.user.id, cost);
 
-      console.log(`[Claude Proxy] Complete - User: ${req.user.email}, Cost: $${cost.toFixed(6)}, Total Today: $${getUserDailyUsage(req.user.id).toFixed(4)}`);
+      console.log(`[Claude Proxy] ✅ REQUEST COMPLETE`);
+      console.log(`[Claude Proxy] Input tokens: ${message.usage.input_tokens}`);
+      console.log(`[Claude Proxy] Output tokens: ${message.usage.output_tokens}`);
+      console.log(`[Claude Proxy] Cost: $${cost.toFixed(6)}`);
+      console.log(`[Claude Proxy] Total today: $${getUserDailyUsage(req.user.id).toFixed(4)}`);
 
       res.json(message);
     }
   } catch (error) {
-    console.error('❌ Claude proxy error:', error);
+    console.error('❌ [Claude Proxy] ERROR:', error.message);
+    console.error('❌ [Claude Proxy] Stack:', error.stack);
 
     res.status(error.status || 500).json({
       type: 'error',

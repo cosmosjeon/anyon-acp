@@ -679,6 +679,148 @@ fn logout_windows() -> Result<(), String> {
     Ok(())
 }
 
+// ============================================================
+// ANYON API Mode (서버 프록시 사용)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnyonApiConfig {
+    /// ANYON 서버 URL
+    pub server_url: String,
+    /// 사용자 JWT 토큰
+    pub jwt_token: String,
+}
+
+/// ANYON API 모드 활성화
+/// Claude Code가 ANYON 서버 프록시를 통해 API를 사용하도록 설정
+#[tauri::command]
+pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), String> {
+    let home = dirs::home_dir()
+        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+
+    let claude_dir = home.join(".claude");
+    fs::create_dir_all(&claude_dir)
+        .map_err(|e| format!("~/.claude 디렉토리 생성 실패: {}", e))?;
+
+    let settings_path = claude_dir.join("settings.local.json");
+
+    // 기존 설정 읽기
+    let mut settings: serde_json::Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("settings.local.json 읽기 실패: {}", e))?;
+        serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    // env 객체 가져오거나 생성
+    let env = settings
+        .as_object_mut()
+        .ok_or("설정이 객체가 아닙니다.")?
+        .entry("env")
+        .or_insert(serde_json::json!({}))
+        .as_object_mut()
+        .ok_or("env가 객체가 아닙니다.")?;
+
+    // ANYON 프록시 설정 추가
+    env.insert(
+        "ANTHROPIC_BASE_URL".to_string(),
+        serde_json::Value::String(config.server_url.clone())
+    );
+    env.insert(
+        "ANTHROPIC_AUTH_TOKEN".to_string(),
+        serde_json::Value::String(config.jwt_token.clone())
+    );
+
+    // apiKeyHelper 제거 (ANYON API 모드에서는 사용 안 함)
+    if let Some(obj) = settings.as_object_mut() {
+        obj.remove("apiKeyHelper");
+    }
+
+    // 저장
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("settings.local.json 저장 실패: {}", e))?;
+
+    log::info!("ANYON API 모드 활성화: {}", config.server_url);
+    Ok(())
+}
+
+/// ANYON API 모드 비활성화
+/// Claude Code 설정에서 ANYON 관련 환경변수 제거
+#[tauri::command]
+pub async fn claude_auth_disable_anyon_api() -> Result<(), String> {
+    let home = dirs::home_dir()
+        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+
+    let settings_path = home.join(".claude").join("settings.local.json");
+
+    if !settings_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(&settings_path)
+        .map_err(|e| format!("설정 파일 읽기 실패: {}", e))?;
+
+    let mut settings: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("JSON 파싱 실패: {}", e))?;
+
+    // env에서 ANYON 관련 설정 제거
+    if let Some(env) = settings.get_mut("env").and_then(|e| e.as_object_mut()) {
+        env.remove("ANTHROPIC_BASE_URL");
+        env.remove("ANTHROPIC_AUTH_TOKEN");
+
+        // env가 비어있으면 전체 제거
+        if env.is_empty() {
+            if let Some(obj) = settings.as_object_mut() {
+                obj.remove("env");
+            }
+        }
+    }
+
+    // 저장
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("설정 파일 저장 실패: {}", e))?;
+
+    log::info!("ANYON API 모드 비활성화");
+    Ok(())
+}
+
+/// 현재 ANYON API 모드 상태 확인
+#[tauri::command]
+pub async fn claude_auth_get_anyon_api_status() -> Result<Option<String>, String> {
+    let home = dirs::home_dir()
+        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+
+    let settings_path = home.join(".claude").join("settings.local.json");
+
+    if !settings_path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&settings_path)
+        .map_err(|e| format!("설정 파일 읽기 실패: {}", e))?;
+
+    let settings: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("JSON 파싱 실패: {}", e))?;
+
+    // ANTHROPIC_BASE_URL 확인
+    if let Some(base_url) = settings
+        .get("env")
+        .and_then(|e| e.get("ANTHROPIC_BASE_URL"))
+        .and_then(|v| v.as_str())
+    {
+        return Ok(Some(base_url.to_string()));
+    }
+
+    Ok(None)
+}
+
 /// Helper 스크립트 및 설정 제거 (macOS/Linux only)
 #[cfg(not(target_os = "windows"))]
 fn delete_api_key_helper() -> Result<(), String> {

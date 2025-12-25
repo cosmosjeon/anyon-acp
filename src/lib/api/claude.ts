@@ -417,7 +417,103 @@ export const claudeAuthApi = {
       throw error;
     }
   },
+
+  /**
+   * Enable ANYON API mode (server proxy)
+   * @param serverUrl - ANYON server URL
+   * @param jwtToken - User's JWT token
+   * @returns Promise resolving when mode is enabled
+   */
+  async enableAnyonApi(serverUrl: string, jwtToken: string): Promise<void> {
+    try {
+      return await apiCall<void>('claude_auth_enable_anyon_api', {
+        config: { server_url: serverUrl, jwt_token: jwtToken }
+      });
+    } catch (error) {
+      console.error('Failed to enable ANYON API:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Disable ANYON API mode
+   * @returns Promise resolving when mode is disabled
+   */
+  async disableAnyonApi(): Promise<void> {
+    try {
+      return await apiCall<void>('claude_auth_disable_anyon_api');
+    } catch (error) {
+      console.error('Failed to disable ANYON API:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get ANYON API mode status
+   * @returns Promise resolving to the server URL if enabled, null otherwise
+   */
+  async getAnyonApiStatus(): Promise<string | null> {
+    try {
+      return await apiCall<string | null>('claude_auth_get_anyon_api_status');
+    } catch (error) {
+      console.error('Failed to get ANYON API status:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Get ANYON API usage for the current user
+   * @param serverUrl - ANYON server URL
+   * @param jwtToken - User's JWT token
+   * @returns Promise resolving to usage data
+   */
+  async getAnyonApiUsage(serverUrl: string, jwtToken: string): Promise<AnyonApiUsage> {
+    try {
+      const response = await fetch(`${serverUrl}/api/claude/usage`, {
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch usage: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get ANYON API usage:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Check ANYON API status
+   * @param serverUrl - ANYON server URL
+   * @returns Promise resolving to API status
+   */
+  async checkAnyonApiAvailability(serverUrl: string): Promise<{ available: boolean; message: string; dailyLimitUSD: number }> {
+    try {
+      const response = await fetch(`${serverUrl}/api/claude/status`);
+      if (!response.ok) {
+        throw new Error(`Failed to check status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to check ANYON API availability:', error);
+      return { available: false, message: 'Server unreachable', dailyLimitUSD: 0 };
+    }
+  },
 };
+
+/**
+ * ANYON API Usage data
+ */
+export interface AnyonApiUsage {
+  userId: string;
+  date: string;
+  usedUSD: number;
+  limitUSD: number;
+  remainingUSD: number;
+  percentUsed: number;
+}
 
 /**
  * Planning Documents API

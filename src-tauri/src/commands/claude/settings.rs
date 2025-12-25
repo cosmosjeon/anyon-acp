@@ -454,14 +454,39 @@ pub async fn init_git_repo(
     let exit_code = output.status.code();
     
     log::info!("[Rust] Git init result - success: {}, stdout: {}, stderr: {}", success, stdout, stderr);
-    
+
+    // If git init succeeded, create an initial empty commit for rollback capability
+    if success {
+        log::info!("[Rust] Creating initial empty commit...");
+
+        let mut commit_cmd = Command::new("git");
+        commit_cmd.args(["commit", "--allow-empty", "-m", "Initial commit (ANYON)"])
+            .current_dir(&path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        match commit_cmd.output().await {
+            Ok(commit_output) => {
+                let commit_success = commit_output.status.success();
+                let commit_stdout = String::from_utf8_lossy(&commit_output.stdout).to_string();
+                let commit_stderr = String::from_utf8_lossy(&commit_output.stderr).to_string();
+                log::info!("[Rust] Initial commit result - success: {}, stdout: {}, stderr: {}",
+                    commit_success, commit_stdout, commit_stderr);
+            }
+            Err(e) => {
+                log::warn!("[Rust] Failed to create initial commit: {}", e);
+                // Not critical, continue anyway
+            }
+        }
+    }
+
     let result = NpxRunResult {
         success,
         stdout,
         stderr,
         exit_code,
     };
-    
+
     // Emit completion event
     let _ = app_handle.emit("git-init-complete", &result);
 
