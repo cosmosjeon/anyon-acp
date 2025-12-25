@@ -120,7 +120,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increase limit for Claude API requests
 
 // Rate limiting - prevent brute force attacks
 const authLimiter = rateLimit({
