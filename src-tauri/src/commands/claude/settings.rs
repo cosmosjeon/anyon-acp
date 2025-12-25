@@ -310,42 +310,6 @@ pub async fn save_claude_md_file(file_path: String, content: String) -> Result<S
 }
 
 #[tauri::command]
-pub async fn get_recently_modified_files(
-    app: tauri::State<'_, crate::checkpoint::state::CheckpointState>,
-    session_id: String,
-    project_id: String,
-    project_path: String,
-    minutes: i64,
-) -> Result<Vec<String>, String> {
-    use chrono::{Duration, Utc};
-
-    log::info!(
-        "Getting files modified in the last {} minutes for session: {}",
-        minutes,
-        session_id
-    );
-
-    let manager = app
-        .get_or_create_manager(session_id, project_id, PathBuf::from(project_path))
-        .await
-        .map_err(|e| format!("Failed to get checkpoint manager: {}", e))?;
-
-    let since = Utc::now() - Duration::minutes(minutes);
-    let modified_files = manager.get_files_modified_since(since).await;
-
-    // Also log the last modification time
-    if let Some(last_mod) = manager.get_last_modification_time().await {
-        log::info!("Last file modification was at: {}", last_mod);
-    }
-
-    Ok(modified_files
-        .into_iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect())
-}
-
-
-#[tauri::command]
 pub async fn check_anyon_installed(project_path: String) -> Result<AnyonInstallationStatus, String> {
     let path = PathBuf::from(&project_path);
     
@@ -490,14 +454,39 @@ pub async fn init_git_repo(
     let exit_code = output.status.code();
     
     log::info!("[Rust] Git init result - success: {}, stdout: {}, stderr: {}", success, stdout, stderr);
-    
+
+    // If git init succeeded, create an initial empty commit for rollback capability
+    if success {
+        log::info!("[Rust] Creating initial empty commit...");
+
+        let mut commit_cmd = Command::new("git");
+        commit_cmd.args(["commit", "--allow-empty", "-m", "Initial commit (ANYON)"])
+            .current_dir(&path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        match commit_cmd.output().await {
+            Ok(commit_output) => {
+                let commit_success = commit_output.status.success();
+                let commit_stdout = String::from_utf8_lossy(&commit_output.stdout).to_string();
+                let commit_stderr = String::from_utf8_lossy(&commit_output.stderr).to_string();
+                log::info!("[Rust] Initial commit result - success: {}, stdout: {}, stderr: {}",
+                    commit_success, commit_stdout, commit_stderr);
+            }
+            Err(e) => {
+                log::warn!("[Rust] Failed to create initial commit: {}", e);
+                // Not critical, continue anyway
+            }
+        }
+    }
+
     let result = NpxRunResult {
         success,
         stdout,
         stderr,
         exit_code,
     };
-    
+
     // Emit completion event
     let _ = app_handle.emit("git-init-complete", &result);
 

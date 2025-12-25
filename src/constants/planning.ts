@@ -11,6 +11,7 @@ import {
   STARTUP_ARCHITECTURE_PROMPT,
   STARTUP_ERD_PROMPT,
 } from './workflows/planning';
+import { ANYON_DOCS } from './paths';
 
 export type WorkflowIconType = 'file-text' | 'palette' | 'paintbrush' | 'settings' | 'boxes' | 'database';
 
@@ -90,7 +91,7 @@ export const WORKFLOW_SEQUENCE: WorkflowStep[] = [
   },
 ];
 
-export const ANYON_DOCS_DIR = 'anyon-docs/planning';
+export const ANYON_DOCS_DIR = ANYON_DOCS.PLANNING;
 
 /**
  * Get the next workflow step after the given filename
@@ -108,7 +109,7 @@ export const getNextWorkflowStep = (currentFilename: string): WorkflowStep | nul
 /**
  * Get workflow step by ID
  */
-export const getWorkflowStepById = (id: string): WorkflowStep | undefined => {
+export const getPlanningStepById = (id: string): WorkflowStep | undefined => {
   return WORKFLOW_SEQUENCE.find((step) => step.id === id);
 };
 

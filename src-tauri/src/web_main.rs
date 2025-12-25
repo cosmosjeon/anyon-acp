@@ -1,6 +1,5 @@
 use clap::Parser;
 
-mod checkpoint;
 mod claude_binary;
 mod commands;
 mod process;

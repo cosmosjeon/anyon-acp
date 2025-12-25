@@ -19,6 +19,8 @@ import { PlanningDocsPanel } from '@/components/planning';
 import { DevDocsPanel } from '@/components/development';
 import { EnhancedPreviewPanel } from '@/components/preview';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
+import { FloatingHelpButton, AIChatModal, PlanningCompleteModal, PreviewWelcomeModal } from '@/components/help';
+import { SUPPORT_CONFIG } from '@/constants/support';
 import { Settings } from '@/components/Settings';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
 import { useWorkflowPreview } from '@/hooks/useWorkflowPreview';
@@ -109,8 +111,12 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const [activeTab, setActiveTab] = useState<MvpTabType>('planning');
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [sessionKey, setSessionKey] = useState(0);
+  const [sessionKey, _setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [showPlanningCompleteModal, setShowPlanningCompleteModal] = useState(false);
+  const [showPreviewWelcomeModal, setShowPreviewWelcomeModal] = useState(false);
+  const [hasShownPreviewWelcome, setHasShownPreviewWelcome] = useState(false);
 
   // Sidebar state - collapsed by default
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -169,11 +175,15 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     if (project?.path) {
       try {
         const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
+        console.log('[MvpWorkspace] Last session data:', lastSessionData);
         if (lastSessionData) {
           const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+          console.log('[MvpWorkspace] Created session:', session);
           if (session) {
             setCurrentSession(session);
           }
+        } else {
+          console.log('[MvpWorkspace] No last session data found for path:', project.path);
         }
       } catch (err) {
         console.error('[MvpWorkspace] Failed to load last session:', err);
@@ -289,35 +299,47 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
     }
   }, []);
 
-  const handleSessionSelect = useCallback((session: Session | null) => {
-    setCurrentSession(session);
-    setSessionKey(prev => prev + 1);
-    if (session?.id && project?.path) {
-      try {
-        SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', session.id);
-      } catch (err) {
-        console.error('[MvpWorkspace] Failed to save session:', err);
-      }
-    }
-  }, [project?.path]);
-
   const handleSessionCreated = useCallback((sessionId: string) => {
     if (!sessionId) {
       console.warn('[MvpWorkspace] handleSessionCreated called with empty sessionId');
       return;
     }
-    if (project?.path) {
+    if (project?.path && project?.id) {
       try {
-        SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId);
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId, project.id);
       } catch (err) {
         console.error('[MvpWorkspace] Failed to save session:', err);
       }
     }
-  }, [project?.path]);
+  }, [project?.path, project?.id]);
 
-  const handleNewSession = useCallback(() => {
-    setCurrentSession(null);
-    setSessionKey(prev => prev + 1);
+  // Callback when all planning docs are complete
+  const handlePlanningComplete = useCallback(() => {
+    setShowPlanningCompleteModal(true);
+  }, []);
+
+  // Proceed to development after planning complete
+  const handleProceedWithAI = useCallback(() => {
+    setActiveTab('development');
+  }, []);
+
+  // Open KakaoTalk channel for support
+  const handleContactSupport = useCallback(() => {
+    window.open(SUPPORT_CONFIG.KAKAO_CHANNEL_URL, '_blank');
+  }, []);
+
+  // Handle preview tab click - show welcome modal on first visit
+  const handlePreviewTabClick = useCallback(() => {
+    if (!hasShownPreviewWelcome) {
+      setShowPreviewWelcomeModal(true);
+      setHasShownPreviewWelcome(true);
+    }
+    setActiveTab('preview');
+  }, [hasShownPreviewWelcome]);
+
+  // View preview action from modal
+  const handleViewPreview = useCallback(() => {
+    setActiveTab('preview');
   }, []);
 
   const projectName = project?.path.split('/').pop() || 'Project';
@@ -349,9 +371,6 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
         <WorkspaceSidebar
           projectPath={project?.path || ''}
           tabType="mvp"
-          currentSessionId={currentSession?.id}
-          onNewSession={handleNewSession}
-          onSessionSelect={handleSessionSelect}
           onLogoClick={() => setShowSettings(false)}
           onSettingsClick={() => setShowSettings(false)}
           collapsed={sidebarCollapsed}
@@ -366,13 +385,10 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
   return (
     <div ref={containerRef} className="h-full flex overflow-hidden bg-background">
-      {/* Sidebar with Sessions */}
+      {/* Sidebar */}
       <WorkspaceSidebar
         projectPath={project?.path || ''}
         tabType="mvp"
-        currentSessionId={currentSession?.id}
-        onNewSession={handleNewSession}
-        onSessionSelect={handleSessionSelect}
         onLogoClick={goToProjectList}
         onSettingsClick={() => setShowSettings(true)}
         collapsed={sidebarCollapsed}
@@ -567,7 +583,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                   {/* 프리뷰 탭 */}
                   <PreviewTabButton
                     isActive={activeTab === 'preview'}
-                    onClick={() => setActiveTab('preview')}
+                    onClick={handlePreviewTabClick}
                   />
                 </div>
               </div>
@@ -577,15 +593,16 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                 {activeTab === 'planning' && (
                   <PlanningDocsPanel
                     projectPath={project?.path}
-                    onStartNewWorkflow={handleStartNewWorkflow}
+                    onStartWorkflow={handleStartNewWorkflow}
                     isSessionLoading={isSessionLoading}
+                    onPlanningComplete={handlePlanningComplete}
                   />
                 )}
                 {activeTab === 'development' && (
                   <DevDocsPanel
                     projectPath={project?.path}
                     isPlanningComplete={isPlanningComplete}
-                    onStartNewSession={handleStartNewWorkflow}
+                    onStartWorkflow={handleStartNewWorkflow}
                     isSessionLoading={isSessionLoading}
                   />
                 )}
@@ -604,6 +621,31 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
       {/* Drag overlay */}
       {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
+
+      {/* Floating Help Button */}
+      <FloatingHelpButton onOpenAIChat={() => setShowAIChat(true)} />
+
+      {/* AI Chat Modal */}
+      <AIChatModal
+        isOpen={showAIChat}
+        onClose={() => setShowAIChat(false)}
+      />
+
+      {/* Planning Complete Modal */}
+      <PlanningCompleteModal
+        isOpen={showPlanningCompleteModal}
+        onClose={() => setShowPlanningCompleteModal(false)}
+        onProceedWithAI={handleProceedWithAI}
+        onContactSupport={handleContactSupport}
+      />
+
+      {/* Preview Welcome Modal */}
+      <PreviewWelcomeModal
+        isOpen={showPreviewWelcomeModal}
+        onClose={() => setShowPreviewWelcomeModal(false)}
+        onViewPreview={handleViewPreview}
+        onContactSupport={handleContactSupport}
+      />
     </div>
   );
 };

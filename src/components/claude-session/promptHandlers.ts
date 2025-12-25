@@ -91,7 +91,6 @@ export interface StreamMessageHandlerOptions {
   isMountedRef: React.MutableRefObject<boolean>;
   accumulatedTextRef: React.MutableRefObject<string>;
   setStreamingText: (text: string) => void;
-  setRawJsonlOutput: React.Dispatch<React.SetStateAction<string[]>>;
   setMessages: React.Dispatch<React.SetStateAction<ClaudeStreamMessage[]>>;
   sessionMetrics: React.MutableRefObject<{
     toolsExecuted: number;
@@ -120,22 +119,16 @@ export function createStreamMessageHandler(
       if (!options.isMountedRef.current) return;
 
       let message: ClaudeStreamMessage;
-      let rawPayload: string;
 
       if (typeof payload === 'string') {
         // Tauri mode: payload is a JSON string
-        rawPayload = payload;
         message = JSON.parse(payload) as ClaudeStreamMessage;
       } else {
         // Web mode: payload is already parsed object
         message = payload;
-        rawPayload = JSON.stringify(payload);
       }
 
       console.log('[ClaudeCodeSession] handleStreamMessage - message type:', message.type);
-
-      // Store raw JSONL
-      options.setRawJsonlOutput((prev) => [...prev, rawPayload]);
 
       // Track enhanced tool execution
       if (message.type === 'assistant' && message.message?.content) {
@@ -340,7 +333,7 @@ export async function handleSessionInit(
             undefined, // firstMessage will be updated later
             options.messages.length
           );
-          SessionPersistenceService.saveLastSessionForTab(options.projectPath, options.tabType, message.session_id);
+          SessionPersistenceService.saveLastSessionForTab(options.projectPath, options.tabType, message.session_id, projectId);
         } else {
           SessionPersistenceService.saveSession(
             message.session_id,
@@ -349,6 +342,20 @@ export async function handleSessionInit(
             options.messages.length
           );
         }
+
+        // 세션 생성 시 기존 메시지들의 displayText를 localStorage에 저장
+        options.messages.forEach(msg => {
+          if (msg.type === 'user' && msg.displayText && msg.message?.content) {
+            const textContent = msg.message.content.find((c: any) => c.type === 'text');
+            if (textContent?.text) {
+              SessionPersistenceService.saveDisplayText(
+                message.session_id,
+                textContent.text,
+                msg.displayText
+              );
+            }
+          }
+        });
 
         // Notify parent about new session
         options.onSessionCreated?.(message.session_id);
@@ -387,7 +394,6 @@ export interface CompletionHandlerOptions {
     errorsEncountered: number;
     lastActivityTime: number;
     toolExecutionTimes: number[];
-    checkpointCount: number;
     wasResumed: boolean;
     modelChanges: Array<{ from: string; to: string; timestamp: number }>;
     promptsSent: number;
@@ -398,15 +404,8 @@ export interface CompletionHandlerOptions {
   trackEvent: {
     enhancedSessionStopped: (params: any) => void;
   };
-  api: {
-    getCheckpointSettings: (sessionId: string, projectId: string, projectPath: string) => Promise<any>;
-    checkAutoCheckpoint: (sessionId: string, projectId: string, projectPath: string, prompt: string) => Promise<boolean>;
-  };
-  setTimelineVersion: React.Dispatch<React.SetStateAction<number>>;
   setQueuedPrompts: React.Dispatch<React.SetStateAction<QueuedPrompt[]>>;
   handleSendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus") => Promise<void>;
-  prompt: string;
-  projectPath: string;
 }
 
 export function createCompletionHandler(options: CompletionHandlerOptions) {
@@ -460,8 +459,6 @@ export function createCompletionHandler(options: CompletionHandlerOptions) {
         model: metrics.modelChanges.length > 0
           ? metrics.modelChanges[metrics.modelChanges.length - 1].to
           : 'sonnet',
-        has_checkpoints: metrics.checkpointCount > 0,
-        checkpoint_count: metrics.checkpointCount,
         was_resumed: metrics.wasResumed,
 
         // Agent context (if applicable)
@@ -475,29 +472,6 @@ export function createCompletionHandler(options: CompletionHandlerOptions) {
         has_pending_prompts: options.queuedPrompts.length > 0,
         pending_prompts_count: options.queuedPrompts.length,
       });
-    }
-
-    if (options.effectiveSession && success) {
-      try {
-        const settings = await options.api.getCheckpointSettings(
-          options.effectiveSession.id,
-          options.effectiveSession.project_id,
-          options.projectPath
-        );
-
-        if (settings.auto_checkpoint_enabled) {
-          await options.api.checkAutoCheckpoint(
-            options.effectiveSession.id,
-            options.effectiveSession.project_id,
-            options.projectPath,
-            options.prompt
-          );
-          // Reload timeline to show new checkpoint
-          options.setTimelineVersion((v) => v + 1);
-        }
-      } catch (err) {
-        console.error('Failed to check auto checkpoint:', err);
-      }
     }
 
     // Process queued prompts after completion
@@ -725,6 +699,8 @@ export async function executePromptCommand(options: CommandExecutionOptions): Pr
 
 export interface UserMessageOptions {
   prompt: string;
+  /** 워크플로우 짧은 표시 텍스트 (예: "PRD 문서 작성 시작") */
+  displayText?: string;
   setMessages: React.Dispatch<React.SetStateAction<ClaudeStreamMessage[]>>;
   selectedElement?: SelectedElement;
 }
@@ -732,6 +708,7 @@ export interface UserMessageOptions {
 export function addUserMessageToUI(options: UserMessageOptions): void {
   const userMessage: ClaudeStreamMessage = {
     type: "user",
+    displayText: options.displayText,
     message: {
       content: [
         {

@@ -12,8 +12,10 @@ import {
   Palette,
   Wifi,
   Loader2,
-  Cpu,
   Key,
+  Code,
+  Eye,
+  FileText,
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -22,10 +24,13 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { ProxySettings } from "./ProxySettings";
-import { CCAgents } from "./CCAgents";
 import { ClaudeAuthSettings } from "./ClaudeAuthSettings";
+import { PlanningCompleteModal, PreviewWelcomeModal } from "./help";
 import { useTheme, useTrackEvent, useTranslation } from "@/hooks";
 import { useAuthStore } from "@/stores/authStore";
+import { SUPPORT_CONFIG } from "@/constants/support";
+
+const isDev = import.meta.env.DEV;
 
 interface SettingsProps {
   className?: string;
@@ -36,15 +41,15 @@ type SettingsSection =
   | "appearance"
   | "ai-auth"
   | "ai-proxy"
-  | "ai-agents"
   | "account"
-  | "subscription";
+  | "subscription"
+  | "dev-tools";
 
 interface NavItem {
   id: SettingsSection;
   label: string;
   icon: React.ElementType;
-  category: "general" | "ai" | "account";
+  category: "general" | "ai" | "account" | "dev";
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -66,6 +71,10 @@ export const Settings: React.FC<SettingsProps> = ({
   // Startup intro preference
   const [startupIntroEnabled, setStartupIntroEnabled] = useState(true);
 
+  // Dev tools modal states
+  const [showPlanningModal, setShowPlanningModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
   // Auth store
   const { user, logout, getUserSettings, updateUserSetting } = useAuthStore();
 
@@ -74,9 +83,9 @@ export const Settings: React.FC<SettingsProps> = ({
     { id: "appearance", label: t('settings.simple.appearance'), icon: Palette, category: "general" },
     { id: "ai-auth", label: t('settings.claudeAuth.title'), icon: Key, category: "ai" },
     { id: "ai-proxy", label: t('settings.ai.proxy'), icon: Wifi, category: "ai" },
-    { id: "ai-agents", label: "CC Agents", icon: Cpu, category: "ai" },
     { id: "account", label: t('settings.account.title'), icon: User, category: "account" },
     { id: "subscription", label: t('settings.account.subscription'), icon: Crown, category: "account" },
+    ...(isDev ? [{ id: "dev-tools" as const, label: "개발자 도구", icon: Code, category: "dev" as const }] : []),
   ];
 
   // Load settings on mount
@@ -234,14 +243,6 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         );
 
-      case "ai-agents":
-        return (
-          <CCAgents
-            onBack={() => setActiveSection("ai-auth")}
-            className="h-full -m-6"
-          />
-        );
-
       case "account":
         return (
           <div className="space-y-6">
@@ -340,6 +341,63 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
         );
 
+      case "dev-tools":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-orange-500/10">
+                <Code className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">개발자 도구</h3>
+                <p className="text-sm text-muted-foreground">개발 환경에서만 표시됩니다</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-muted/40">
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  팝업 테스트
+                </h4>
+                <p className="text-xs text-muted-foreground mb-4">
+                  각 버튼을 클릭하면 해당 팝업을 미리 볼 수 있습니다.
+                </p>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3"
+                    onClick={() => setShowPlanningModal(true)}
+                  >
+                    <FileText className="h-4 w-4 text-green-500" />
+                    <div className="text-left">
+                      <div className="font-medium">기획완료 팝업</div>
+                      <div className="text-xs text-muted-foreground">PlanningCompleteModal</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3"
+                    onClick={() => setShowPreviewModal(true)}
+                  >
+                    <Eye className="h-4 w-4 text-blue-500" />
+                    <div className="text-left">
+                      <div className="font-medium">프리뷰 웰컴 팝업</div>
+                      <div className="text-xs text-muted-foreground">PreviewWelcomeModal</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  ⚠️ 이 섹션은 개발 모드(DEV)에서만 표시됩니다. 프로덕션 빌드에서는 자동으로 숨겨집니다.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -432,6 +490,32 @@ export const Settings: React.FC<SettingsProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Dev Section (only in development) */}
+            {isDev && navItems.some(item => item.category === "dev") && (
+              <div>
+                <p className="text-xs font-semibold text-orange-500 uppercase tracking-wider mb-2 px-2">
+                  DEV
+                </p>
+                <div className="space-y-0.5">
+                  {navItems.filter(item => item.category === "dev").map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors",
+                        activeSection === item.id
+                          ? "bg-orange-500 text-white"
+                          : "text-orange-600 dark:text-orange-400 hover:bg-orange-500/10"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
         </div>
 
@@ -466,6 +550,36 @@ export const Settings: React.FC<SettingsProps> = ({
           />
         )}
       </ToastContainer>
+
+      {/* Dev Tools Modals */}
+      {isDev && (
+        <>
+          <PlanningCompleteModal
+            isOpen={showPlanningModal}
+            onClose={() => setShowPlanningModal(false)}
+            onProceedWithAI={() => {
+              setShowPlanningModal(false);
+              setToast({ message: '개발문서 작성하기 클릭됨', type: 'success' });
+            }}
+            onContactSupport={() => {
+              window.open(SUPPORT_CONFIG.KAKAO_CHANNEL_URL, '_blank');
+              setShowPlanningModal(false);
+            }}
+          />
+          <PreviewWelcomeModal
+            isOpen={showPreviewModal}
+            onClose={() => setShowPreviewModal(false)}
+            onViewPreview={() => {
+              setShowPreviewModal(false);
+              setToast({ message: '프리뷰 확인하기 클릭됨', type: 'success' });
+            }}
+            onContactSupport={() => {
+              window.open(SUPPORT_CONFIG.KAKAO_CHANNEL_URL, '_blank');
+              setShowPreviewModal(false);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

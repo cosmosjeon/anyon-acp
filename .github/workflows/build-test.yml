@@ -3,9 +3,9 @@ name: Build Test
 # Trigger on every push and pull request
 on:
   push:
-    branches: [ main, develop, 'release/**', 'feature/**' ]
+    branches: [ main, dev, develop, 'release/**', 'feature/**' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, dev, develop ]
     types: [opened, synchronize, reopened]
 
 # Cancel in-progress workflows when a new commit is pushed

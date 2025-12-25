@@ -437,11 +437,19 @@ interface LanguageState {
 - System preference detection
 - Persistence via API
 
+#### RetryContext
+- Retry count tracking
+- Max retries configuration
+- Retry/reset actions
+
 ---
 
 ## Custom Hooks
 
-Total: 8 custom hooks for state management, performance, and feature integration.
+Total: 14 custom hooks for state management, performance, and feature integration.
+
+> Removed: useApiCall, useDebounce, useLoadingState, usePagination (consolidated or unused)
+> Added: useDevWorkflow hook
 
 ### Core Hooks
 
@@ -474,6 +482,7 @@ Total: 8 custom hooks for state management, performance, and feature integration
 
 | Hook | Purpose | Returns | Usage |
 |------|---------|---------|-------|
+| `useChatHistory` | Chat history management | `{ history, addMessage(), clearHistory() }` | Chat message persistence |
 | `useDevServer` | Dev server lifecycle | `{ startDevServer(), stopDevServer(), getDevServerInfo() }` | Project dev server |
 | `usePlanningDocs` | Planning doc management | `{ docs, createDoc(), updateDoc() }` | SDD docs CRUD |
 | `usePreviewMessages` | Preview iframe messaging | `{ sendMessage(), messages[] }` | iframe communication |
@@ -692,7 +701,7 @@ src/
 | **Widgets** | 29 | Tool execution displays (~3400 lines) |
 | **Custom Hooks** | 21 | Core, analytics, feature, utility |
 | **Zustand Stores** | 5 | Auth, session, agent, preview, language |
-| **Context Providers** | 3 | Tab, theme, output cache |
+| **Context Providers** | 4 | Tab, theme, output cache, retry |
 | **UI Components** | 23 | Radix-based primitives |
 | **Dependencies** | 50+ | React ecosystem + Tauri |
 

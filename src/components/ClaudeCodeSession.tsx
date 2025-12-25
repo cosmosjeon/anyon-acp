@@ -11,19 +11,14 @@ import { createLogger } from "@/lib/logger";
 
 const logger = createLogger('ClaudeCodeSession');
 import {
-  Copy,
   ChevronDown,
-  GitBranch,
   ChevronUp,
   X,
-  Wrench,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Plus,
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type Session } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -38,10 +33,8 @@ import { StreamMessage } from "./StreamMessage";
 import { StreamingText } from "./StreamingText";
 import { FloatingPromptInput, type FloatingPromptInputRef, type ExecutionMode } from "./FloatingPromptInput";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { TimelineNavigator } from "./TimelineNavigator";
-import { CheckpointSettings } from "./CheckpointSettings";
 import { SlashCommandsManager } from "./SlashCommandsManager";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TooltipProvider, TooltipSimple } from "@/components/ui/tooltip-modern";
 import { SplitPane } from "@/components/ui/split-pane";
 import { WebviewPreview } from "./WebviewPreview";
@@ -153,20 +146,11 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   // Streaming text state for real-time typing effect
   const [streamingText, setStreamingText] = useState<string>('');
   const accumulatedTextRef = useRef<string>('');
-  const [rawJsonlOutput, setRawJsonlOutput] = useState<string[]>([]);
-  const [copyPopoverOpen, setCopyPopoverOpen] = useState(false);
   const [isFirstPrompt, setIsFirstPrompt] = useState(!session);
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
   const [claudeSessionId, setClaudeSessionId] = useState<string | null>(null);
-  const [showTimeline, setShowTimeline] = useState(false);
-  const [timelineVersion, setTimelineVersion] = useState(0);
-  const [timelinePanelWidth, setTimelinePanelWidth] = useState(384); // 384px = w-96
-  const [showSettings, setShowSettings] = useState(false);
-  const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSlashCommandsSettings, setShowSlashCommandsSettings] = useState(false);
-  const [forkCheckpointId, setForkCheckpointId] = useState<string | null>(null);
-  const [forkSessionName, setForkSessionName] = useState("");
   
   // Queued prompts state
   const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
@@ -181,6 +165,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   // Add collapsed state for queued prompts
   const [queuedPromptsCollapsed, setQueuedPromptsCollapsed] = useState(false);
 
+  // Model selection state
+  const [selectedModel, setSelectedModel] = useState<"haiku" | "sonnet" | "opus">("sonnet");
+
   const parentRef = useRef<HTMLDivElement>(null);
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const hasActiveSessionRef = useRef(false);
@@ -189,7 +176,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const isMountedRef = useRef(true);
   const isListeningRef = useRef(false);
   const sessionStartTime = useRef<number>(Date.now());
-  const isIMEComposingRef = useRef(false);
   const currentSessionIdRef = useRef<string | null>(null);
   
   // Session metrics state for enhanced analytics
@@ -205,7 +191,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     errorsEncountered: 0,
     lastActivityTime: Date.now(),
     toolExecutionTimes: [] as number[],
-    checkpointCount: 0,
     wasResumed: !!session,
     modelChanges: [] as Array<{ from: string; to: string; timestamp: number }>,
   });
@@ -495,12 +480,15 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   const loadSessionHistory = async () => {
     if (!session) return;
-    
+
+    console.log('[ClaudeCodeSession] loadSessionHistory called with session:', session.id, session.project_id);
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const history = await api.loadSessionHistory(session.id, session.project_id);
+      console.log('[ClaudeCodeSession] Loaded history:', history?.length, 'messages');
       
       // Save session data for restoration
       if (history && history.length > 0) {
@@ -512,15 +500,37 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         );
       }
       
-      // Convert history to messages format
-      const loadedMessages: ClaudeStreamMessage[] = history.map(entry => ({
-        ...entry,
-        type: entry.type || "assistant"
-      }));
-      
+      // Convert history to messages format with displayText enrichment
+      const loadedMessages: ClaudeStreamMessage[] = history.map(entry => {
+        const message: ClaudeStreamMessage = {
+          ...entry,
+          type: entry.type || "assistant"
+        };
+
+        // user 메시지에 displayText 복원 시도
+        if (message.type === "user" && message.message?.content && !message.displayText) {
+          // content가 배열인 경우에만 find 사용
+          if (Array.isArray(message.message.content)) {
+            const textContent = message.message.content.find((c: any) => c.type === "text");
+            if (textContent?.text) {
+              // localStorage에서 저장된 displayText 찾기
+              const storedDisplayText = SessionPersistenceService.findDisplayText(
+                session.id,
+                textContent.text
+              );
+              if (storedDisplayText) {
+                message.displayText = storedDisplayText;
+              }
+            }
+          }
+        }
+
+        return message;
+      });
+
+      console.log('[ClaudeCodeSession] Setting messages:', loadedMessages.length);
       setMessages(loadedMessages);
-      setRawJsonlOutput(history.map(h => JSON.stringify(h)));
-      
+
       // After loading history, we're continuing a conversation
       setIsFirstPrompt(false);
       
@@ -539,7 +549,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       });
     } catch (err) {
       logger.error("Failed to load session history:", err);
-      setError("Failed to load session history");
+      // Don't show error - just start fresh without history
+      // The session data might be corrupted or the backend session might not exist
+      setMessages([]);
     } finally {
       setIsLoading(false);
     }
@@ -601,9 +613,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
         if (!isMountedRef.current) return;
 
-        // Store raw JSONL
-        setRawJsonlOutput(prev => [...prev, event.payload]);
-
         // Parse and display
         const message = JSON.parse(event.payload) as ClaudeStreamMessage;
         setMessages(prev => [...prev, message]);
@@ -646,14 +655,18 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     startNewSession: (backendPrompt: string, userMessage?: string) => {
       // Clear current session and start a new one
       setMessages([]);
-      setRawJsonlOutput([]);
       setError(null);
       setIsFirstPrompt(true);
       setTotalTokens(0);
 
       // Add display message to UI if provided (for workflow prompts)
+      // userMessage는 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
       if (userMessage) {
-        addUserMessageToUI({ prompt: userMessage, setMessages });
+        addUserMessageToUI({
+          prompt: userMessage,
+          displayText: userMessage,  // displayText로도 저장하여 세션 복원 시 사용
+          setMessages
+        });
       }
 
       // Send the backend prompt (full workflow prompt) to Claude
@@ -715,7 +728,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           isMountedRef,
           accumulatedTextRef,
           setStreamingText,
-          setRawJsonlOutput,
           setMessages,
           sessionMetrics,
           workflowTracking,
@@ -736,12 +748,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           totalTokens,
           queuedPrompts,
           trackEvent,
-          api,
-          setTimelineVersion,
           setQueuedPrompts,
-          handleSendPrompt,
-          prompt,
-          projectPath
+          handleSendPrompt
         });
 
         // Setup all event listeners
@@ -769,7 +777,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         addUserMessageToUI({ prompt, setMessages, selectedElement: selectedElement ?? undefined });
       }
 
-      // 7. Update first message if needed
+      // 8. Update first message if needed
       updateSessionFirstMessage({
         isFirstPrompt,
         tabType,
@@ -808,96 +816,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       setIsLoading(false);
       hasActiveSessionRef.current = false;
     }
-  };
-
-  const handleCopyAsJsonl = async () => {
-    const jsonl = rawJsonlOutput.join('\n');
-    await navigator.clipboard.writeText(jsonl);
-    setCopyPopoverOpen(false);
-  };
-
-  const handleCopyAsMarkdown = async () => {
-    let markdown = `# Claude Code Session\n\n`;
-    markdown += `**Project:** ${projectPath}\n`;
-    markdown += `**Date:** ${new Date().toISOString()}\n\n`;
-    markdown += `---\n\n`;
-
-    for (const msg of messages) {
-      if (msg.type === "system" && msg.subtype === "init") {
-        markdown += `## System Initialization\n\n`;
-        markdown += `- Session ID: \`${msg.session_id || 'N/A'}\`\n`;
-        markdown += `- Model: \`${msg.model || 'default'}\`\n`;
-        if (msg.cwd) markdown += `- Working Directory: \`${msg.cwd}\`\n`;
-        if (msg.tools?.length) markdown += `- Tools: ${msg.tools.join(', ')}\n`;
-        markdown += `\n`;
-      } else if (msg.type === "assistant" && msg.message) {
-        markdown += `## Assistant\n\n`;
-        for (const content of msg.message.content || []) {
-          if (content.type === "text") {
-            const textContent = typeof content.text === 'string' 
-              ? content.text 
-              : (content.text?.text || JSON.stringify(content.text || content));
-            markdown += `${textContent}\n\n`;
-          } else if (content.type === "tool_use") {
-            markdown += `### Tool: ${content.name}\n\n`;
-            markdown += `\`\`\`json\n${JSON.stringify(content.input, null, 2)}\n\`\`\`\n\n`;
-          }
-        }
-        if (msg.message.usage) {
-          markdown += `*Tokens: ${msg.message.usage.input_tokens} in, ${msg.message.usage.output_tokens} out*\n\n`;
-        }
-      } else if (msg.type === "user" && msg.message) {
-        markdown += `## User\n\n`;
-        for (const content of msg.message.content || []) {
-          if (content.type === "text") {
-            const textContent = typeof content.text === 'string' 
-              ? content.text 
-              : (content.text?.text || JSON.stringify(content.text));
-            markdown += `${textContent}\n\n`;
-          } else if (content.type === "tool_result") {
-            markdown += `### Tool Result\n\n`;
-            let contentText = '';
-            if (typeof content.content === 'string') {
-              contentText = content.content;
-            } else if (content.content && typeof content.content === 'object') {
-              if (content.content.text) {
-                contentText = content.content.text;
-              } else if (Array.isArray(content.content)) {
-                contentText = content.content
-                  .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-                  .join('\n');
-              } else {
-                contentText = JSON.stringify(content.content, null, 2);
-              }
-            }
-            markdown += `\`\`\`\n${contentText}\n\`\`\`\n\n`;
-          }
-        }
-      } else if (msg.type === "result") {
-        markdown += `## Execution Result\n\n`;
-        if (msg.result) {
-          markdown += `${msg.result}\n\n`;
-        }
-        if (msg.error) {
-          markdown += `**Error:** ${msg.error}\n\n`;
-        }
-      }
-    }
-
-    await navigator.clipboard.writeText(markdown);
-    setCopyPopoverOpen(false);
-  };
-
-  const handleCheckpointSelect = async () => {
-    // Reload messages from the checkpoint
-    await loadSessionHistory();
-    // Ensure timeline reloads to highlight current checkpoint
-    setTimelineVersion((v) => v + 1);
-  };
-  
-  const handleCheckpointCreated = () => {
-    // Update checkpoint count in session metrics
-    sessionMetrics.current.checkpointCount += 1;
   };
 
   const handleCancelExecution = async () => {
@@ -953,10 +871,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         
         // Session context
         model: metrics.modelChanges.length > 0 
-          ? metrics.modelChanges[metrics.modelChanges.length - 1].to 
+          ? metrics.modelChanges[metrics.modelChanges.length - 1].to
           : 'sonnet', // Default to sonnet
-        has_checkpoints: metrics.checkpointCount > 0,
-        checkpoint_count: metrics.checkpointCount,
         was_resumed: metrics.wasResumed,
         
         // Agent context (if applicable)
@@ -1014,67 +930,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       hasActiveSessionRef.current = false;
       isListeningRef.current = false;
       setError(null);
-    }
-  };
-
-  const handleFork = (checkpointId: string) => {
-    setForkCheckpointId(checkpointId);
-    setForkSessionName(`Fork-${new Date().toISOString().slice(0, 10)}`);
-    setShowForkDialog(true);
-  };
-
-  const handleCompositionStart = () => {
-    isIMEComposingRef.current = true;
-  };
-
-  const handleCompositionEnd = () => {
-    setTimeout(() => {
-      isIMEComposingRef.current = false;
-    }, 0);
-  };
-
-  const handleConfirmFork = async () => {
-    if (!forkCheckpointId) {
-      logger.warn('Cannot fork: no checkpoint ID');
-      return;
-    }
-    if (!forkSessionName?.trim()) {
-      logger.warn('Cannot fork: no session name');
-      return;
-    }
-    if (!effectiveSession) {
-      logger.warn('Cannot fork: no effective session');
-      setError("Cannot fork: no active session");
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const newSessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await api.forkFromCheckpoint(
-        forkCheckpointId,
-        effectiveSession.id,
-        effectiveSession.project_id,
-        projectPath,
-        newSessionId,
-        forkSessionName
-      );
-
-
-      // Open the new forked session
-      // You would need to implement navigation to the new session
-      logger.log("Forked to new session:", newSessionId);
-
-      setShowForkDialog(false);
-      setForkCheckpointId(null);
-      setForkSessionName("");
-    } catch (err) {
-      logger.error("Failed to fork checkpoint:", err);
-      setError("Failed to fork checkpoint");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -1160,13 +1015,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       // Clean up listeners
       unlistenRefs.current.forEach(unlisten => unlisten());
       unlistenRefs.current = [];
-      
-      // Clear checkpoint manager when session ends
-      if (effectiveSession) {
-        api.clearCheckpointManager(effectiveSession.id).catch(err => {
-          logger.error("Failed to clear checkpoint manager:", err);
-        });
-      }
     };
   }, [effectiveSession, projectPath]);
 
@@ -1199,10 +1047,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                 top: virtualItem.start,
               }}
             >
-              <StreamMessage 
-                message={message} 
+              <StreamMessage
+                message={message}
                 streamMessages={messages}
                 onLinkDetected={handleLinkDetected}
+                messageIndex={virtualItem.index}
+                sessionId={claudeSessionId || undefined}
+                isSessionLoading={isLoading}
               />
             </div>
           );
@@ -1287,7 +1138,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   return (
     <TooltipProvider>
       <div className={cn("flex flex-col h-full bg-background", className)}>
-        <div className="w-full h-full flex flex-col">
+        <div className="w-full h-full flex flex-col flex-1 min-h-0">
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden">
@@ -1471,236 +1322,33 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               onCancel={handleCancelExecution}
               isLoading={isLoading}
               disabled={!projectPath}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
               projectPath={projectPath}
               embedded={embedded}
               showExecutionMode={tabType === "maintenance"}
               extraMenuItems={
-                <>
-                  {effectiveSession && (
-                    <TooltipSimple content="Session Timeline" side="top">
-                      <motion.div
-                        whileTap={{ scale: 0.97 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowTimeline(!showTimeline)}
-                          className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                        >
-                          <GitBranch className={cn("h-3.5 w-3.5", showTimeline && "text-primary")} />
-                        </Button>
-                      </motion.div>
-                    </TooltipSimple>
-                  )}
-                  {messages.length > 0 && (
-                    <Popover
-                      trigger={
-                        <TooltipSimple content="Copy conversation" side="top">
-                          <motion.div
-                            whileTap={{ scale: 0.97 }}
-                            transition={{ duration: 0.15 }}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </Button>
-                          </motion.div>
-                        </TooltipSimple>
-                      }
-                      content={
-                        <div className="w-44 p-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCopyAsMarkdown}
-                            className="w-full justify-start text-xs"
-                          >
-                            Copy as Markdown
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCopyAsJsonl}
-                            className="w-full justify-start text-xs"
-                          >
-                            Copy as JSONL
-                          </Button>
-                        </div>
-                      }
-                      open={copyPopoverOpen}
-                      onOpenChange={setCopyPopoverOpen}
-                      side="top"
-                      align="end"
-                    />
-                  )}
-                  <TooltipSimple content="Checkpoint Settings" side="top">
-                    <motion.div
-                      whileTap={{ scale: 0.97 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowSettings(!showSettings)}
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      >
-                        <Wrench className={cn("h-3.5 w-3.5", showSettings && "text-primary")} />
-                      </Button>
-                    </motion.div>
-                  </TooltipSimple>
-                </>
+                <button
+                  onClick={() => {
+                    setMessages([]);
+                    setError(null);
+                    setIsFirstPrompt(true);
+                    setTotalTokens(0);
+                    currentSessionIdRef.current = null;
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/80 transition-colors w-full"
+                >
+                  <span className="p-1.5 rounded-lg bg-muted/80">
+                    <Plus className="h-4 w-4 text-primary" />
+                  </span>
+                  <span className="flex-1 text-left text-sm">새 세션</span>
+                </button>
               }
             />
           </div>
 
         </ErrorBoundary>
-
-        {/* Timeline Overlay */}
-        <AnimatePresence>
-          {showTimeline && effectiveSession && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="fixed inset-0 bg-black/20 z-40"
-                onClick={() => setShowTimeline(false)}
-              />
-              {/* Panel */}
-              <motion.div
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="fixed right-0 top-9 h-[calc(100%-2.25rem)] bg-background border-l border-border shadow-xl z-50 overflow-hidden"
-                style={{ width: `${timelinePanelWidth}px`, minWidth: '280px', maxWidth: '800px' }}
-              >
-                {/* Resize Handle */}
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/50 active:bg-primary/70 transition-colors z-10"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    const startX = e.clientX;
-                    const startWidth = timelinePanelWidth;
-                    
-                    const handleMouseMove = (moveEvent: MouseEvent) => {
-                      const delta = startX - moveEvent.clientX;
-                      const newWidth = Math.min(800, Math.max(280, startWidth + delta));
-                      setTimelinePanelWidth(newWidth);
-                    };
-                    
-                    const handleMouseUp = () => {
-                      document.removeEventListener('mousemove', handleMouseMove);
-                      document.removeEventListener('mouseup', handleMouseUp);
-                    };
-                    
-                    document.addEventListener('mousemove', handleMouseMove);
-                    document.addEventListener('mouseup', handleMouseUp);
-                  }}
-                />
-                <div className="h-full flex flex-col">
-                  {/* Timeline Header */}
-                  <div className="flex items-center justify-between p-4 border-b border-border tauri-no-drag">
-                    <h3 className="text-lg font-semibold">작업 히스토리</h3>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowTimeline(false)}
-                      className="h-8 w-8"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  {/* Timeline Content */}
-                  <div className="flex-1 overflow-y-auto p-4">
-                    <TimelineNavigator
-                      sessionId={effectiveSession.id}
-                      projectId={effectiveSession.project_id}
-                      projectPath={projectPath}
-                      currentMessageIndex={messages.length - 1}
-                      onCheckpointSelect={handleCheckpointSelect}
-                      onFork={handleFork}
-                      onCheckpointCreated={handleCheckpointCreated}
-                      refreshVersion={timelineVersion}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
       </div>
-
-      {/* Fork Dialog */}
-      <Dialog open={showForkDialog} onOpenChange={setShowForkDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Fork Session</DialogTitle>
-            <DialogDescription>
-              Create a new session branch from the selected checkpoint.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="fork-name">New Session Name</Label>
-              <Input
-                id="fork-name"
-                placeholder="e.g., Alternative approach"
-                value={forkSessionName}
-                onChange={(e) => setForkSessionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isLoading) {
-                    if (e.nativeEvent.isComposing || isIMEComposingRef.current) {
-                      return;
-                    }
-                    handleConfirmFork();
-                  }
-                }}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowForkDialog(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmFork}
-              disabled={isLoading || !forkSessionName.trim()}
-            >
-              Create Fork
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Settings Dialog */}
-      {showSettings && effectiveSession && (
-        <Dialog open={showSettings} onOpenChange={setShowSettings}>
-          <DialogContent className="max-w-2xl">
-            <CheckpointSettings
-              sessionId={effectiveSession.id}
-              projectId={effectiveSession.project_id}
-              projectPath={projectPath}
-              onClose={() => setShowSettings(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Slash Commands Settings Dialog */}
       {showSlashCommandsSettings && (

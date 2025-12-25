@@ -36,16 +36,16 @@ import {
 } from "./ToolWidgets";
 import { InlineToolBadge, ToolBadgeGroup } from "./InlineToolBadge";
 import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
-import { 
-  FileText as FileTextIcon, 
-  Palette, 
-  Paintbrush, 
-  Settings, 
-  Boxes, 
-  Database, 
-  LayoutList, 
-  Rocket, 
-  CheckCircle 
+import {
+  FileText as FileTextIcon,
+  Palette,
+  Paintbrush,
+  Settings,
+  Boxes,
+  Database,
+  LayoutList,
+  Rocket,
+  CheckCircle
 } from "@/lib/icons";
 
 // Icon mapping for workflow prompts
@@ -69,6 +69,12 @@ interface StreamMessageProps {
   className?: string;
   streamMessages: ClaudeStreamMessage[];
   onLinkDetected?: (url: string) => void;
+  /** Index of this message in the conversation */
+  messageIndex?: number;
+  /** Session ID */
+  sessionId?: string;
+  /** Whether the session is currently loading */
+  isSessionLoading?: boolean;
 }
 
 /**
@@ -77,7 +83,12 @@ interface StreamMessageProps {
  * - Natural flowing conversation
  * - Inline tool badges with slide-over details
  */
-const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, className, streamMessages, onLinkDetected }) => {
+const StreamMessageComponent: React.FC<StreamMessageProps> = ({
+  message,
+  className,
+  streamMessages,
+  onLinkDetected,
+}) => {
   const [toolResults, setToolResults] = useState<Map<string, any>>(new Map());
   
   const { theme } = useTheme();
@@ -239,13 +250,6 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                 {toolBadges}
               </ToolBadgeGroup>
             )}
-            
-            {/* Usage info - subtle */}
-            {msg.usage && (
-              <div className="text-xs text-muted-foreground/60">
-                {msg.usage.input_tokens + msg.usage.output_tokens} tokens
-              </div>
-            )}
           </div>
         </div>
       );
@@ -258,21 +262,36 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       const msg = message.message || message;
       let hasContent = false;
       const contentParts: React.ReactNode[] = [];
-      
+      let isSimpleTextPrompt = false;
+      let simpleTextContent = '';
+
+      // displayText가 있으면 우선 사용 (워크플로우 짧은 표시 텍스트)
+      if (message.displayText) {
+        const { icon } = getPromptDisplayInfo(message.displayText);
+        return (
+          <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <WorkflowIcon icon={icon} className="h-4 w-4" />
+              <span>{message.displayText}</span>
+            </div>
+          </div>
+        );
+      }
+
       // Handle string content
       if (typeof msg.content === 'string' || (msg.content && !Array.isArray(msg.content))) {
         const contentStr = typeof msg.content === 'string' ? msg.content : String(msg.content);
         if (contentStr.trim()) {
           hasContent = true;
-          
+
           // Command message
           const commandMatch = contentStr.match(/<command-name>(.+?)<\/command-name>[\s\S]*?<command-message>(.+?)<\/command-message>[\s\S]*?<command-args>(.*?)<\/command-args>/);
           if (commandMatch) {
             const [, commandName, commandMessage, commandArgs] = commandMatch;
             contentParts.push(
-              <CommandWidget 
+              <CommandWidget
                 key="cmd"
-                commandName={commandName.trim()} 
+                commandName={commandName.trim()}
                 commandMessage={commandMessage.trim()}
                 commandArgs={commandArgs?.trim()}
               />
@@ -285,23 +304,24 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
               );
             }
           } else if (isAnyonWorkflowCommand(contentStr.trim())) {
+            // Workflow command
             const { text, icon } = getPromptDisplayInfo(contentStr.trim());
-            contentParts.push(
-              <div key="workflow" className="flex items-center gap-2 text-sm font-medium text-primary">
-                <WorkflowIcon icon={icon} className="h-4 w-4" />
-                <span>{text}</span>
+            return (
+              <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <WorkflowIcon icon={icon} className="h-4 w-4" />
+                  <span>{text}</span>
+                </div>
               </div>
             );
           } else {
-            contentParts.push(
-              <div key="text" className="text-sm whitespace-pre-wrap">
-                {contentStr}
-              </div>
-            );
+            // Simple text prompt
+            isSimpleTextPrompt = true;
+            simpleTextContent = contentStr;
           }
         }
       }
-      
+
       // Handle array content
       if (Array.isArray(msg.content)) {
         msg.content.forEach((content: any, idx: number) => {
@@ -325,7 +345,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
               }
             }
             if (hasWidget) return;
-            
+
             // Render tool result
             let contentText = '';
             if (typeof content.content === 'string') {
@@ -337,7 +357,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
             } else if (content.content) {
               contentText = JSON.stringify(content.content, null, 2);
             }
-            
+
             // System reminder
             const reminderMatch = contentText.match(/<system-reminder>(.*?)<\/system-reminder>/s);
             if (reminderMatch) {
@@ -349,7 +369,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
               );
               return;
             }
-            
+
             if (contentText.trim()) {
               hasContent = true;
               contentParts.push(
@@ -359,12 +379,12 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
               );
             }
           }
-          
+
           if (content.type === "text") {
             const textContent = typeof content.text === 'string' ? content.text : (content.text?.text || JSON.stringify(content.text));
             if (textContent.trim()) {
               hasContent = true;
-              
+
               if (isAnyonWorkflowCommand(textContent.trim())) {
                 const { text, icon } = getPromptDisplayInfo(textContent.trim());
                 contentParts.push(
@@ -374,25 +394,47 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                   </div>
                 );
               } else {
-                contentParts.push(
-                  <div key={`txt-${idx}`} className="text-sm whitespace-pre-wrap">
-                    {textContent}
-                  </div>
-                );
+                // Check if this is a simple text user prompt (first text content)
+                if (contentParts.length === 0 && !isSimpleTextPrompt) {
+                  isSimpleTextPrompt = true;
+                  simpleTextContent = textContent;
+                } else {
+                  contentParts.push(
+                    <div key={`txt-${idx}`} className="text-sm whitespace-pre-wrap">
+                      {textContent}
+                    </div>
+                  );
+                }
               }
             }
           }
         });
       }
-      
-      if (!hasContent) return null;
+
+      if (!hasContent && !isSimpleTextPrompt) return null;
 
       // Check for selected element metadata
       const selectedElement = message.selectedElement;
 
+      // If this is a simple text prompt with no other content
+      if (isSimpleTextPrompt && contentParts.length === 0) {
+        return (
+          <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
+            <div className="text-sm whitespace-pre-wrap">
+              {simpleTextContent}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
           <div className="space-y-2">
+            {isSimpleTextPrompt && (
+              <div key="simple-text" className="text-sm whitespace-pre-wrap">
+                {simpleTextContent}
+              </div>
+            )}
             {contentParts}
           </div>
           {/* Selected element badge */}
@@ -413,18 +455,13 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       );
     }
 
-    // Result message - compact metadata bar
+    // Result message - compact metadata bar (only show errors and duration)
     if (message.type === "result") {
       const isError = message.is_error || message.subtype?.includes("error");
-      const hasMetadata = message.cost_usd !== undefined || 
-                          message.total_cost_usd !== undefined || 
-                          message.duration_ms !== undefined || 
-                          message.num_turns !== undefined || 
-                          message.usage !== undefined ||
-                          message.error;
-      
+      const hasMetadata = message.duration_ms !== undefined || message.error;
+
       if (!hasMetadata && !isError) return null;
-      
+
       return (
         <div className={cn(
           "flex items-center gap-4 px-4 py-2 text-xs border-t border-border/30",
@@ -436,19 +473,10 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
           ) : (
             <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
           )}
-          
+
           {message.error && <span className="text-destructive">{message.error}</span>}
-          {(message.cost_usd !== undefined || message.total_cost_usd !== undefined) && (
-            <span>${((message.cost_usd || message.total_cost_usd)!).toFixed(4)}</span>
-          )}
           {message.duration_ms !== undefined && (
             <span>{(message.duration_ms / 1000).toFixed(1)}s</span>
-          )}
-          {message.num_turns !== undefined && (
-            <span>{message.num_turns} turns</span>
-          )}
-          {message.usage && (
-            <span>{message.usage.input_tokens + message.usage.output_tokens} tokens</span>
           )}
         </div>
       );

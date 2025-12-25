@@ -37,7 +37,7 @@ interface AuthState {
   updateUserSetting: (key: string, value: any) => Promise<void>;
 }
 
-const API_URL = 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
 
 // Dev user for development environment
 const DEV_USER: User = {
@@ -253,6 +253,18 @@ export const useAuthStore = create<AuthState>()(
         accessToken: isDev ? 'dev-token' : state.accessToken,
         isAuthenticated: isDev ? true : state.isAuthenticated,
       }),
+      // Merge function to ensure dev user is always used in development mode
+      merge: (persistedState, currentState) => {
+        const merged = { ...currentState, ...(persistedState as Partial<AuthState>) };
+        // In dev mode, always override with dev user regardless of persisted state
+        if (isDev) {
+          merged.user = DEV_USER;
+          merged.subscription = DEV_SUBSCRIPTION;
+          merged.accessToken = 'dev-token';
+          merged.isAuthenticated = true;
+        }
+        return merged;
+      },
     }
   )
 );

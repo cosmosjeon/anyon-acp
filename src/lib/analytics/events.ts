@@ -1,4 +1,4 @@
-import type { 
+import type {
   EventName,
   FeatureUsageProperties,
   ErrorProperties,
@@ -11,8 +11,6 @@ import type {
   PromptSubmittedProperties,
   SessionStoppedProperties,
   EnhancedSessionStoppedProperties,
-  CheckpointCreatedProperties,
-  CheckpointRestoredProperties,
   ToolExecutedProperties,
   AgentStartedProperties,
   AgentProgressProperties,
@@ -52,8 +50,6 @@ export const ANALYTICS_EVENTS = {
   SESSION_RESUMED: 'session_resumed' as EventName,
   PROMPT_SUBMITTED: 'prompt_submitted' as EventName,
   SESSION_STOPPED: 'session_stopped' as EventName,
-  CHECKPOINT_CREATED: 'checkpoint_created' as EventName,
-  CHECKPOINT_RESTORED: 'checkpoint_restored' as EventName,
   TOOL_EXECUTED: 'tool_executed' as EventName,
   
   // Feature usage events
@@ -254,8 +250,6 @@ export const eventBuilders = {
       errors_encountered: props.errors_encountered,
       // Session context
       model: props.model,
-      has_checkpoints: props.has_checkpoints,
-      checkpoint_count: props.checkpoint_count,
       was_resumed: props.was_resumed,
       // Agent context
       agent_type: props.agent_type,
@@ -268,23 +262,7 @@ export const eventBuilders = {
       pending_prompts_count: props.pending_prompts_count,
     },
   }),
-  
-  checkpointCreated: (props: CheckpointCreatedProperties) => ({
-    event: ANALYTICS_EVENTS.CHECKPOINT_CREATED,
-    properties: {
-      category: 'session',
-      ...props,
-    },
-  }),
-  
-  checkpointRestored: (props: CheckpointRestoredProperties) => ({
-    event: ANALYTICS_EVENTS.CHECKPOINT_RESTORED,
-    properties: {
-      category: 'session',
-      ...props,
-    },
-  }),
-  
+
   toolExecuted: (props: ToolExecutedProperties) => ({
     event: ANALYTICS_EVENTS.TOOL_EXECUTED,
     properties: {

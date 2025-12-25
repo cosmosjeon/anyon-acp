@@ -638,6 +638,10 @@ const ENV_VARS_EXACT: &[&str] = &[
     "HTTPS_PROXY",
     "NO_PROXY",
     "ALL_PROXY",
+    // Claude Code API keys
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
 ];
 
 /// Determines if an environment variable should be inherited

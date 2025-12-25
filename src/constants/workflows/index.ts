@@ -18,7 +18,6 @@ export const WORKFLOW_IDS = [
   'startup-architecture',
   'startup-erd',
   // Development workflows
-  'pm-opensource',
   'pm-orchestrator',
   'pm-executor',
   'pm-reviewer',
