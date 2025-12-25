@@ -718,18 +718,37 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
     // Collect inherited environment variables
     let mut env_vars = get_inherited_env_vars();
 
-    // First, try to load env vars from ~/.claude/settings.local.json
+    // Priority 1: Check if Claude OAuth is active
+    // If OAuth is active, don't inject any API keys - let Claude CLI handle it
+    if is_claude_oauth_active() {
+        info!("Claude OAuth is active - using OAuth authentication");
+        return CommandEnvConfig {
+            env_vars,
+            modified_path: compute_modified_path(program, &std::env::var("PATH").unwrap_or_default()),
+        };
+    }
+
+    // Priority 2: Check for ANYON API mode (settings.local.json with ANTHROPIC_BASE_URL)
     if let Some(claude_env_vars) = get_claude_settings_env_vars() {
-        for (key, value) in claude_env_vars {
-            info!("Injecting env var from Claude settings: {}", key);
-            env_vars.push((key, value));
+        // Only use settings.local.json if ANTHROPIC_BASE_URL is present (indicates ANYON API mode)
+        let has_base_url = claude_env_vars.iter().any(|(k, _)| k == "ANTHROPIC_BASE_URL");
+        if has_base_url {
+            info!("ANYON API mode detected - using proxy authentication");
+            for (key, value) in claude_env_vars {
+                info!("Injecting env var from Claude settings: {}", key);
+                env_vars.push((key, value));
+            }
+            return CommandEnvConfig {
+                env_vars,
+                modified_path: compute_modified_path(program, &std::env::var("PATH").unwrap_or_default()),
+            };
         }
     }
 
-    // If ANTHROPIC_API_KEY is still not set, try to get from keychain
+    // Priority 3: Fall back to keychain API key
     if !env_vars.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY") {
         if let Some(api_key) = get_api_key_from_keychain() {
-            info!("Injecting ANTHROPIC_API_KEY from keychain");
+            info!("Using API key from keychain");
             env_vars.push(("ANTHROPIC_API_KEY".to_string(), api_key));
         }
     }
@@ -757,6 +776,46 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
 const ANYON_SERVICE_NAME: &str = "anyon-claude";
 /// Account name for API key in keychain
 const API_KEY_ACCOUNT: &str = "anthropic_api_key";
+/// Claude Code keychain service name for OAuth
+const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+
+/// Check if Claude OAuth is active by reading keychain
+fn is_claude_oauth_active() -> bool {
+    #[cfg(not(target_os = "windows"))]
+    {
+        use keyring::Entry;
+
+        // Try macOS/Linux keychain
+        if let Ok(entry) = Entry::new(CLAUDE_KEYCHAIN_SERVICE, "default") {
+            if let Ok(creds_json) = entry.get_password() {
+                // Try to parse as JSON to check if OAuth token exists and is not expired
+                if let Ok(creds) = serde_json::from_str::<serde_json::Value>(&creds_json) {
+                    if let Some(oauth) = creds.get("claudeAiOauth") {
+                        if let Some(expires_at) = oauth.get("expiresAt").and_then(|v| v.as_i64()) {
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_millis() as i64)
+                                .unwrap_or(0);
+
+                            let is_valid = expires_at > now;
+                            debug!("Claude OAuth found, valid: {}", is_valid);
+                            return is_valid;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows implementation would go here
+        // For now, return false as we don't have Windows OAuth check
+        debug!("Windows OAuth check not implemented");
+    }
+
+    false
+}
 
 /// Get environment variables from ~/.claude/settings.local.json
 fn get_claude_settings_env_vars() -> Option<Vec<(String, String)>> {

@@ -3,7 +3,8 @@ use std::fs;
 use std::process::Command;
 use crate::claude_binary::find_claude_binary;
 
-const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Safe Storage";
+const CLAUDE_KEYCHAIN_ACCOUNT: &str = "Claude Key";
 const ANYON_SERVICE_NAME: &str = "anyon-claude";
 const API_KEY_ACCOUNT: &str = "anthropic_api_key";
 
@@ -178,7 +179,7 @@ fn read_claude_credentials() -> Result<(ClaudeCredentials, Option<String>), Stri
 #[cfg(target_os = "macos")]
 fn read_credentials_macos() -> Result<(ClaudeCredentials, Option<String>), String> {
     let output = Command::new("security")
-        .args(["find-generic-password", "-s", CLAUDE_KEYCHAIN_SERVICE, "-w"])
+        .args(["find-generic-password", "-s", CLAUDE_KEYCHAIN_SERVICE, "-a", CLAUDE_KEYCHAIN_ACCOUNT, "-w"])
         .output()
         .map_err(|e| format!("Keychain 명령 실행 실패: {}", e))?;
 
@@ -395,6 +396,7 @@ fn get_stored_api_key() -> Result<Option<String>, String> {
 }
 
 /// API 키 저장 및 apiKeyHelper 스크립트 설정
+/// 다른 인증 방법(ANYON API)을 자동으로 제거합니다
 #[tauri::command]
 pub async fn claude_auth_save_api_key(api_key: String) -> Result<(), String> {
     // 1. 형식 검증
@@ -402,7 +404,12 @@ pub async fn claude_auth_save_api_key(api_key: String) -> Result<(), String> {
         return Err("API 키는 'sk-ant-'로 시작해야 합니다.".to_string());
     }
 
-    // 2. Keychain/Credential Manager에 저장
+    // 2. ANYON API 설정 제거 (상호 배타적)
+    if let Err(e) = claude_auth_disable_anyon_api().await {
+        log::warn!("ANYON API 비활성화 실패 (무시): {}", e);
+    }
+
+    // 3. Keychain/Credential Manager에 저장
     let entry = keyring::Entry::new(ANYON_SERVICE_NAME, API_KEY_ACCOUNT)
         .map_err(|e| format!("Keyring Entry 생성 실패: {}", e))?;
 
@@ -693,8 +700,14 @@ pub struct AnyonApiConfig {
 
 /// ANYON API 모드 활성화
 /// Claude Code가 ANYON 서버 프록시를 통해 API를 사용하도록 설정
+/// 다른 인증 방법(API Key)을 자동으로 제거합니다
 #[tauri::command]
 pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), String> {
+    // 1. Keychain에서 API Key 제거 (상호 배타적)
+    if let Err(e) = claude_auth_delete_api_key().await {
+        log::warn!("API Key 제거 실패 (무시): {}", e);
+    }
+
     let home = dirs::home_dir()
         .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
