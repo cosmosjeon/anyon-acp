@@ -11,15 +11,13 @@ import { createLogger } from "@/lib/logger";
 
 const logger = createLogger('ClaudeCodeSession');
 import {
-  Copy,
   ChevronDown,
   ChevronUp,
   X,
   Loader2,
-  AlertCircle
+  AlertCircle,
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
-import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type Session } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -145,8 +143,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   // Streaming text state for real-time typing effect
   const [streamingText, setStreamingText] = useState<string>('');
   const accumulatedTextRef = useRef<string>('');
-  const [rawJsonlOutput, setRawJsonlOutput] = useState<string[]>([]);
-  const [copyPopoverOpen, setCopyPopoverOpen] = useState(false);
   const [isFirstPrompt, setIsFirstPrompt] = useState(!session);
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
@@ -165,6 +161,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   
   // Add collapsed state for queued prompts
   const [queuedPromptsCollapsed, setQueuedPromptsCollapsed] = useState(false);
+
+  // Model selection state
+  const [selectedModel, setSelectedModel] = useState<"haiku" | "sonnet" | "opus">("sonnet");
 
   const parentRef = useRef<HTMLDivElement>(null);
   const unlistenRefs = useRef<UnlistenFn[]>([]);
@@ -528,7 +527,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
       console.log('[ClaudeCodeSession] Setting messages:', loadedMessages.length);
       setMessages(loadedMessages);
-      setRawJsonlOutput(history.map(h => JSON.stringify(h)));
 
       // After loading history, we're continuing a conversation
       setIsFirstPrompt(false);
@@ -612,9 +610,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
         if (!isMountedRef.current) return;
 
-        // Store raw JSONL
-        setRawJsonlOutput(prev => [...prev, event.payload]);
-
         // Parse and display
         const message = JSON.parse(event.payload) as ClaudeStreamMessage;
         setMessages(prev => [...prev, message]);
@@ -657,7 +652,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     startNewSession: (backendPrompt: string, userMessage?: string) => {
       // Clear current session and start a new one
       setMessages([]);
-      setRawJsonlOutput([]);
       setError(null);
       setIsFirstPrompt(true);
       setTotalTokens(0);
@@ -724,7 +718,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           isMountedRef,
           accumulatedTextRef,
           setStreamingText,
-          setRawJsonlOutput,
           setMessages,
           sessionMetrics,
           workflowTracking,
@@ -810,84 +803,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       setIsLoading(false);
       hasActiveSessionRef.current = false;
     }
-  };
-
-  const handleCopyAsJsonl = async () => {
-    const jsonl = rawJsonlOutput.join('\n');
-    await navigator.clipboard.writeText(jsonl);
-    setCopyPopoverOpen(false);
-  };
-
-  const handleCopyAsMarkdown = async () => {
-    let markdown = `# Claude Code Session\n\n`;
-    markdown += `**Project:** ${projectPath}\n`;
-    markdown += `**Date:** ${new Date().toISOString()}\n\n`;
-    markdown += `---\n\n`;
-
-    for (const msg of messages) {
-      if (msg.type === "system" && msg.subtype === "init") {
-        markdown += `## System Initialization\n\n`;
-        markdown += `- Session ID: \`${msg.session_id || 'N/A'}\`\n`;
-        markdown += `- Model: \`${msg.model || 'default'}\`\n`;
-        if (msg.cwd) markdown += `- Working Directory: \`${msg.cwd}\`\n`;
-        if (msg.tools?.length) markdown += `- Tools: ${msg.tools.join(', ')}\n`;
-        markdown += `\n`;
-      } else if (msg.type === "assistant" && msg.message) {
-        markdown += `## Assistant\n\n`;
-        for (const content of msg.message.content || []) {
-          if (content.type === "text") {
-            const textContent = typeof content.text === 'string' 
-              ? content.text 
-              : (content.text?.text || JSON.stringify(content.text || content));
-            markdown += `${textContent}\n\n`;
-          } else if (content.type === "tool_use") {
-            markdown += `### Tool: ${content.name}\n\n`;
-            markdown += `\`\`\`json\n${JSON.stringify(content.input, null, 2)}\n\`\`\`\n\n`;
-          }
-        }
-        if (msg.message.usage) {
-          markdown += `*Tokens: ${msg.message.usage.input_tokens} in, ${msg.message.usage.output_tokens} out*\n\n`;
-        }
-      } else if (msg.type === "user" && msg.message) {
-        markdown += `## User\n\n`;
-        for (const content of msg.message.content || []) {
-          if (content.type === "text") {
-            const textContent = typeof content.text === 'string' 
-              ? content.text 
-              : (content.text?.text || JSON.stringify(content.text));
-            markdown += `${textContent}\n\n`;
-          } else if (content.type === "tool_result") {
-            markdown += `### Tool Result\n\n`;
-            let contentText = '';
-            if (typeof content.content === 'string') {
-              contentText = content.content;
-            } else if (content.content && typeof content.content === 'object') {
-              if (content.content.text) {
-                contentText = content.content.text;
-              } else if (Array.isArray(content.content)) {
-                contentText = content.content
-                  .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
-                  .join('\n');
-              } else {
-                contentText = JSON.stringify(content.content, null, 2);
-              }
-            }
-            markdown += `\`\`\`\n${contentText}\n\`\`\`\n\n`;
-          }
-        }
-      } else if (msg.type === "result") {
-        markdown += `## Execution Result\n\n`;
-        if (msg.result) {
-          markdown += `${msg.result}\n\n`;
-        }
-        if (msg.error) {
-          markdown += `**Error:** ${msg.error}\n\n`;
-        }
-      }
-    }
-
-    await navigator.clipboard.writeText(markdown);
-    setCopyPopoverOpen(false);
   };
 
   const handleCancelExecution = async () => {
@@ -1195,7 +1110,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   return (
     <TooltipProvider>
       <div className={cn("flex flex-col h-full bg-background", className)}>
-        <div className="w-full h-full flex flex-col">
+        <div className="w-full h-full flex flex-col flex-1 min-h-0">
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden">
@@ -1379,57 +1294,11 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               onCancel={handleCancelExecution}
               isLoading={isLoading}
               disabled={!projectPath}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
               projectPath={projectPath}
               embedded={embedded}
               showExecutionMode={tabType === "maintenance"}
-              extraMenuItems={
-                <>
-                  {messages.length > 0 && (
-                    <Popover
-                      trigger={
-                        <TooltipSimple content="Copy conversation" side="top">
-                          <motion.div
-                            whileTap={{ scale: 0.97 }}
-                            transition={{ duration: 0.15 }}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </Button>
-                          </motion.div>
-                        </TooltipSimple>
-                      }
-                      content={
-                        <div className="w-44 p-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCopyAsMarkdown}
-                            className="w-full justify-start text-xs"
-                          >
-                            Copy as Markdown
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCopyAsJsonl}
-                            className="w-full justify-start text-xs"
-                          >
-                            Copy as JSONL
-                          </Button>
-                        </div>
-                      }
-                      open={copyPopoverOpen}
-                      onOpenChange={setCopyPopoverOpen}
-                      side="top"
-                      align="end"
-                    />
-                  )}
-                </>
-              }
             />
           </div>
 

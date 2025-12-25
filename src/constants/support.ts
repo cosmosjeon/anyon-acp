@@ -3,8 +3,8 @@
  */
 
 export const SUPPORT_CONFIG = {
-  // 카카오톡 채널 URL (production에서 실제 URL로 교체)
-  KAKAO_CHANNEL_URL: 'https://pf.kakao.com/_mock',
+  // 카카오톡 채널 URL
+  KAKAO_CHANNEL_URL: 'https://pf.kakao.com/_LxnByn',
 
   // 외주 상담 폼 URL
   OUTSOURCE_FORM_URL: 'https://forms.google.com/mock-form',

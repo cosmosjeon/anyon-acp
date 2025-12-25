@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { open } from '@tauri-apps/plugin-shell';
 import { Headphones, X, MessageCircle, Bot } from '@/lib/icons';
 import { SUPPORT_CONFIG } from '@/constants/support';
 import { cn } from '@/lib/utils';
@@ -61,8 +62,8 @@ export function FloatingHelpButton({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isExpanded]);
 
-  const handleKakaoClick = useCallback(() => {
-    window.open(SUPPORT_CONFIG.KAKAO_CHANNEL_URL, '_blank');
+  const handleKakaoClick = useCallback(async () => {
+    await open(SUPPORT_CONFIG.KAKAO_CHANNEL_URL);
     setIsExpanded(false);
   }, []);
 

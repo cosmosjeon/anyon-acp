@@ -6,17 +6,18 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 71 |
+| **React Components** | 75 |
 | **UI Components** | 20 |
 | **Widget Components** | 29 |
 | **Preview Components** | 6 |
-| **Claude Session Components** | 1 |
+| **Claude Session Components** | 12 |
 | **Zustand Stores** | 5 |
 | **Custom Hooks** | 13 |
 | **Context Providers** | 2 |
 
 > Last synced: 2025-12-25
 > Note: CheckpointSettings and TimelineNavigator components removed (checkpoint system deprecated)
+> Added: ToolsMenu, ExecutionControlBar, promptHandlers.ts, support.ts constants
 
 ---
 
@@ -48,16 +49,24 @@
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
-| `ClaudeCodeSession` | ~1000 | Main chat interface |
+| `ClaudeCodeSession` | ~1330 | Main chat interface with streaming, queued prompts, preview |
 | `MessageList` | ~200 | Message display (claude-code-session/) |
 | `PromptQueue` | ~150 | Queue management (claude-code-session/) |
 | `SessionHeader` | ~120 | Session header (claude-code-session/) |
-| `StreamMessage` | ~300 | Stream message renderer |
+| `StreamMessage` | ~720 | Stream message renderer with tool widgets |
 | `StreamingText` | ~100 | Streaming text animation |
 | `SessionList` | ~200 | Session list display |
 | `SessionOutputViewer` | ~180 | Session output viewer |
-| `FloatingPromptInput` | ~150 | Floating prompt input |
+| `FloatingPromptInput` | ~920 | ChatGPT-style prompt input with file/slash pickers |
 | `RunningClaudeSessions` | ~150 | Running sessions list |
+| `ToolsMenu` | ~485 | Model/thinking/execution mode menu popover |
+| `ExecutionControlBar` | ~85 | Floating execution control bar (stop, elapsed time) |
+
+### Chat/Session Utilities (claude-session/)
+
+| Module | Lines | Purpose |
+|--------|-------|---------|
+| `promptHandlers.ts` | ~720 | Extracted handlers for handleSendPrompt (validation, queue, stream, completion) |
 
 ### Preview
 
@@ -76,7 +85,7 @@
 | Component | Lines | Purpose |
 |-----------|-------|---------|
 | `Agents` | ~400 | Agent browser main view |
-| `AgentExecution` | ~400 | Agent run view |
+| `AgentExecution` | ~910 | Agent run view with virtualized output |
 | `AgentRunsList` | ~200 | Agent runs list |
 | `AgentRunView` | ~180 | Single agent run view |
 | `AgentRunOutputViewer` | ~150 | Run output viewer |
@@ -348,9 +357,22 @@ Located in `src/hooks/` (12 hooks):
 | Component | File | Purpose |
 |-----------|------|---------|
 | `AIChatModal` | `src/components/help/AIChatModal.tsx` | AI-powered help chat modal |
-| `FloatingHelpButton` | `src/components/help/FloatingHelpButton.tsx` | Floating help button component |
+| `FloatingHelpButton` | `src/components/help/FloatingHelpButton.tsx` | Floating FAB with Kakao/AI chat options (~185 lines) |
 | `PlanningCompleteModal` | `src/components/help/PlanningCompleteModal.tsx` | Planning completion modal |
 | `PreviewWelcomeModal` | `src/components/help/PreviewWelcomeModal.tsx` | Preview welcome modal |
+
+### Planning Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `PlanningDocsPanel` | `src/components/planning/PlanningDocsPanel.tsx` | 6-step workflow progress panel (~380 lines) |
+| `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
+
+### Constants
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `support.ts` | `src/constants/support.ts` | Beta support system config (Kakao URL, AI chat, UI settings) |
 
 ---
 

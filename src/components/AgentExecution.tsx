@@ -106,7 +106,6 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
 
   // Execution stats
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
-  const [totalTokens, setTotalTokens] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
   const [isFullscreenModalOpen, setIsFullscreenModalOpen] = useState(false);
@@ -258,21 +257,6 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       }
     };
   }, [isRunning, executionStartTime]);
-
-  // Calculate total tokens from messages
-  useEffect(() => {
-    const tokens = messages.reduce((total, msg) => {
-      if (msg.message?.usage) {
-        return total + msg.message.usage.input_tokens + msg.message.usage.output_tokens;
-      }
-      if (msg.usage) {
-        return total + msg.usage.input_tokens + msg.usage.output_tokens;
-      }
-      return total;
-    }, 0);
-    setTotalTokens(tokens);
-  }, [messages]);
-
 
   // Project path selection is handled upstream when opening an execution tab
 
@@ -784,7 +768,6 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       <ExecutionControlBar
         isExecuting={isRunning}
         onStop={handleStop}
-        totalTokens={totalTokens}
         elapsedTime={elapsedTime}
       />
 

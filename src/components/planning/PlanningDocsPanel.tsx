@@ -184,51 +184,69 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       {/* 프로그레스 바 영역 */}
       <div className="flex-shrink-0 border-b px-4 py-3 bg-background">
 
-        {/* 프로그레스 바 */}
-        <div className="relative">
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${(progress.completed / progress.total) * 100}%` }}
-            />
-          </div>
+        {/* 단계 인디케이터 + 레이블 통합 */}
+        <div className="flex justify-between">
+          {WORKFLOW_SEQUENCE.map((step, index) => {
+            const doc = documents.find(d => d.id === step.id);
+            const isCompleted = doc?.exists;
+            const isActive = activeDocId === step.id;
+            const isEnabled = isTabEnabled(index);
 
-          {/* 단계 인디케이터 */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between px-0">
-            {WORKFLOW_SEQUENCE.map((step, index) => {
-              const doc = documents.find(d => d.id === step.id);
-              const isCompleted = doc?.exists;
-              const isActive = activeDocId === step.id;
-              const isEnabled = isTabEnabled(index);
+            // 짧은 약어 매핑
+            const shortLabel: Record<string, string> = {
+              'prd': 'PRD',
+              'ux-design': 'UX',
+              'design-guide': 'UI',
+              'trd': 'TRD',
+              'architecture': 'Arch',
+              'erd': 'ERD',
+            };
 
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => handleTabClick(step.id)}
-                  disabled={!isEnabled}
+            return (
+              <button
+                key={step.id}
+                onClick={() => handleTabClick(step.id)}
+                disabled={!isEnabled}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 group",
+                  isEnabled && "cursor-pointer",
+                  !isEnabled && "cursor-not-allowed"
+                )}
+                title={step.title}
+              >
+                {/* 인디케이터 점 */}
+                <div
                   className={cn(
                     "w-3 h-3 rounded-full border-2 transition-all",
                     isCompleted && "bg-primary border-primary",
                     !isCompleted && isEnabled && "bg-background border-muted-foreground/40",
                     !isCompleted && !isEnabled && "bg-muted border-muted-foreground/20",
                     isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                    isEnabled && "cursor-pointer hover:scale-110",
-                    !isEnabled && "cursor-not-allowed"
+                    isEnabled && "group-hover:scale-110"
                   )}
-                  title={step.title}
                 />
-              );
-            })}
-          </div>
+                {/* 레이블 */}
+                <span
+                  className={cn(
+                    "text-[10px] transition-colors",
+                    isActive && "text-foreground font-medium",
+                    !isActive && isEnabled && "text-muted-foreground group-hover:text-foreground",
+                    !isEnabled && "text-muted-foreground/50"
+                  )}
+                >
+                  {shortLabel[step.id] || step.title}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* 단계 레이블 (간소화) */}
-        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-          {WORKFLOW_SEQUENCE.map((step) => (
-            <span key={step.id} className="w-8 text-center truncate">
-              {step.title.split(' ')[0]}
-            </span>
-          ))}
+        {/* 프로그레스 바 */}
+        <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-300"
+            style={{ width: `${(progress.completed / progress.total) * 100}%` }}
+          />
         </div>
       </div>
 

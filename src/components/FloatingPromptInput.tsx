@@ -2,29 +2,17 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
-  Maximize2,
-  Minimize2,
-  ChevronUp,
-  Sparkles,
-  Zap,
   Square,
-  Brain,
-  Lightbulb,
-  Cpu,
-  Rocket,
-  Loader2,
-  FileText,
-  Play,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { TooltipProvider, TooltipSimple, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip-modern";
+import { TooltipProvider, TooltipSimple } from "@/components/ui/tooltip-modern";
 import { FilePicker } from "./FilePicker";
 import { SlashCommandPicker } from "./SlashCommandPicker";
 import { ImagePreview } from "./ImagePreview";
 import { SelectedComponentsDisplay } from "./preview/SelectedComponentsDisplay";
+import { ToolsMenu, THINKING_MODES, type ThinkingMode, type ExecutionMode } from "./ToolsMenu";
 import { type FileEntry, type SlashCommand } from "@/lib/api";
 
 // Conditional import for Tauri webview window
@@ -40,10 +28,8 @@ try {
 // Web-compatible replacement
 const getCurrentWebviewWindow = tauriGetCurrentWebviewWindow || (() => ({ listen: () => Promise.resolve(() => {}) }));
 
-/**
- * Execution mode type
- */
-export type ExecutionMode = "execute" | "plan";
+// Re-export ExecutionMode for external use
+export type { ExecutionMode } from "./ToolsMenu";
 
 interface FloatingPromptInputProps {
   /**
@@ -59,9 +45,13 @@ interface FloatingPromptInputProps {
    */
   disabled?: boolean;
   /**
-   * Default model to select
+   * Selected model (controlled from parent)
    */
-  defaultModel?: "haiku" | "sonnet" | "opus";
+  selectedModel: "haiku" | "sonnet" | "opus";
+  /**
+   * Callback when model changes
+   */
+  onModelChange: (model: "haiku" | "sonnet" | "opus") => void;
   /**
    * Project path for file picker
    */
@@ -99,185 +89,15 @@ export interface FloatingPromptInputRef {
 }
 
 /**
- * Thinking mode type definition
- */
-type ThinkingMode = "auto" | "think" | "think_hard" | "think_harder" | "ultrathink";
-
-/**
- * Thinking mode configuration
- */
-type ThinkingModeConfig = {
-  id: ThinkingMode;
-  name: string;
-  description: string;
-  level: number; // 0-4 for visual indicator
-  phrase?: string; // The phrase to append
-  icon: React.ReactNode;
-  color: string;
-  shortName: string;
-};
-
-const THINKING_MODES: ThinkingModeConfig[] = [
-  {
-    id: "auto",
-    name: "자동",
-    description: "알아서 판단",
-    level: 0,
-    icon: <Sparkles className="h-3.5 w-3.5" />,
-    color: "text-muted-foreground",
-    shortName: "자동"
-  },
-  {
-    id: "think",
-    name: "생각",
-    description: "한번 생각해보고 답변",
-    level: 1,
-    phrase: "think",
-    icon: <Lightbulb className="h-3.5 w-3.5" />,
-    color: "text-primary",
-    shortName: "생각"
-  },
-  {
-    id: "think_hard",
-    name: "꼼꼼히",
-    description: "꼼꼼하게 분석",
-    level: 2,
-    phrase: "think hard",
-    icon: <Brain className="h-3.5 w-3.5" />,
-    color: "text-primary",
-    shortName: "꼼꼼"
-  },
-  {
-    id: "think_harder",
-    name: "심층",
-    description: "깊이 있게 고민",
-    level: 3,
-    phrase: "think harder",
-    icon: <Cpu className="h-3.5 w-3.5" />,
-    color: "text-primary",
-    shortName: "심층"
-  },
-  {
-    id: "ultrathink",
-    name: "최대",
-    description: "최선을 다해 생각",
-    level: 4,
-    phrase: "ultrathink",
-    icon: <Rocket className="h-3.5 w-3.5" />,
-    color: "text-primary",
-    shortName: "최대"
-  }
-];
-
-/**
- * ThinkingModeIndicator component - Shows visual indicator bars for thinking level
- */
-const ThinkingModeIndicator: React.FC<{ level: number; color?: string }> = ({ level, color: _color }) => {
-  const getBarColor = (barIndex: number) => {
-    if (barIndex > level) return "bg-muted";
-    return "bg-primary";
-  };
-  
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4].map((i) => (
-        <div
-          key={i}
-          className={cn(
-            "w-1 h-3 rounded-full transition-all duration-200",
-            getBarColor(i),
-            i <= level && "shadow-sm"
-          )}
-        />
-      ))}
-    </div>
-  );
-};
-
-type Model = {
-  id: "haiku" | "sonnet" | "opus";
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  shortName: string;
-  color: string;
-};
-
-const MODELS: Model[] = [
-  {
-    id: "haiku",
-    name: "Haiku",
-    description: "가장 빠름, 간단한 작업에 적합",
-    icon: <Zap className="h-3.5 w-3.5" />,
-    shortName: "H",
-    color: "text-muted-foreground"
-  },
-  {
-    id: "sonnet",
-    name: "Sonnet",
-    description: "빠르고 효율적, 대부분의 작업에 적합",
-    icon: <Zap className="h-3.5 w-3.5" />,
-    shortName: "S",
-    color: "text-primary"
-  },
-  {
-    id: "opus",
-    name: "Opus",
-    description: "가장 똑똑함, 복잡한 작업에 적합",
-    icon: <Zap className="h-3.5 w-3.5" />,
-    shortName: "O",
-    color: "text-primary"
-  }
-];
-
-/**
- * Execution mode configuration
- */
-type ExecutionModeConfig = {
-  id: ExecutionMode;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-  borderColor: string;
-};
-
-const EXECUTION_MODES: ExecutionModeConfig[] = [
-  {
-    id: "execute",
-    name: "실행",
-    description: "바로 코드 수정/실행",
-    icon: <Play className="h-3.5 w-3.5" />,
-    color: "text-primary",
-    borderColor: "border-primary"
-  },
-  {
-    id: "plan",
-    name: "Plan",
-    description: "계획 먼저, 질문으로 구체화",
-    icon: <FileText className="h-3.5 w-3.5" />,
-    color: "text-violet-500",
-    borderColor: "border-violet-500"
-  }
-];
-
-/**
- * FloatingPromptInput component - Fixed position prompt input with model picker
- * 
- * @example
- * const promptRef = useRef<FloatingPromptInputRef>(null);
- * <FloatingPromptInput
- *   ref={promptRef}
- *   onSend={(prompt, model) => console.log('Send:', prompt, model)}
- *   isLoading={false}
- * />
+ * FloatingPromptInput component - ChatGPT-style prompt input
  */
 const FloatingPromptInputInner = (
   {
     onSend,
     isLoading = false,
     disabled = false,
-    defaultModel = "sonnet",
+    selectedModel,
+    onModelChange,
     projectPath,
     className,
     onCancel,
@@ -289,13 +109,8 @@ const FloatingPromptInputInner = (
   ref: React.Ref<FloatingPromptInputRef>,
 ) => {
   const [prompt, setPrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState<"haiku" | "sonnet" | "opus">(defaultModel);
   const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
   const [selectedExecutionMode, setSelectedExecutionMode] = useState<ExecutionMode>(defaultExecutionMode);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [thinkingModePickerOpen, setThinkingModePickerOpen] = useState(false);
-  const [executionModePickerOpen, setExecutionModePickerOpen] = useState(false);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [showSlashCommandPicker, setShowSlashCommandPicker] = useState(false);
@@ -303,11 +118,11 @@ const FloatingPromptInputInner = (
   const [cursorPosition, setCursorPosition] = useState(0);
   const [embeddedImages, setEmbeddedImages] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const expandedTextareaRef = useRef<HTMLTextAreaElement>(null);
   const unlistenDragDropRef = useRef<(() => void) | null>(null);
-  const [textareaHeight, setTextareaHeight] = useState<number>(48);
+  const [textareaHeight, setTextareaHeight] = useState<number>(44);
   const isIMEComposingRef = useRef(false);
 
   // Expose a method to add images programmatically
@@ -318,120 +133,90 @@ const FloatingPromptInputInner = (
         setPrompt(currentPrompt => {
           const existingPaths = extractImagePaths(currentPrompt);
           if (existingPaths.includes(imagePath)) {
-            return currentPrompt; // Image already added
+            return currentPrompt;
           }
 
-          // Wrap path in quotes if it contains spaces
           const mention = imagePath.includes(' ') ? `@"${imagePath}"` : `@${imagePath}`;
           const newPrompt = currentPrompt + (currentPrompt.endsWith(' ') || currentPrompt === '' ? '' : ' ') + mention + ' ';
 
-          // Focus the textarea
           setTimeout(() => {
-            const target = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-            target?.focus();
-            target?.setSelectionRange(newPrompt.length, newPrompt.length);
+            textareaRef.current?.focus();
+            textareaRef.current?.setSelectionRange(newPrompt.length, newPrompt.length);
           }, 0);
 
           return newPrompt;
         });
       }
     }),
-    [isExpanded]
+    []
   );
 
   // Helper function to check if a file is an image
   const isImageFile = (path: string): boolean => {
-    // Check if it's a data URL
     if (path.startsWith('data:image/')) {
       return true;
     }
-    // Otherwise check file extension
     const ext = path.split('.').pop()?.toLowerCase();
     return ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'].includes(ext || '');
   };
 
   // Extract image paths from prompt text
   const extractImagePaths = (text: string): string[] => {
-    console.log('[extractImagePaths] Input text length:', text.length);
-    
-    // Updated regex to handle both quoted and unquoted paths
-    // Pattern 1: @"path with spaces or data URLs" - quoted paths
-    // Pattern 2: @path - unquoted paths (continues until @ or end)
     const quotedRegex = /@"([^"]+)"/g;
     const unquotedRegex = /@([^@\n\s]+)/g;
-    
-    const pathsSet = new Set<string>(); // Use Set to ensure uniqueness
-    
-    // First, extract quoted paths (including data URLs)
+
+    const pathsSet = new Set<string>();
+
     let matches = Array.from(text.matchAll(quotedRegex));
-    console.log('[extractImagePaths] Quoted matches:', matches.length);
-    
+
     for (const match of matches) {
-      const path = match[1]; // No need to trim, quotes preserve exact path
-      console.log('[extractImagePaths] Processing quoted path:', path.startsWith('data:') ? 'data URL' : path);
-      
-      // For data URLs, use as-is; for file paths, convert to absolute
-      const fullPath = path.startsWith('data:') 
-        ? path 
+      const path = match[1];
+      const fullPath = path.startsWith('data:')
+        ? path
         : (path.startsWith('/') ? path : (projectPath ? `${projectPath}/${path}` : path));
-      
-      if (isImageFile(fullPath)) {
-        pathsSet.add(fullPath);
-      }
-    }
-    
-    // Remove quoted mentions from text to avoid double-matching
-    let textWithoutQuoted = text.replace(quotedRegex, '');
-    
-    // Then extract unquoted paths (typically file paths)
-    matches = Array.from(textWithoutQuoted.matchAll(unquotedRegex));
-    console.log('[extractImagePaths] Unquoted matches:', matches.length);
-    
-    for (const match of matches) {
-      const path = match[1].trim();
-      // Skip if it looks like a data URL fragment (shouldn't happen with proper quoting)
-      if (path.includes('data:')) continue;
-      
-      console.log('[extractImagePaths] Processing unquoted path:', path);
-      
-      // Convert relative path to absolute if needed
-      const fullPath = path.startsWith('/') ? path : (projectPath ? `${projectPath}/${path}` : path);
-      
+
       if (isImageFile(fullPath)) {
         pathsSet.add(fullPath);
       }
     }
 
-    const uniquePaths = Array.from(pathsSet);
-    console.log('[extractImagePaths] Final extracted paths (unique):', uniquePaths.length);
-    return uniquePaths;
+    let textWithoutQuoted = text.replace(quotedRegex, '');
+
+    matches = Array.from(textWithoutQuoted.matchAll(unquotedRegex));
+
+    for (const match of matches) {
+      const path = match[1].trim();
+      if (path.includes('data:')) continue;
+
+      const fullPath = path.startsWith('/') ? path : (projectPath ? `${projectPath}/${path}` : path);
+
+      if (isImageFile(fullPath)) {
+        pathsSet.add(fullPath);
+      }
+    }
+
+    return Array.from(pathsSet);
   };
 
   // Update embedded images when prompt changes
   useEffect(() => {
-    console.log('[useEffect] Prompt changed:', prompt);
     const imagePaths = extractImagePaths(prompt);
-    console.log('[useEffect] Setting embeddedImages to:', imagePaths);
     setEmbeddedImages(imagePaths);
-    
-    // Auto-resize on prompt change (handles paste, programmatic changes, etc.)
-    if (textareaRef.current && !isExpanded) {
+
+    if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      const newHeight = Math.min(Math.max(scrollHeight, 48), 240);
+      const newHeight = Math.min(Math.max(scrollHeight, 44), 240);
       setTextareaHeight(newHeight);
-      textareaRef.current.style.height = `${newHeight}px`;
     }
-  }, [prompt, projectPath, isExpanded]);
+  }, [prompt, projectPath]);
 
   // Set up Tauri drag-drop event listener
   useEffect(() => {
-    // This effect runs only once on component mount to set up the listener.
     let lastDropTime = 0;
 
     const setupListener = async () => {
       try {
-        // If a listener from a previous mount/render is still around, clean it up.
         if (unlistenDragDropRef.current) {
           unlistenDragDropRef.current();
         }
@@ -447,8 +232,6 @@ const FloatingPromptInputInner = (
 
             const currentTime = Date.now();
             if (currentTime - lastDropTime < 200) {
-              // This debounce is crucial to handle the storm of drop events
-              // that Tauri/OS can fire for a single user action.
               return;
             }
             lastDropTime = currentTime;
@@ -462,12 +245,10 @@ const FloatingPromptInputInner = (
                 const newPaths = imagePaths.filter(p => !existingPaths.includes(p));
 
                 if (newPaths.length === 0) {
-                  return currentPrompt; // All dropped images are already in the prompt
+                  return currentPrompt;
                 }
 
-                // Wrap paths with spaces in quotes for clarity
                 const mentionsToAdd = newPaths.map(p => {
-                  // If path contains spaces, wrap in quotes
                   if (p.includes(' ')) {
                     return `@"${p}"`;
                   }
@@ -476,9 +257,8 @@ const FloatingPromptInputInner = (
                 const newPrompt = currentPrompt + (currentPrompt.endsWith(' ') || currentPrompt === '' ? '' : ' ') + mentionsToAdd + ' ';
 
                 setTimeout(() => {
-                  const target = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-                  target?.focus();
-                  target?.setSelectionRange(newPrompt.length, newPrompt.length);
+                  textareaRef.current?.focus();
+                  textareaRef.current?.setSelectionRange(newPrompt.length, newPrompt.length);
                 }, 0);
 
                 return newPrompt;
@@ -494,46 +274,30 @@ const FloatingPromptInputInner = (
     setupListener();
 
     return () => {
-      // On unmount, ensure we clean up the listener.
       if (unlistenDragDropRef.current) {
         unlistenDragDropRef.current();
         unlistenDragDropRef.current = null;
       }
     };
-  }, []); // Empty dependency array ensures this runs only on mount/unmount.
-
-  useEffect(() => {
-    // Focus the appropriate textarea when expanded state changes
-    if (isExpanded && expandedTextareaRef.current) {
-      expandedTextareaRef.current.focus();
-    } else if (!isExpanded && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isExpanded]);
+  }, []);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     const newCursorPosition = e.target.selectionStart || 0;
-    
-    // Auto-resize textarea based on content
-    if (textareaRef.current && !isExpanded) {
-      // Reset height to auto to get the actual scrollHeight
+
+    if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      // Set min height to 48px and max to 240px (about 10 lines)
-      const newHeight = Math.min(Math.max(scrollHeight, 48), 240);
+      const newHeight = Math.min(Math.max(scrollHeight, 44), 240);
       setTextareaHeight(newHeight);
-      textareaRef.current.style.height = `${newHeight}px`;
     }
 
     // Check if / was just typed at the beginning of input or after whitespace
     if (newValue.length > prompt.length && newValue[newCursorPosition - 1] === '/') {
-      // Check if it's at the start or after whitespace
-      const isStartOfCommand = newCursorPosition === 1 || 
+      const isStartOfCommand = newCursorPosition === 1 ||
         (newCursorPosition > 1 && /\s/.test(newValue[newCursorPosition - 2]));
-      
+
       if (isStartOfCommand) {
-        console.log('[FloatingPromptInput] / detected for slash command');
         setShowSlashCommandPicker(true);
         setSlashCommandQuery("");
         setCursorPosition(newCursorPosition);
@@ -542,7 +306,6 @@ const FloatingPromptInputInner = (
 
     // Check if @ was just typed
     if (projectPath?.trim() && newValue.length > prompt.length && newValue[newCursorPosition - 1] === '@') {
-      console.log('[FloatingPromptInput] @ detected, projectPath:', projectPath);
       setShowFilePicker(true);
       setFilePickerQuery("");
       setCursorPosition(newCursorPosition);
@@ -550,14 +313,12 @@ const FloatingPromptInputInner = (
 
     // Check if we're typing after / (for slash command search)
     if (showSlashCommandPicker && newCursorPosition >= cursorPosition) {
-      // Find the / position before cursor
       let slashPosition = -1;
       for (let i = newCursorPosition - 1; i >= 0; i--) {
         if (newValue[i] === '/') {
           slashPosition = i;
           break;
         }
-        // Stop if we hit whitespace (new word)
         if (newValue[i] === ' ' || newValue[i] === '\n') {
           break;
         }
@@ -567,7 +328,6 @@ const FloatingPromptInputInner = (
         const query = newValue.substring(slashPosition + 1, newCursorPosition);
         setSlashCommandQuery(query);
       } else {
-        // / was removed or cursor moved away
         setShowSlashCommandPicker(false);
         setSlashCommandQuery("");
       }
@@ -575,14 +335,12 @@ const FloatingPromptInputInner = (
 
     // Check if we're typing after @ (for search query)
     if (showFilePicker && newCursorPosition >= cursorPosition) {
-      // Find the @ position before cursor
       let atPosition = -1;
       for (let i = newCursorPosition - 1; i >= 0; i--) {
         if (newValue[i] === '@') {
           atPosition = i;
           break;
         }
-        // Stop if we hit whitespace (new word)
         if (newValue[i] === ' ' || newValue[i] === '\n') {
           break;
         }
@@ -592,7 +350,6 @@ const FloatingPromptInputInner = (
         const query = newValue.substring(atPosition + 1, newCursorPosition);
         setFilePickerQuery(query);
       } else {
-        // @ was removed or cursor moved away
         setShowFilePicker(false);
         setFilePickerQuery("");
       }
@@ -604,39 +361,32 @@ const FloatingPromptInputInner = (
 
   const handleFileSelect = (entry: FileEntry) => {
     if (!entry?.path) {
-      console.warn('[FloatingPromptInput] handleFileSelect called with invalid entry');
       setShowFilePicker(false);
       return;
     }
-    
+
     const textarea = textareaRef.current;
     if (!textarea) {
-      console.warn('[FloatingPromptInput] handleFileSelect: textarea ref is null');
       setShowFilePicker(false);
       return;
     }
-    
-    // Find the @ position before cursor
+
     let atPosition = -1;
     for (let i = cursorPosition - 1; i >= 0; i--) {
       if (prompt[i] === '@') {
         atPosition = i;
         break;
       }
-      // Stop if we hit whitespace (new word)
       if (prompt[i] === ' ' || prompt[i] === '\n') {
         break;
       }
     }
 
     if (atPosition === -1) {
-      // @ not found, this shouldn't happen but handle gracefully
-      console.warn('[FloatingPromptInput] @ position not found');
       setShowFilePicker(false);
       return;
     }
 
-    // Replace the @ and partial query with the selected path (file or directory)
     const beforeAt = prompt.substring(0, atPosition);
     const afterCursor = prompt.substring(cursorPosition);
     const relativePath = entry.path.startsWith(projectPath || '')
@@ -648,11 +398,10 @@ const FloatingPromptInputInner = (
     setShowFilePicker(false);
     setFilePickerQuery("");
 
-    // Focus back on textarea and set cursor position after the inserted path
     setTimeout(() => {
       if (textarea) {
         textarea.focus();
-        const newCursorPos = beforeAt.length + relativePath.length + 2; // +2 for @ and space
+        const newCursorPos = beforeAt.length + relativePath.length + 2;
         textarea.setSelectionRange(newCursorPos, newCursorPos);
       }
     }, 0);
@@ -661,7 +410,6 @@ const FloatingPromptInputInner = (
   const handleFilePickerClose = () => {
     setShowFilePicker(false);
     setFilePickerQuery("");
-    // Return focus to textarea
     setTimeout(() => {
       textareaRef.current?.focus();
     }, 0);
@@ -669,62 +417,52 @@ const FloatingPromptInputInner = (
 
   const handleSlashCommandSelect = (command: SlashCommand) => {
     if (!command?.full_command) {
-      console.warn('[FloatingPromptInput] handleSlashCommandSelect called with invalid command');
-      setShowSlashCommandPicker(false);
-      return;
-    }
-    
-    const textarea = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-    if (!textarea) {
-      console.warn('[FloatingPromptInput] handleSlashCommandSelect: textarea ref is null');
       setShowSlashCommandPicker(false);
       return;
     }
 
-    // Find the / position before cursor
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setShowSlashCommandPicker(false);
+      return;
+    }
+
     let slashPosition = -1;
     for (let i = cursorPosition - 1; i >= 0; i--) {
       if (prompt[i] === '/') {
         slashPosition = i;
         break;
       }
-      // Stop if we hit whitespace (new word)
       if (prompt[i] === ' ' || prompt[i] === '\n') {
         break;
       }
     }
 
     if (slashPosition === -1) {
-      console.warn('[FloatingPromptInput] / position not found');
       setShowSlashCommandPicker(false);
       return;
     }
 
-    // Simply insert the command syntax
     const beforeSlash = prompt.substring(0, slashPosition);
     const afterCursor = prompt.substring(cursorPosition);
-    
+
     if (command.accepts_arguments) {
-      // Insert command with placeholder for arguments
       const newPrompt = `${beforeSlash}${command.full_command} `;
       setPrompt(newPrompt);
       setShowSlashCommandPicker(false);
       setSlashCommandQuery("");
 
-      // Focus and position cursor after the command
       setTimeout(() => {
         textarea.focus();
         const newCursorPos = beforeSlash.length + command.full_command.length + 1;
         textarea.setSelectionRange(newCursorPos, newCursorPos);
       }, 0);
     } else {
-      // Insert command and close picker
       const newPrompt = `${beforeSlash}${command.full_command} ${afterCursor}`;
       setPrompt(newPrompt);
       setShowSlashCommandPicker(false);
       setSlashCommandQuery("");
 
-      // Focus and position cursor after the command
       setTimeout(() => {
         textarea.focus();
         const newCursorPos = beforeSlash.length + command.full_command.length + 1;
@@ -736,10 +474,8 @@ const FloatingPromptInputInner = (
   const handleSlashCommandPickerClose = () => {
     setShowSlashCommandPicker(false);
     setSlashCommandQuery("");
-    // Return focus to textarea
     setTimeout(() => {
-      const textarea = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-      textarea?.focus();
+      textareaRef.current?.focus();
     }, 0);
   };
 
@@ -798,12 +534,10 @@ const FloatingPromptInputInner = (
     let effectiveExecutionMode = selectedExecutionMode;
     if (finalPrompt.toLowerCase().startsWith('@plan ')) {
       effectiveExecutionMode = 'plan';
-      finalPrompt = finalPrompt.substring(6).trim(); // Remove @plan prefix
+      finalPrompt = finalPrompt.substring(6).trim();
     }
 
-    // Final validation after prefix removal
     if (!finalPrompt) {
-      console.warn('[FloatingPromptInput] Empty prompt after processing');
       return;
     }
 
@@ -817,7 +551,7 @@ const FloatingPromptInputInner = (
       onSend(finalPrompt, selectedModel, showExecutionMode ? effectiveExecutionMode : undefined);
       setPrompt("");
       setEmbeddedImages([]);
-      setTextareaHeight(48); // Reset height after sending
+      setTextareaHeight(44);
     } catch (err) {
       console.error('[FloatingPromptInput] Failed to send prompt:', err);
     }
@@ -838,17 +572,9 @@ const FloatingPromptInputInner = (
       return;
     }
 
-    // Add keyboard shortcut for expanding
-    if (e.key === 'e' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
-      e.preventDefault();
-      setIsExpanded(true);
-      return;
-    }
-
     if (
       e.key === "Enter" &&
       !e.shiftKey &&
-      !isExpanded &&
       !showFilePicker &&
       !showSlashCommandPicker
     ) {
@@ -867,34 +593,28 @@ const FloatingPromptInputInner = (
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
-        
-        // Get the image blob
+
         const blob = item.getAsFile();
         if (!blob) continue;
 
         try {
-          // Convert blob to base64
           const reader = new FileReader();
           reader.onload = () => {
             const base64Data = reader.result as string;
-            
-            // Add the base64 data URL directly to the prompt
+
             setPrompt(currentPrompt => {
-              // Use the data URL directly as the image reference
               const mention = `@"${base64Data}"`;
               const newPrompt = currentPrompt + (currentPrompt.endsWith(' ') || currentPrompt === '' ? '' : ' ') + mention + ' ';
-              
-              // Focus the textarea and move cursor to end
+
               setTimeout(() => {
-                const target = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-                target?.focus();
-                target?.setSelectionRange(newPrompt.length, newPrompt.length);
+                textareaRef.current?.focus();
+                textareaRef.current?.setSelectionRange(newPrompt.length, newPrompt.length);
               }, 0);
 
               return newPrompt;
             });
           };
-          
+
           reader.readAsDataURL(blob);
         } catch (error) {
           console.error('Failed to paste image:', error);
@@ -903,46 +623,33 @@ const FloatingPromptInputInner = (
     }
   };
 
-  // Browser drag and drop handlers - just prevent default behavior
-  // Actual file handling is done via Tauri's window-level drag-drop events
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Visual feedback is handled by Tauri events
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // File processing is handled by Tauri's onDragDropEvent
   };
 
   const handleRemoveImage = (index: number) => {
-    // Remove the corresponding @mention from the prompt
     const imagePath = embeddedImages[index];
-    
-    // For data URLs, we need to handle them specially since they're always quoted
+
     if (imagePath.startsWith('data:')) {
-      // Simply remove the exact quoted data URL
       const quotedPath = `@"${imagePath}"`;
       const newPrompt = prompt.replace(quotedPath, '').trim();
       setPrompt(newPrompt);
       return;
     }
-    
-    // For file paths, use the original logic
+
     const escapedPath = imagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedRelativePath = imagePath.replace(projectPath + '/', '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
-    // Create patterns for both quoted and unquoted mentions
+
     const patterns = [
-      // Quoted full path
       new RegExp(`@"${escapedPath}"\\s?`, 'g'),
-      // Unquoted full path
       new RegExp(`@${escapedPath}\\s?`, 'g'),
-      // Quoted relative path
       new RegExp(`@"${escapedRelativePath}"\\s?`, 'g'),
-      // Unquoted relative path
       new RegExp(`@${escapedRelativePath}\\s?`, 'g')
     ];
 
@@ -954,210 +661,63 @@ const FloatingPromptInputInner = (
     setPrompt(newPrompt.trim());
   };
 
-  const selectedModelData = MODELS.find(m => m.id === selectedModel) || MODELS[0];
+  // Trigger file picker from Tools menu
+  const handleFilePickerTrigger = () => {
+    if (!projectPath?.trim()) return;
+
+    // Insert @ at cursor position and show picker
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart || 0;
+      const before = prompt.substring(0, start);
+      const after = prompt.substring(start);
+      const newPrompt = `${before}@${after}`;
+      setPrompt(newPrompt);
+      setCursorPosition(start + 1);
+      setShowFilePicker(true);
+      setFilePickerQuery("");
+
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + 1, start + 1);
+      }, 0);
+    }
+  };
+
+  // Trigger slash command picker from Tools menu
+  const handleSlashCommandTrigger = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart || 0;
+      const before = prompt.substring(0, start);
+      const after = prompt.substring(start);
+
+      // Check if we need to add space before /
+      const needsSpace = before.length > 0 && !/\s$/.test(before);
+      const newPrompt = `${before}${needsSpace ? ' ' : ''}/`;
+      const newCursorPos = newPrompt.length;
+
+      setPrompt(newPrompt + after);
+      setCursorPosition(newCursorPos);
+      setShowSlashCommandPicker(true);
+      setSlashCommandQuery("");
+
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+  };
+
+  const selectedThinkingData = THINKING_MODES.find(m => m.id === selectedThinkingMode) || THINKING_MODES[0];
 
   return (
     <TooltipProvider>
-    <>
-      {/* Expanded Modal */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-            onClick={() => setIsExpanded(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}
-              className="bg-background border border-border rounded-lg shadow-lg w-full max-w-2xl p-4 space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Compose your prompt</h3>
-                <TooltipSimple content="Minimize" side="bottom">
-                  <motion.div
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsExpanded(false)}
-                      className="h-8 w-8"
-                    >
-                      <Minimize2 className="h-4 w-4" />
-                    </Button>
-                  </motion.div>
-                </TooltipSimple>
-              </div>
-
-              {/* Image previews in expanded mode */}
-              {embeddedImages.length > 0 && (
-                <ImagePreview
-                  images={embeddedImages}
-                  onRemove={handleRemoveImage}
-                  className="border-t border-border pt-2"
-                />
-              )}
-
-              <Textarea
-                ref={expandedTextareaRef}
-                value={prompt}
-                onChange={handleTextChange}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-                onPaste={handlePaste}
-                placeholder="Type your message..."
-                className="min-h-[200px] resize-none"
-                disabled={disabled}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-              />
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Model:</span>
-                    <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                        >
-                          <span className={selectedModelData.color}>
-                            {selectedModelData.icon}
-                          </span>
-                          {selectedModelData.name}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" side="top" className="w-[300px] p-1">
-                        {MODELS.map((model) => (
-                          <button
-                            key={model.id}
-                            onClick={() => {
-                              setSelectedModel(model.id);
-                              setModelPickerOpen(false);
-                            }}
-                            className={cn(
-                              "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                              "hover:bg-accent",
-                              selectedModel === model.id && "bg-accent"
-                            )}
-                          >
-                            <div className="mt-0.5">
-                              <span className={model.color}>
-                                {model.icon}
-                              </span>
-                            </div>
-                            <div className="flex-1 space-y-1">
-                              <div className="font-medium text-sm">{model.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {model.description}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Thinking:</span>
-                    <Popover open={thinkingModePickerOpen} onOpenChange={setThinkingModePickerOpen}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                            >
-                              <span className={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.color}>
-                                {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.icon}
-                              </span>
-                              <ThinkingModeIndicator
-                                level={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.level || 0}
-                              />
-                            </Button>
-                          </PopoverTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-medium">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
-                          <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <PopoverContent align="start" side="top" className="w-[280px] p-1">
-                        {THINKING_MODES.map((mode) => (
-                          <button
-                            key={mode.id}
-                            onClick={() => {
-                              setSelectedThinkingMode(mode.id);
-                              setThinkingModePickerOpen(false);
-                            }}
-                            className={cn(
-                              "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                              "hover:bg-accent",
-                              selectedThinkingMode === mode.id && "bg-accent"
-                            )}
-                          >
-                            <span className={cn("mt-0.5", mode.color)}>
-                              {mode.icon}
-                            </span>
-                            <div className="flex-1 space-y-1">
-                              <div className="font-medium text-sm">
-                                {mode.name}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {mode.description}
-                              </div>
-                            </div>
-                            <ThinkingModeIndicator level={mode.level} />
-                          </button>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                <TooltipSimple content="Send message" side="top">
-                  <motion.div
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <Button
-                      onClick={handleSend}
-                      disabled={!prompt.trim() || disabled}
-                      size="default"
-                      className="min-w-[60px]"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </motion.div>
-                </TooltipSimple>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Fixed Position Input Bar - Modern Floating Card Style */}
       <div
         className={cn(
           embedded
             ? "w-full px-4 pb-4"
-            : "fixed bottom-0 left-0 right-0 z-40 px-6 pb-6",
+            : "fixed bottom-0 left-0 right-0 z-40 px-4 pb-4",
           className
         )}
         onDragEnter={handleDrag}
@@ -1168,17 +728,29 @@ const FloatingPromptInputInner = (
         <div
           className={cn(
             "mx-auto max-w-3xl",
-            "bg-background backdrop-blur-xl",
-            "border rounded-2xl",
-            "ring-1 ring-white/10",
-            // Plan mode: violet border
-            showExecutionMode && selectedExecutionMode === "plan"
-              ? "border-violet-500/50"
-              : "border-border/20",
-            dragActive && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+            // Background with theme support
+            "bg-card",
+            // Smooth rounded corners
+            "rounded-2xl",
+            // Border with theme support
+            "border-2 border-border",
+            // Outer ring for more definition
+            "ring-1 ring-border/50",
+            // Plan mode: violet glow
+            showExecutionMode && selectedExecutionMode === "plan" && "border-violet-500/70 ring-violet-500/30",
+            // Focus state: primary glow
+            isFocused && "border-primary/50 ring-primary/20",
+            // Drag active
+            dragActive && "ring-2 ring-primary/50 border-primary",
+            // Smooth transition
+            "transition-all duration-300 ease-out",
+            // Drop shadow classes for theme support
+            "drop-shadow-lg",
+            isFocused && "drop-shadow-xl"
           )}
           style={{
-            boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px -5px rgba(0,0,0,0.4), 0 30px 60px -10px rgba(0,0,0,0.5), 0 50px 80px -20px rgba(0,0,0,0.3)"
+            // Inset effects via box-shadow
+            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.05)"
           }}
         >
           {/* Selected Components Display */}
@@ -1189,322 +761,148 @@ const FloatingPromptInputInner = (
             <ImagePreview
               images={embeddedImages}
               onRemove={handleRemoveImage}
-              className={cn(
-                "border-b border-border/50",
-                !embedded && "px-4 pt-3"
-              )}
+              className="border-b border-border/30 px-4 pt-3"
             />
           )}
 
+          {/* Main Input Area */}
           <div className="p-3">
-            {/* Unified Input Box */}
-            <div className="relative">
-              {/* Textarea */}
-              <Textarea
-                ref={textareaRef}
-                value={prompt}
-                onChange={handleTextChange}
-                onKeyDown={handleKeyDown}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-                onPaste={handlePaste}
-                placeholder={
-                  dragActive
-                    ? "Drop images here..."
-                    : "Ask anything..."
-                }
+            {/* Textarea with inline buttons */}
+            <div className="flex items-end gap-3">
+              {/* + Button (Tools Menu) */}
+              <ToolsMenu
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                selectedThinkingMode={selectedThinkingMode}
+                onThinkingModeChange={setSelectedThinkingMode}
+                selectedExecutionMode={selectedExecutionMode}
+                onExecutionModeChange={setSelectedExecutionMode}
+                showExecutionMode={showExecutionMode}
                 disabled={disabled}
-                className={cn(
-                  "resize-none pl-4 pr-4 py-3 transition-all duration-200",
-                  "bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0",
-                  "placeholder:text-muted-foreground/50",
-                  textareaHeight >= 240 && "overflow-y-auto scrollbar-thin"
-                )}
-                style={{
-                  height: `${textareaHeight}px`,
-                  overflowY: textareaHeight >= 240 ? 'auto' : 'hidden'
-                }}
+                onFilePickerTrigger={handleFilePickerTrigger}
+                onSlashCommandTrigger={handleSlashCommandTrigger}
               />
 
-              {/* File Picker */}
-              <AnimatePresence>
-                {showFilePicker && projectPath && projectPath.trim() && (
-                  <FilePicker
-                    basePath={projectPath.trim()}
-                    onSelect={handleFileSelect}
-                    onClose={handleFilePickerClose}
-                    initialQuery={filePickerQuery}
-                  />
-                )}
-              </AnimatePresence>
+              {/* Textarea Container */}
+              <div className="flex-1 relative min-h-[44px]">
+                <Textarea
+                  ref={textareaRef}
+                  value={prompt}
+                  onChange={handleTextChange}
+                  onKeyDown={handleKeyDown}
+                  onCompositionStart={handleCompositionStart}
+                  onCompositionEnd={handleCompositionEnd}
+                  onPaste={handlePaste}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  placeholder={
+                    dragActive
+                      ? "이미지를 여기에 놓으세요..."
+                      : "무엇이든 물어보세요..."
+                  }
+                  disabled={disabled}
+                  className={cn(
+                    "resize-none px-1 py-2",
+                    "bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0",
+                    "placeholder:text-muted-foreground/40",
+                    "text-[15px] leading-relaxed",
+                    textareaHeight >= 240 && "overflow-y-auto scrollbar-thin"
+                  )}
+                  style={{
+                    height: `${textareaHeight}px`,
+                    overflowY: textareaHeight >= 240 ? 'auto' : 'hidden',
+                    transition: 'height 150ms ease-out'
+                  }}
+                />
 
-              {/* Slash Command Picker */}
-              <AnimatePresence>
-                {showSlashCommandPicker && (
-                  <SlashCommandPicker
-                    projectPath={projectPath}
-                    onSelect={handleSlashCommandSelect}
-                    onClose={handleSlashCommandPickerClose}
-                    initialQuery={slashCommandQuery}
-                  />
-                )}
-              </AnimatePresence>
+                {/* File Picker */}
+                <AnimatePresence>
+                  {showFilePicker && projectPath && projectPath.trim() && (
+                    <FilePicker
+                      basePath={projectPath.trim()}
+                      onSelect={handleFileSelect}
+                      onClose={handleFilePickerClose}
+                      initialQuery={filePickerQuery}
+                    />
+                  )}
+                </AnimatePresence>
 
-              {/* Bottom Bar - Model & Thinking Mode Selectors + Hints */}
-              <div className="flex items-center justify-between px-1 pt-1 pb-0">
-                <div className="flex items-center gap-1">
-                {/* Model Selector */}
-                <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <PopoverTrigger asChild>
-                        <motion.div
-                          whileTap={{ scale: 0.97 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={disabled}
-                            className="h-7 px-2 hover:bg-accent/50 gap-1.5 text-xs"
-                          >
-                            <span className={selectedModelData.color}>
-                              {selectedModelData.icon}
-                            </span>
-                            <span className="font-medium">
-                              {selectedModelData.name}
-                            </span>
-                            <ChevronUp className="h-3 w-3 opacity-50" />
-                          </Button>
-                        </motion.div>
-                      </PopoverTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p className="text-xs font-medium">{selectedModelData.name}</p>
-                      <p className="text-xs text-muted-foreground">{selectedModelData.description}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <PopoverContent align="start" side="top" className="w-auto p-1">
-                    <div className="flex flex-col">
-                      {MODELS.map((model, idx) => (
-                        <button
-                          key={model.id}
-                          onClick={() => {
-                            setSelectedModel(model.id);
-                            setModelPickerOpen(false);
-                          }}
-                          className={cn(
-                            "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors whitespace-nowrap",
-                            "hover:bg-accent/80",
-                            selectedModel === model.id ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-                            idx === 0 && "rounded-t",
-                            idx === MODELS.length - 1 && "rounded-b"
-                          )}
-                        >
-                          <span className={cn("w-3 h-3", model.color)}>{model.icon}</span>
-                          <span>{model.name}</span>
-                          <span className="text-[10px] text-muted-foreground/60 ml-1">{model.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                {/* Slash Command Picker */}
+                <AnimatePresence>
+                  {showSlashCommandPicker && (
+                    <SlashCommandPicker
+                      projectPath={projectPath}
+                      onSelect={handleSlashCommandSelect}
+                      onClose={handleSlashCommandPickerClose}
+                      initialQuery={slashCommandQuery}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
 
-                <div className="w-px h-4 bg-border/50 mx-1" />
+              {/* Send Button */}
+              <TooltipSimple content={isLoading ? "중지" : "전송 (Enter)"} side="top">
+                <motion.div
+                  whileTap={{ scale: 0.92 }}
+                  whileHover={{ scale: 1.04 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  <Button
+                    onClick={isLoading ? onCancel : handleSend}
+                    disabled={isLoading ? false : (!prompt.trim() || disabled)}
+                    variant={isLoading ? "destructive" : "default"}
+                    size="icon"
+                    className={cn(
+                      "h-10 w-10 rounded-xl transition-all duration-200",
+                      !prompt.trim() && !isLoading && "bg-muted/80 text-muted-foreground/60 hover:bg-muted/90 hover:text-muted-foreground",
+                      prompt.trim() && !isLoading && "bg-primary shadow-lg shadow-primary/25 hover:shadow-primary/40",
+                      isLoading && "bg-destructive shadow-lg shadow-destructive/25"
+                    )}
+                  >
+                    {isLoading ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </motion.div>
+              </TooltipSimple>
+            </div>
 
-                {/* Thinking Mode Selector */}
-                <Popover open={thinkingModePickerOpen} onOpenChange={setThinkingModePickerOpen}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <PopoverTrigger asChild>
-                        <motion.div
-                          whileTap={{ scale: 0.97 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={disabled}
-                            className="h-7 px-2 hover:bg-accent/50 gap-1.5 text-xs"
-                          >
-                            <span className={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.color}>
-                              {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.icon}
-                            </span>
-                            <span className="font-medium">
-                              {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name}
-                            </span>
-                            <ChevronUp className="h-3 w-3 opacity-50" />
-                          </Button>
-                        </motion.div>
-                      </PopoverTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p className="text-xs font-medium">Thinking: {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
-                      <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <PopoverContent align="start" side="top" className="w-auto p-1">
-                    <div className="flex flex-col">
-                      {THINKING_MODES.map((mode, idx) => (
-                        <button
-                          key={mode.id}
-                          onClick={() => {
-                            setSelectedThinkingMode(mode.id);
-                            setThinkingModePickerOpen(false);
-                          }}
-                          className={cn(
-                            "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors whitespace-nowrap",
-                            "hover:bg-accent/80",
-                            selectedThinkingMode === mode.id ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-                            idx === 0 && "rounded-t",
-                            idx === THINKING_MODES.length - 1 && "rounded-b"
-                          )}
-                        >
-                          <span className={cn("w-3 h-3", mode.color)}>{mode.icon}</span>
-                          <span>{mode.name}</span>
-                          <span className="text-[10px] text-muted-foreground/60 ml-1">{mode.description}</span>
-                          <ThinkingModeIndicator level={mode.level} />
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+            {/* Bottom Bar - Mode badges only (if any selected) */}
+            {(selectedThinkingMode !== "auto" || (showExecutionMode && selectedExecutionMode === "plan") || extraMenuItems) && (
+              <div className="flex items-center justify-between mt-2 px-1">
+                <div className="flex items-center gap-1.5">
+                  {/* Thinking Mode Badge */}
+                  {selectedThinkingMode !== "auto" && (
+                    <span className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium",
+                      "bg-primary/10 text-primary"
+                    )}>
+                      {selectedThinkingData.icon}
+                      {selectedThinkingData.name}
+                    </span>
+                  )}
 
-                {/* Execution Mode Selector (Plan/Execute) - Only shown when showExecutionMode is true */}
-                {showExecutionMode && (
-                  <>
-                    <div className="w-px h-4 bg-border/50 mx-1" />
-                    <Popover open={executionModePickerOpen} onOpenChange={setExecutionModePickerOpen}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <PopoverTrigger asChild>
-                            <motion.div
-                              whileTap={{ scale: 0.97 }}
-                              transition={{ duration: 0.15 }}
-                            >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={disabled}
-                                className={cn(
-                                  "h-7 px-2 hover:bg-accent/50 gap-1.5 text-xs",
-                                  selectedExecutionMode === "plan" && "text-violet-500"
-                                )}
-                              >
-                                <span className={selectedExecutionMode === "plan" ? "text-violet-500" : "text-primary"}>
-                                  {EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.icon}
-                                </span>
-                                <span className="font-medium">
-                                  {EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.name}
-                                </span>
-                                <ChevronUp className="h-3 w-3 opacity-50" />
-                              </Button>
-                            </motion.div>
-                          </PopoverTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="text-xs font-medium">{EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.name}</p>
-                          <p className="text-xs text-muted-foreground">{EXECUTION_MODES.find(m => m.id === selectedExecutionMode)?.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <PopoverContent align="start" side="top" className="w-auto p-1">
-                        <div className="flex flex-col">
-                          {EXECUTION_MODES.map((mode, idx) => (
-                            <button
-                              key={mode.id}
-                              onClick={() => {
-                                setSelectedExecutionMode(mode.id);
-                                setExecutionModePickerOpen(false);
-                              }}
-                              className={cn(
-                                "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors whitespace-nowrap",
-                                "hover:bg-accent/80",
-                                selectedExecutionMode === mode.id ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-                                idx === 0 && "rounded-t",
-                                idx === EXECUTION_MODES.length - 1 && "rounded-b"
-                              )}
-                            >
-                              <span className={cn("w-3 h-3", mode.color)}>{mode.icon}</span>
-                              <span>{mode.name}</span>
-                              <span className="text-[10px] text-muted-foreground/60 ml-1">{mode.description}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </>
-                )}
+                  {/* Plan Mode Badge */}
+                  {showExecutionMode && selectedExecutionMode === "plan" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-500/10 text-violet-500">
+                      Plan
+                    </span>
+                  )}
+                </div>
 
                 {/* Extra menu items */}
                 {extraMenuItems && (
-                  <>
-                    <div className="w-px h-4 bg-border/50 mx-1" />
+                  <div className="flex items-center gap-1">
                     {extraMenuItems}
-                  </>
+                  </div>
                 )}
-                </div>
-
-                {/* Keyboard hints */}
-                <div className="hidden sm:flex items-center gap-2 text-[10px] text-muted-foreground/50">
-                  <span>
-                    <kbd className="px-1 py-0.5 bg-muted/40 rounded text-[9px]">/</kbd> commands
-                  </span>
-                  <span>
-                    <kbd className="px-1 py-0.5 bg-muted/40 rounded text-[9px]">@</kbd> files
-                  </span>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-1">
-                  <TooltipSimple content="Expand (Ctrl+Shift+E)" side="top">
-                    <motion.div
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.1 }}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsExpanded(true)}
-                        disabled={disabled}
-                        className="h-7 w-7 rounded-md hover:bg-accent/50 transition-colors"
-                      >
-                        <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-                    </motion.div>
-                  </TooltipSimple>
-
-                  <TooltipSimple content={isLoading ? "Stop generation" : "Send message (Enter)"} side="top">
-                    <motion.div
-                      whileTap={{ scale: 0.95 }}
-                      whileHover={{ scale: prompt.trim() && !isLoading ? 1.05 : 1 }}
-                      transition={{ duration: 0.1 }}
-                    >
-                      <Button
-                        onClick={isLoading ? onCancel : handleSend}
-                        disabled={isLoading ? false : (!prompt.trim() || disabled)}
-                        variant={isLoading ? "destructive" : "default"}
-                        size="icon"
-                        className={cn(
-                          "h-7 w-7 rounded-md transition-all duration-200",
-                          !prompt.trim() && !isLoading && "bg-muted text-muted-foreground hover:bg-muted",
-                          prompt.trim() && !isLoading && "shadow-sm"
-                        )}
-                      >
-                        {isLoading ? (
-                          <Square className="h-3.5 w-3.5" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </motion.div>
-                  </TooltipSimple>
-                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
-    </>
     </TooltipProvider>
   );
 };

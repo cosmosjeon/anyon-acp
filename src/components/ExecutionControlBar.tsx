@@ -1,27 +1,25 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { StopCircle, Clock, Hash , Loader2 } from "@/lib/icons";
+import { StopCircle, Clock, Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ExecutionControlBarProps {
   isExecuting: boolean;
   onStop: () => void;
-  totalTokens?: number;
   elapsedTime?: number; // in seconds
   className?: string;
 }
 
 /**
  * Floating control bar shown during agent execution
- * Provides stop functionality and real-time statistics
+ * Provides stop functionality and elapsed time
  */
-export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({ 
-  isExecuting, 
-  onStop, 
-  totalTokens = 0,
+export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({
+  isExecuting,
+  onStop,
   elapsedTime = 0,
-  className 
+  className
 }) => {
   // Format elapsed time
   const formatTime = (seconds: number) => {
@@ -31,14 +29,6 @@ export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({
       return `${mins}m ${secs.toFixed(0)}s`;
     }
     return `${secs.toFixed(1)}s`;
-  };
-
-  // Format token count
-  const formatTokens = (tokens: number) => {
-    if (tokens >= 1000) {
-      return `${(tokens / 1000).toFixed(1)}k`;
-    }
-    return tokens.toString();
   };
 
   return (
@@ -67,19 +57,10 @@ export const ExecutionControlBar: React.FC<ExecutionControlBarProps> = ({
           {/* Divider */}
           <div className="h-4 w-px bg-border" />
 
-          {/* Stats */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            {/* Time */}
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              <span>{formatTime(elapsedTime)}</span>
-            </div>
-
-            {/* Tokens */}
-            <div className="flex items-center gap-1.5">
-              <Hash className="h-3.5 w-3.5" />
-              <span>{formatTokens(totalTokens)} tokens</span>
-            </div>
+          {/* Elapsed time */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span>{formatTime(elapsedTime)}</span>
           </div>
 
           {/* Divider */}

@@ -88,7 +88,6 @@ export interface StreamMessageHandlerOptions {
   isMountedRef: React.MutableRefObject<boolean>;
   accumulatedTextRef: React.MutableRefObject<string>;
   setStreamingText: (text: string) => void;
-  setRawJsonlOutput: React.Dispatch<React.SetStateAction<string[]>>;
   setMessages: React.Dispatch<React.SetStateAction<ClaudeStreamMessage[]>>;
   sessionMetrics: React.MutableRefObject<{
     toolsExecuted: number;
@@ -117,22 +116,16 @@ export function createStreamMessageHandler(
       if (!options.isMountedRef.current) return;
 
       let message: ClaudeStreamMessage;
-      let rawPayload: string;
 
       if (typeof payload === 'string') {
         // Tauri mode: payload is a JSON string
-        rawPayload = payload;
         message = JSON.parse(payload) as ClaudeStreamMessage;
       } else {
         // Web mode: payload is already parsed object
         message = payload;
-        rawPayload = JSON.stringify(payload);
       }
 
       console.log('[ClaudeCodeSession] handleStreamMessage - message type:', message.type);
-
-      // Store raw JSONL
-      options.setRawJsonlOutput((prev) => [...prev, rawPayload]);
 
       // Track enhanced tool execution
       if (message.type === 'assistant' && message.message?.content) {
