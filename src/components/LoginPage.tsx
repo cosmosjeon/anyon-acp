@@ -9,7 +9,7 @@ import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import anyonTextLogo from '@/assets/ANYON.png';
 
-const API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://claude-anyon-web-production.up.railway.app';
+const API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
 
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);

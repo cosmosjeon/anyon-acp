@@ -52,7 +52,7 @@
           "url": "http://localhost:4000/*"
         },
         {
-          "url": "https://claude-anyon-web-production.up.railway.app/*"
+          "url": "https://auth.any-on.com/*"
         }
       ]
     },

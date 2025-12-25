@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuth2Client } from 'google-auth-library';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -59,6 +60,31 @@ const genAI = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
 
+// Anthropic AI Client for Claude Proxy
+const anthropic = process.env.ANYON_ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANYON_ANTHROPIC_API_KEY })
+  : null;
+
+// Token blacklist for logout (in-memory, cleared on server restart)
+// In production, consider using Redis for persistence across restarts
+const tokenBlacklist = new Set();
+const TOKEN_BLACKLIST_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+// Cleanup expired tokens from blacklist periodically
+setInterval(() => {
+  const now = Math.floor(Date.now() / 1000);
+  for (const entry of tokenBlacklist) {
+    try {
+      const decoded = jwt.decode(entry);
+      if (decoded && decoded.exp && decoded.exp < now) {
+        tokenBlacklist.delete(entry);
+      }
+    } catch {
+      tokenBlacklist.delete(entry);
+    }
+  }
+}, TOKEN_BLACKLIST_CLEANUP_INTERVAL);
+
 const SUPPORT_SYSTEM_PROMPT = `당신은 Anyon 서비스의 AI 서포트입니다.
 사용자가 AI 자동 개발 도구를 사용하다가 막히거나 궁금한 점이 있을 때 도움을 줍니다.
 
@@ -82,7 +108,8 @@ const SUPPORT_SYSTEM_PROMPT = `당신은 Anyon 서비스의 AI 서포트입니�
 // CORS Configuration - only allow specific origins
 const allowedOrigins = [
   'http://localhost:5173',  // Vite dev server
-  'http://localhost:4000',  // Self
+  'http://localhost:4000',  // Self (dev)
+  'https://auth.any-on.com', // Production server
   'tauri://localhost',      // Tauri app
   'https://tauri.localhost' // Tauri app (alternative)
 ];
@@ -129,6 +156,10 @@ function generateToken(userId) {
 // Helper: Verify JWT token
 function verifyToken(token) {
   try {
+    // Check if token is blacklisted (logged out)
+    if (tokenBlacklist.has(token)) {
+      return null;
+    }
     return jwt.verify(token, EFFECTIVE_JWT_SECRET);
   } catch (error) {
     return null;
@@ -155,6 +186,7 @@ function authenticate(req, res, next) {
   }
 
   req.user = user;
+  req.token = token; // Store token for logout
   next();
 }
 
@@ -214,7 +246,7 @@ app.get('/auth/google/callback', async (req, res) => {
   const { code } = req.query;
 
   if (!code) {
-    return res.status(400).send('Authorization code is missing');
+    return res.status(400).json({ error: 'Authorization code is missing' });
   }
 
   try {
@@ -234,10 +266,31 @@ app.get('/auth/google/callback', async (req, res) => {
     const name = payload.name;
     const picture = payload.picture;
 
-    // Check if user exists
-    let user = userRepository.findByEmail(email);
+    // Check if user exists - prioritize googleId lookup
+    let user = userRepository.findByGoogleId(googleId);
 
     if (!user) {
+      // Fallback to email lookup (for users created before googleId tracking)
+      user = userRepository.findByEmail(email);
+    }
+
+    if (user) {
+      // Update existing user's profile if changed
+      const needsUpdate =
+        user.name !== name ||
+        user.profilePicture !== picture ||
+        user.googleId !== googleId;
+
+      if (needsUpdate) {
+        user = userRepository.update(user.id, {
+          ...user,
+          name,
+          profilePicture: picture,
+          googleId,
+        });
+        console.log(`✅ Updated user profile: ${email}`);
+      }
+    } else {
       // Create new user
       user = createUser({
         email,
@@ -247,6 +300,7 @@ app.get('/auth/google/callback', async (req, res) => {
         planType: 'FREE',
       });
       userRepository.create(user);
+      console.log(`✅ Created new user: ${email}`);
     }
 
     // Generate JWT token
@@ -258,7 +312,7 @@ app.get('/auth/google/callback', async (req, res) => {
     res.send(html);
   } catch (error) {
     console.error('❌ OAuth callback error:', error);
-    res.status(500).send('Authentication failed');
+    res.status(500).json({ error: 'Authentication failed', details: error.message });
   }
 });
 
@@ -275,6 +329,13 @@ app.get('/auth/me', authenticate, (req, res) => {
 // Verify token
 app.get('/auth/verify', authenticate, (req, res) => {
   res.json({ valid: true });
+});
+
+// Logout - invalidate current token
+app.post('/auth/logout', authenticate, (req, res) => {
+  tokenBlacklist.add(req.token);
+  console.log(`✅ User logged out: ${req.user.email}`);
+  res.json({ success: true, message: 'Logged out successfully' });
 });
 
 // Update subscription (for testing)
@@ -436,12 +497,247 @@ app.post('/api/support/chat', async (req, res) => {
   }
 });
 
+// ============================================
+// Claude API Proxy - Anthropic API 호환 엔드포인트
+// Claude Code가 ANTHROPIC_BASE_URL로 이 서버를 사용할 수 있도록
+// ============================================
+
+// 사용자별 일일 사용량 추적 (in-memory, 프로덕션에서는 Redis/DB 사용)
+const usageTracking = new Map(); // userId -> { date: 'YYYY-MM-DD', totalCost: number }
+const DAILY_LIMIT_USD = 5.0;
+
+// 모델별 토큰당 비용 (USD) - 2025년 1월 기준
+const MODEL_PRICING = {
+  'claude-sonnet-4-20250514': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'claude-opus-4-20250514': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
+  'claude-3-5-sonnet-20241022': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'claude-3-5-haiku-20241022': { input: 0.8 / 1_000_000, output: 4.0 / 1_000_000 },
+  'claude-3-opus-20240229': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
+  // 기본값 (알 수 없는 모델)
+  'default': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+};
+
+// UTC 기준 오늘 날짜
+function getTodayUTC() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// 사용자 일일 사용량 조회
+function getUserDailyUsage(userId) {
+  const today = getTodayUTC();
+  const usage = usageTracking.get(userId);
+
+  if (!usage || usage.date !== today) {
+    // 새 날짜면 리셋
+    usageTracking.set(userId, { date: today, totalCost: 0 });
+    return 0;
+  }
+
+  return usage.totalCost;
+}
+
+// 사용량 추가
+function addUsage(userId, cost) {
+  const today = getTodayUTC();
+  const current = usageTracking.get(userId);
+
+  if (!current || current.date !== today) {
+    usageTracking.set(userId, { date: today, totalCost: cost });
+  } else {
+    current.totalCost += cost;
+  }
+}
+
+// 비용 계산
+function calculateCost(model, inputTokens, outputTokens) {
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['default'];
+  return (inputTokens * pricing.input) + (outputTokens * pricing.output);
+}
+
+// JWT 토큰 기반 인증 미들웨어 (ANTHROPIC_AUTH_TOKEN 헤더용)
+function authenticateAnthropicStyle(req, res, next) {
+  // x-api-key 또는 Authorization 헤더에서 JWT 토큰 추출
+  const apiKey = req.headers['x-api-key'];
+  const authHeader = req.headers.authorization;
+
+  let token = apiKey;
+  if (!token && authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+
+  if (!token) {
+    return res.status(401).json({
+      type: 'error',
+      error: {
+        type: 'authentication_error',
+        message: 'Missing API key or Authorization header'
+      }
+    });
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).json({
+      type: 'error',
+      error: {
+        type: 'authentication_error',
+        message: 'Invalid or expired token'
+      }
+    });
+  }
+
+  const user = userRepository.findById(decoded.userId);
+  if (!user) {
+    return res.status(401).json({
+      type: 'error',
+      error: {
+        type: 'authentication_error',
+        message: 'User not found'
+      }
+    });
+  }
+
+  req.user = user;
+  next();
+}
+
+// Anthropic API 호환 /v1/messages 엔드포인트
+app.post('/v1/messages', authenticateAnthropicStyle, async (req, res) => {
+  const { model, messages, max_tokens, system, temperature, stream } = req.body;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({
+      type: 'error',
+      error: { type: 'invalid_request_error', message: 'messages is required' }
+    });
+  }
+
+  if (!model) {
+    return res.status(400).json({
+      type: 'error',
+      error: { type: 'invalid_request_error', message: 'model is required' }
+    });
+  }
+
+  if (!anthropic) {
+    return res.status(503).json({
+      type: 'error',
+      error: { type: 'api_error', message: 'ANYON API service unavailable' }
+    });
+  }
+
+  // 일일 사용량 체크
+  const currentUsage = getUserDailyUsage(req.user.id);
+  if (currentUsage >= DAILY_LIMIT_USD) {
+    console.log(`[Claude Proxy] BLOCKED - User: ${req.user.email}, Usage: $${currentUsage.toFixed(4)} >= $${DAILY_LIMIT_USD}`);
+    return res.status(429).json({
+      type: 'error',
+      error: {
+        type: 'rate_limit_error',
+        message: `Daily usage limit exceeded ($${DAILY_LIMIT_USD}/day). Resets at UTC midnight.`
+      }
+    });
+  }
+
+  console.log(`[Claude Proxy] User: ${req.user.email}, Model: ${model}, Current Usage: $${currentUsage.toFixed(4)}`);
+
+  try {
+    if (stream) {
+      // SSE 스트리밍 응답
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+
+      const messageStream = await anthropic.messages.stream({
+        model,
+        max_tokens: max_tokens || 4096,
+        system: system || undefined,
+        temperature: temperature ?? undefined,
+        messages,
+      });
+
+      // Anthropic의 SSE 이벤트를 그대로 전달
+      for await (const event of messageStream) {
+        res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+      }
+
+      // 최종 메시지에서 사용량 추적
+      const finalMessage = await messageStream.finalMessage();
+      const cost = calculateCost(model, finalMessage.usage.input_tokens, finalMessage.usage.output_tokens);
+      addUsage(req.user.id, cost);
+
+      console.log(`[Claude Proxy] Complete - User: ${req.user.email}, Cost: $${cost.toFixed(6)}, Total Today: $${getUserDailyUsage(req.user.id).toFixed(4)}`);
+
+      res.write(`event: message_stop\ndata: {"type":"message_stop"}\n\n`);
+      res.end();
+    } else {
+      // 일반 JSON 응답
+      const message = await anthropic.messages.create({
+        model,
+        max_tokens: max_tokens || 4096,
+        system: system || undefined,
+        temperature: temperature ?? undefined,
+        messages,
+      });
+
+      // 사용량 추적
+      const cost = calculateCost(model, message.usage.input_tokens, message.usage.output_tokens);
+      addUsage(req.user.id, cost);
+
+      console.log(`[Claude Proxy] Complete - User: ${req.user.email}, Cost: $${cost.toFixed(6)}, Total Today: $${getUserDailyUsage(req.user.id).toFixed(4)}`);
+
+      res.json(message);
+    }
+  } catch (error) {
+    console.error('❌ Claude proxy error:', error);
+
+    res.status(error.status || 500).json({
+      type: 'error',
+      error: {
+        type: 'api_error',
+        message: error.message || 'Internal server error'
+      }
+    });
+  }
+});
+
+// 레거시 엔드포인트 (기존 호환성 유지)
+app.post('/api/claude/messages', authenticate, async (req, res) => {
+  // /v1/messages로 리다이렉트하는 대신 내부 처리
+  req.headers['x-api-key'] = req.token;
+  return app._router.handle({ ...req, url: '/v1/messages', originalUrl: '/v1/messages' }, res, () => {});
+});
+
+// 사용량 조회 엔드포인트
+app.get('/api/claude/usage', authenticate, (req, res) => {
+  const usage = getUserDailyUsage(req.user.id);
+  res.json({
+    userId: req.user.id,
+    date: getTodayUTC(),
+    usedUSD: usage,
+    limitUSD: DAILY_LIMIT_USD,
+    remainingUSD: Math.max(0, DAILY_LIMIT_USD - usage),
+    percentUsed: Math.min(100, (usage / DAILY_LIMIT_USD) * 100)
+  });
+});
+
+// Claude API 상태 확인
+app.get('/api/claude/status', (req, res) => {
+  res.json({
+    available: !!anthropic,
+    message: anthropic ? 'ANYON Claude API is available' : 'Claude API not configured',
+    dailyLimitUSD: DAILY_LIMIT_USD
+  });
+});
+
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 Auth Server running on http://localhost:${PORT}`);
   console.log(`📦 Environment: ${NODE_ENV}`);
   console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Configured' : '❌ Not configured'}`);
   console.log(`🤖 Gemini AI: ${process.env.GEMINI_API_KEY ? '✅ Configured' : '❌ Not configured'}`);
+  console.log(`🧠 Claude API: ${process.env.ANYON_ANTHROPIC_API_KEY ? '✅ Configured' : '❌ Not configured'}`);
   console.log(`\n📝 Development endpoints:`);
   console.log(`   POST /dev/create-user - Create test user`);
   console.log(`   GET  /dev/users - List all users`);
@@ -449,6 +745,7 @@ const server = app.listen(PORT, () => {
   console.log(`   GET  /auth/google/url - Get OAuth URL`);
   console.log(`   GET  /auth/me - Get current user`);
   console.log(`   GET  /auth/verify - Verify token`);
+  console.log(`   POST /auth/logout - Logout (invalidate token)`);
   console.log(`   POST /auth/subscription - Update subscription`);
   console.log(`\n⚙️  Settings endpoints:`);
   console.log(`   GET    /api/settings - Get user settings`);
@@ -456,7 +753,10 @@ const server = app.listen(PORT, () => {
   console.log(`   PATCH  /api/settings/:key - Update specific setting`);
   console.log(`   DELETE /api/settings/:key - Delete specific setting`);
   console.log(`\n🤖 Support Chat endpoints:`);
-  console.log(`   POST /api/support/chat - AI support chat (SSE streaming)\n`);
+  console.log(`   POST /api/support/chat - AI support chat (SSE streaming)`);
+  console.log(`\n🧠 Claude API Proxy endpoints:`);
+  console.log(`   GET  /api/claude/status - Check Claude API availability`);
+  console.log(`   POST /api/claude/messages - Claude chat (SSE streaming, auth required)\n`);
 });
 
 // Graceful shutdown
