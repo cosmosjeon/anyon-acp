@@ -419,6 +419,45 @@ export const claudeAuthApi = {
   },
 
   /**
+   * Start OAuth login flow directly (opens browser)
+   * @returns Promise resolving to the authorization URL
+   */
+  async startOAuth(): Promise<string> {
+    try {
+      return await apiCall<string>('claude_oauth_start');
+    } catch (error) {
+      console.error('Failed to start OAuth:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Start polling for login completion (for terminal login fallback)
+   * @returns Promise resolving when polling starts
+   */
+  async startLoginPolling(): Promise<void> {
+    try {
+      return await apiCall<void>('claude_auth_poll_for_login');
+    } catch (error) {
+      console.error('Failed to start login polling:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Stop polling for login completion
+   * @returns Promise resolving when polling stops
+   */
+  async stopLoginPolling(): Promise<void> {
+    try {
+      return await apiCall<void>('claude_auth_stop_polling');
+    } catch (error) {
+      console.error('Failed to stop login polling:', error);
+      // Don't throw - this is cleanup
+    }
+  },
+
+  /**
    * Enable ANYON API mode (server proxy)
    * @param serverUrl - ANYON server URL
    * @param jwtToken - User's JWT token

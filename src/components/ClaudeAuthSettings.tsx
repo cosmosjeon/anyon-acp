@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Key,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { claudeAuthApi, type ClaudeAuthStatus, type AnyonApiUsage } from "@/lib/api";
 import { useTranslation } from "@/hooks";
 import { useAuthStore } from "@/stores/authStore";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 interface ClaudeAuthSettingsProps {
   className?: string;
@@ -55,6 +56,10 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
   const [anyonApiAvailable, setAnyonApiAvailable] = useState(false);
   const [loadingAnyonStatus, setLoadingAnyonStatus] = useState(false);
   const [enablingAnyon, setEnablingAnyon] = useState(false);
+
+  // OAuth direct login state
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const unlistenRef = useRef<UnlistenFn[]>([]);
 
   // Server URL from environment
   const ANYON_SERVER_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
@@ -88,6 +93,44 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
     };
     checkPlatform();
   }, []);
+
+  // Set up OAuth event listeners
+  useEffect(() => {
+    if (isWebMode) return;
+
+    const setupListeners = async () => {
+      try {
+        // Listen for OAuth success
+        const unlistenSuccess = await listen<ClaudeAuthStatus>('claude-auth-success', (event) => {
+          console.log('[ClaudeAuthSettings] OAuth success event received:', event.payload);
+          setOauthLoading(false);
+          setAuthStatus(event.payload);
+          setToast?.({ message: '로그인 성공!', type: 'success' });
+        });
+        unlistenRef.current.push(unlistenSuccess);
+
+        // Listen for OAuth timeout
+        const unlistenTimeout = await listen('claude-auth-timeout', () => {
+          console.log('[ClaudeAuthSettings] OAuth timeout event received');
+          setOauthLoading(false);
+          setToast?.({ message: '로그인 시간 초과. 다시 시도해주세요.', type: 'error' });
+        });
+        unlistenRef.current.push(unlistenTimeout);
+      } catch (err) {
+        console.error('Failed to set up event listeners:', err);
+      }
+    };
+
+    setupListeners();
+
+    return () => {
+      // Cleanup listeners
+      unlistenRef.current.forEach(unlisten => unlisten());
+      unlistenRef.current = [];
+      // Stop polling if it was running
+      claudeAuthApi.stopLoginPolling().catch(() => {});
+    };
+  }, [isWebMode, setToast]);
 
   // Load auth status
   const loadAuthStatus = useCallback(async () => {
@@ -261,7 +304,25 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
     }
   };
 
-  // Handle terminal login
+  // Handle OAuth direct login
+  const handleOAuthLogin = async () => {
+    console.log("[ClaudeAuthSettings] handleOAuthLogin called");
+
+    try {
+      setOauthLoading(true);
+      const authUrl = await claudeAuthApi.startOAuth();
+      console.log("[ClaudeAuthSettings] OAuth started, auth URL:", authUrl);
+      setToast?.({ message: '브라우저에서 로그인을 완료해주세요...', type: 'success' });
+    } catch (err) {
+      console.error("[ClaudeAuthSettings] Failed to start OAuth:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setToast?.({ message: `로그인 시작 실패: ${errorMessage}`, type: "error" });
+      setOauthLoading(false);
+    }
+    // Note: setOauthLoading(false) will be called by the event listener on success/timeout
+  };
+
+  // Handle terminal login with polling
   const handleTerminalLogin = async () => {
     console.log("[ClaudeAuthSettings] handleTerminalLogin called");
     console.log("[ClaudeAuthSettings] isWebMode:", isWebMode);
@@ -272,6 +333,11 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
       console.log("[ClaudeAuthSettings] Calling claudeAuthApi.openTerminal()...");
       await claudeAuthApi.openTerminal();
       console.log("[ClaudeAuthSettings] Terminal opened successfully");
+
+      // Start polling for login completion
+      await claudeAuthApi.startLoginPolling();
+      console.log("[ClaudeAuthSettings] Login polling started");
+
       setToast?.({ message: t('settings.claudeAuth.terminalOpened') || "Terminal opened - please complete login", type: "success" });
     } catch (err) {
       console.error("[ClaudeAuthSettings] Failed to open terminal:", err);
@@ -790,62 +856,94 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
             exit={{ opacity: 0, y: -10 }}
             className="space-y-4"
           >
-            {/* Terminal Login */}
-            <div className="p-4 rounded-xl bg-muted/40 space-y-4">
+            {/* OAuth Direct Login (Primary) */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 space-y-4">
               <div className="flex items-center gap-3">
-                <Terminal className="h-5 w-5 text-muted-foreground" />
+                <div className="p-2 rounded-lg bg-blue-500/20">
+                  <User className="h-5 w-5 text-blue-500" />
+                </div>
                 <div>
-                  <h4 className="text-sm font-semibold">{t('settings.claudeAuth.terminalLogin')}</h4>
+                  <h4 className="text-sm font-semibold">Claude 계정으로 로그인</h4>
                   <p className="text-xs text-muted-foreground">
-                    {t('settings.claudeAuth.terminalLoginDesc')}
+                    한 번 클릭으로 브라우저에서 안전하게 로그인
                   </p>
                 </div>
               </div>
 
               <Button
-                onClick={handleTerminalLogin}
-                disabled={openingTerminal || isWebMode}
-                className="w-full gap-2"
+                onClick={handleOAuthLogin}
+                disabled={oauthLoading || isWebMode}
+                className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
               >
-                {openingTerminal ? (
+                {oauthLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {t('settings.claudeAuth.openingTerminal')}
+                    로그인 대기 중...
                   </>
                 ) : (
                   <>
-                    <Terminal className="h-4 w-4" />
-                    {t('settings.claudeAuth.terminalLogin')}
+                    <ExternalLink className="h-4 w-4" />
+                    Claude 계정으로 로그인
                   </>
                 )}
               </Button>
+
+              {oauthLoading && (
+                <p className="text-xs text-muted-foreground text-center">
+                  브라우저에서 로그인을 완료하면 자동으로 연결됩니다
+                </p>
+              )}
             </div>
 
-            {/* Login Steps */}
+            {/* Terminal Login (Fallback) */}
+            <div className="p-4 rounded-xl bg-muted/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Terminal className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground">터미널로 로그인</h4>
+                    <p className="text-xs text-muted-foreground">
+                      브라우저 로그인이 안 될 때 사용
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTerminalLogin}
+                  disabled={openingTerminal || isWebMode || oauthLoading}
+                  className="gap-1"
+                >
+                  {openingTerminal ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Terminal className="h-3 w-3" />
+                  )}
+                  터미널 열기
+                </Button>
+              </div>
+            </div>
+
+            {/* Benefits */}
             <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
-              <h4 className="text-sm font-semibold">{t('settings.claudeAuth.loginSteps')}</h4>
-              <ol className="space-y-2 text-sm text-muted-foreground">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4 text-blue-500" />
+                Claude 계정 로그인 장점
+              </h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">1</span>
-                  {t('settings.claudeAuth.step1')}
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>별도의 API 키 발급 불필요</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">2</span>
-                  {t('settings.claudeAuth.step2')}
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>Claude 구독 플랜에 따른 사용량 제공</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">3</span>
-                  {t('settings.claudeAuth.step3')}
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>안전한 OAuth 인증 방식</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">4</span>
-                  {t('settings.claudeAuth.step4')}
-                </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">5</span>
-                  {t('settings.claudeAuth.step5')}
-                </li>
-              </ol>
+              </ul>
             </div>
 
             {/* Recommendation */}

@@ -777,7 +777,40 @@ const ANYON_SERVICE_NAME: &str = "anyon-claude";
 /// Account name for API key in keychain
 const API_KEY_ACCOUNT: &str = "anthropic_api_key";
 /// Claude Code keychain service name for OAuth
-const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+const CLAUDE_CODE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+/// Legacy Claude Safe Storage service name
+const CLAUDE_LEGACY_SERVICE: &str = "Claude Safe Storage";
+const CLAUDE_LEGACY_ACCOUNT: &str = "Claude Key";
+
+/// Get account candidates to try (username first, then default)
+fn get_oauth_account_candidates() -> Vec<String> {
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "default".to_string());
+
+    if username == "default" {
+        vec!["default".to_string()]
+    } else {
+        vec![username, "default".to_string()]
+    }
+}
+
+/// Check if OAuth credentials are valid in the given JSON
+fn check_oauth_valid(creds_json: &str) -> bool {
+    if let Ok(creds) = serde_json::from_str::<serde_json::Value>(creds_json) {
+        if let Some(oauth) = creds.get("claudeAiOauth") {
+            if let Some(expires_at) = oauth.get("expiresAt").and_then(|v| v.as_i64()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+
+                return expires_at > now;
+            }
+        }
+    }
+    false
+}
 
 /// Check if Claude OAuth is active by reading keychain
 fn is_claude_oauth_active() -> bool {
@@ -785,23 +818,24 @@ fn is_claude_oauth_active() -> bool {
     {
         use keyring::Entry;
 
-        // Try macOS/Linux keychain
-        if let Ok(entry) = Entry::new(CLAUDE_KEYCHAIN_SERVICE, "default") {
-            if let Ok(creds_json) = entry.get_password() {
-                // Try to parse as JSON to check if OAuth token exists and is not expired
-                if let Ok(creds) = serde_json::from_str::<serde_json::Value>(&creds_json) {
-                    if let Some(oauth) = creds.get("claudeAiOauth") {
-                        if let Some(expires_at) = oauth.get("expiresAt").and_then(|v| v.as_i64()) {
-                            let now = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .map(|d| d.as_millis() as i64)
-                                .unwrap_or(0);
-
-                            let is_valid = expires_at > now;
-                            debug!("Claude OAuth found, valid: {}", is_valid);
-                            return is_valid;
-                        }
+        // Try Claude Code-credentials with multiple account names
+        for account in get_oauth_account_candidates() {
+            if let Ok(entry) = Entry::new(CLAUDE_CODE_KEYCHAIN_SERVICE, &account) {
+                if let Ok(creds_json) = entry.get_password() {
+                    if check_oauth_valid(&creds_json) {
+                        debug!("Claude OAuth found (service: {}, account: {}), valid: true", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+                        return true;
                     }
+                }
+            }
+        }
+
+        // Try legacy Claude Safe Storage
+        if let Ok(entry) = Entry::new(CLAUDE_LEGACY_SERVICE, CLAUDE_LEGACY_ACCOUNT) {
+            if let Ok(creds_json) = entry.get_password() {
+                if check_oauth_valid(&creds_json) {
+                    debug!("Claude OAuth found (legacy service), valid: true");
+                    return true;
                 }
             }
         }
@@ -809,11 +843,39 @@ fn is_claude_oauth_active() -> bool {
 
     #[cfg(target_os = "windows")]
     {
-        // Windows implementation would go here
-        // For now, return false as we don't have Windows OAuth check
-        debug!("Windows OAuth check not implemented");
+        use keyring::Entry;
+        use std::fs;
+
+        // 1. Try credentials file first
+        if let Some(home) = dirs::home_dir() {
+            let creds_path = home.join(".claude").join(".credentials.json");
+            if let Ok(content) = fs::read_to_string(&creds_path) {
+                if check_oauth_valid(&content) {
+                    debug!("Claude OAuth found (file), valid: true");
+                    return true;
+                }
+            }
+        }
+
+        // 2. Try Credential Manager
+        let accounts_to_try = get_oauth_account_candidates();
+        let services_to_try = vec![CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE];
+
+        for service in &services_to_try {
+            for account in &accounts_to_try {
+                if let Ok(entry) = Entry::new(service, account) {
+                    if let Ok(creds_json) = entry.get_password() {
+                        if check_oauth_valid(&creds_json) {
+                            debug!("Claude OAuth found (service: {}, account: {}), valid: true", service, account);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
+    debug!("No valid Claude OAuth found");
     false
 }
 

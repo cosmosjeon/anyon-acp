@@ -370,6 +370,50 @@ Located in `src/hooks/` (12 hooks):
 | `MaintenanceWorkspace` | `src/components/MaintenanceWorkspace.tsx` | Maintenance mode workspace |
 | `MvpWorkspace` | `src/components/MvpWorkspace.tsx` | MVP development workspace |
 
+### Settings Components
+
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| `ClaudeAuthSettings` | `src/components/ClaudeAuthSettings.tsx` | ~1031 | Claude authentication manager with 3 methods |
+
+**ClaudeAuthSettings Features**:
+- **3-Tab Interface**: ANYON API, OAuth, API Key
+- **Mutual Exclusivity**: Auto-disables conflicting auth methods
+- **OAuth Direct Login**: PKCE flow with browser callback
+- **Terminal Login Fallback**: Polling-based login detection
+- **ANYON API Mode**: Server proxy with usage tracking ($5 daily limit)
+- **Platform Detection**: Web mode / Windows detection for conditional features
+- **Event Listeners**: `claude-auth-success`, `claude-auth-timeout`
+- **Auto-Cleanup**: Removes conflicting credentials on method switch
+
+**State Management**:
+```typescript
+// Active auth detection (priority-based)
+getActiveAuthMethod(): AuthMethod | null {
+  // 1. OAuth (highest)
+  // 2. ANYON API
+  // 3. API Key
+}
+
+// Tab switch with conflict check
+handleMethodSwitch(method: AuthMethod) {
+  // Blocks if different method active
+  // Shows warning toast
+}
+```
+
+**ANYON API Integration**:
+```typescript
+interface AnyonApiUsage {
+  userId: string;
+  date: string;
+  usedUSD: number;
+  limitUSD: number;
+  remainingUSD: number;
+  percentUsed: number;
+}
+```
+
 ### Help Components
 
 | Component | File | Purpose |

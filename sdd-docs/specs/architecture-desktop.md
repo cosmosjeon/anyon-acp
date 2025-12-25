@@ -96,6 +96,47 @@
 
 ---
 
+## Shared Modules
+
+### claude_binary.rs (~994 LOC)
+
+**Purpose**: Claude binary detection and environment configuration
+
+**Installation Detection**:
+1. Check database for stored path
+2. Try `which/where` command
+3. Scan NVM installations (~/.nvm/versions/node/*/bin/claude)
+4. Check standard paths (/usr/local/bin, /opt/homebrew/bin, etc.)
+5. Select highest version (semantic versioning)
+
+**Environment Configuration (prepare_command_env_config)**:
+- **Priority 1**: OAuth active → use OAuth (no env injection)
+- **Priority 2**: ANYON API (ANTHROPIC_BASE_URL present) → inject settings.local.json
+- **Priority 3**: Keychain API Key → inject ANTHROPIC_API_KEY
+
+**Key Functions**:
+| Function | Description |
+|----------|-------------|
+| `find_claude_binary` | Find Claude binary (db → system scan → selection) |
+| `discover_claude_installations` | List all available installations |
+| `create_command_with_env` | Create Command with env vars |
+| `create_tokio_command_with_env` | Create async Command with env vars |
+| `is_claude_oauth_active` | Check OAuth credentials validity |
+| `get_claude_settings_env_vars` | Read settings.local.json env |
+| `get_api_key_from_keychain` | Get API key from keychain |
+
+**Version Comparison**:
+```rust
+// Semantic version comparison (1.0.17 > 1.0.16)
+// Preference: which > homebrew > system > nvm > local-bin
+```
+
+**PATH Modification**:
+- Auto-detects NVM/Homebrew paths
+- Prepends to PATH for binary execution
+
+---
+
 ## Command Modules
 
 ### agents/ (Modular Architecture)
@@ -316,24 +357,57 @@ src-tauri/src/commands/claude/
 | `mcp_read_project_config` | Read .mcp.json |
 | `mcp_save_project_config` | Save .mcp.json |
 
-### claude_auth.rs (~720 LOC)
+### claude_auth.rs (~1381 LOC)
 
-**Purpose**: Claude authentication
+**Purpose**: Claude authentication with priority system
+
+**Authentication Priority System**:
+1. **OAuth (Highest)** - Claude Code keychain credentials
+2. **ANYON API** - settings.local.json with ANTHROPIC_BASE_URL
+3. **API Key (Fallback)** - Keychain API key with helper script
 
 **Credential Storage**:
-- macOS: Keychain
-- Windows: Credential Manager
-- Linux: secret-tool / fallback file
+- macOS: Keychain (security command)
+- Windows: Credential Manager + ~/.claude/.credentials.json
+- Linux: secret-tool / ~/.claude/.credentials.json fallback
+
+**OAuth Services**:
+- Primary: `Claude Code-credentials` (multi-account support)
+- Legacy: `Claude Safe Storage` (backward compatibility)
+- Accounts: username → default fallback
 
 **Key Commands**:
 | Command | Description |
 |---------|-------------|
-| `claude_auth_check` | Check auth status |
+| `claude_auth_check` | Check auth status (with priority) |
 | `claude_auth_open_terminal` | Open login terminal |
-| `claude_auth_save_api_key` | Store API key |
+| `claude_auth_save_api_key` | Store API key (auto-disables ANYON API) |
 | `claude_auth_validate_api_key` | Verify key |
 | `claude_auth_delete_api_key` | Remove key |
-| `claude_auth_logout` | Logout |
+| `claude_auth_logout` | Logout (multi-service cleanup) |
+| `claude_auth_enable_anyon_api` | Enable ANYON API mode (auto-deletes API key) |
+| `claude_auth_disable_anyon_api` | Disable ANYON API mode |
+| `claude_auth_get_anyon_api_status` | Get ANYON API status |
+| `claude_oauth_start` | Start OAuth direct login (PKCE flow) |
+| `claude_auth_poll_for_login` | Poll for terminal login completion |
+| `claude_auth_stop_polling` | Stop login polling |
+
+**OAuth Flow**:
+```rust
+// Direct OAuth (PKCE)
+1. Generate code_verifier + code_challenge
+2. Start local callback server (random port)
+3. Open browser to claude.ai/oauth/authorize
+4. User logs in → callback with code
+5. Exchange code for token (console.anthropic.com)
+6. Save credentials to keychain
+7. Emit 'claude-auth-success' event
+```
+
+**Mutual Exclusivity**:
+- API Key save → auto-disables ANYON API
+- ANYON API enable → auto-deletes API Key
+- OAuth active → blocks other methods (checked at runtime)
 
 ### storage.rs (~530 LOC)
 

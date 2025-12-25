@@ -71,6 +71,9 @@ futures-util = "0.3"
 jsonwebtoken = "9"
 yup-oauth2 = "11"
 keyring = "2"
+rand = "0.8"
+open = "5"
+urlencoding = "2.1"
 # Pin image to avoid edition2024 requirement
 image = "=0.25.1"
 

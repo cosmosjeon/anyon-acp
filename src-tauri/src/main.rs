@@ -37,6 +37,7 @@ use commands::claude_auth::{
     claude_auth_check, claude_auth_open_terminal, claude_auth_save_api_key,
     claude_auth_delete_api_key, claude_auth_validate_api_key, claude_auth_logout,
     claude_auth_enable_anyon_api, claude_auth_disable_anyon_api, claude_auth_get_anyon_api_status,
+    claude_oauth_start, claude_auth_poll_for_login, claude_auth_stop_polling,
 };
 
 use commands::preview::{scan_ports, check_port_alive};
@@ -452,6 +453,10 @@ macro_rules! create_handlers {
             claude_auth_enable_anyon_api,
             claude_auth_disable_anyon_api,
             claude_auth_get_anyon_api_status,
+            // OAuth Direct Login
+            claude_oauth_start,
+            claude_auth_poll_for_login,
+            claude_auth_stop_polling,
             // Git Operations
             commands::git::get_git_head_sha,
             commands::git::has_git_uncommitted_changes,
