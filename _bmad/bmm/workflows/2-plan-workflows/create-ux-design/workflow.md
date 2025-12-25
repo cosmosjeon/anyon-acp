@@ -8,6 +8,15 @@ web_bundle: true
 
 **Goal:** Create comprehensive UX design specifications through collaborative visual exploration and informed decision-making where you act as a UX facilitator working with a product stakeholder.
 
+## PHASE CONSTRAINTS
+
+This workflow produces **DESIGN ARTIFACTS ONLY**:
+- UX specification documents (markdown)
+- HTML/CSS visual prototypes
+- Excalidraw wireframes and diagrams
+
+**NEVER** produces application code. Implementation happens in Phase 4 (dev-story workflow).
+
 ---
 
 ## WORKFLOW ARCHITECTURE

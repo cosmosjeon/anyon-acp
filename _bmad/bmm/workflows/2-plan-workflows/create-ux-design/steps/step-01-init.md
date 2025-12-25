@@ -18,6 +18,22 @@
 - 📖 Set up frontmatter `stepsCompleted: [1]` before loading next step
 - 🚫 FORBIDDEN to load next step until setup is complete
 
+## PROHIBITED ACTIONS (HARD CONSTRAINTS):
+
+- ❌ NEVER create application code (React, Next.js, Vue, Angular, etc.)
+- ❌ NEVER run npx/npm/bun/yarn create commands
+- ❌ NEVER create project scaffolding or boilerplate
+- ❌ NEVER write TypeScript/JavaScript application logic
+- ❌ NEVER create database schemas or API endpoints
+
+## ALLOWED OUTPUTS ONLY:
+
+- ✅ HTML/CSS mockups (static prototypes in `{output_folder}/`)
+- ✅ Excalidraw wireframes (`.excalidraw` files)
+- ✅ Markdown design specifications
+- ✅ Color theme HTML files
+- ✅ Design direction HTML files
+
 ## CONTEXT BOUNDARIES:
 
 - Variables from workflow.md are available in memory
