@@ -270,11 +270,21 @@ export class SessionPersistenceService {
 
   /**
    * Save last used session for a tab
+   * Also saves full session data for restoration
    */
-  static saveLastSessionForTab(projectPath: string, tabType: TabType, sessionId: string): void {
+  static saveLastSessionForTab(
+    projectPath: string,
+    tabType: TabType,
+    sessionId: string,
+    projectId: string
+  ): void {
     try {
+      // Save the session ID reference
       const key = this.getLastSessionKey(projectPath, tabType);
       localStorage.setItem(key, sessionId);
+
+      // Also save full session data for restoration
+      this.saveSession(sessionId, projectId, projectPath);
     } catch (error) {
       console.error('Failed to save last session:', error);
     }
@@ -298,8 +308,11 @@ export class SessionPersistenceService {
    */
   static getLastSessionDataForTab(projectPath: string, tabType: TabType): SessionRestoreData | null {
     const sessionId = this.getLastSessionForTab(projectPath, tabType);
+    console.log('[SessionPersistence] getLastSessionDataForTab - sessionId:', sessionId, 'for path:', projectPath, 'tabType:', tabType);
     if (!sessionId) return null;
-    return this.loadSession(sessionId);
+    const data = this.loadSession(sessionId);
+    console.log('[SessionPersistence] loadSession result:', data);
+    return data;
   }
 
   /**
@@ -343,6 +356,89 @@ export class SessionPersistenceService {
       }
     } catch (error) {
       console.error('Failed to update session first message:', error);
+    }
+  }
+
+  // ============================================
+  // Display Text 저장/조회 (세션 복원 시 짧은 표시 텍스트 유지)
+  // ============================================
+
+  private static readonly DISPLAY_TEXT_PREFIX = 'anyon_display_text_';
+
+  /**
+   * 프롬프트 해시 생성 (프롬프트 앞 100자 + 길이)
+   */
+  private static getPromptHash(prompt: string): string {
+    return `${prompt.substring(0, 100)}_${prompt.length}`;
+  }
+
+  /**
+   * displayText 저장
+   * @param sessionId 세션 ID
+   * @param prompt 전체 프롬프트 (해시 생성용)
+   * @param displayText 짧은 표시 텍스트
+   */
+  static saveDisplayText(sessionId: string, prompt: string, displayText: string): void {
+    try {
+      const key = `${this.DISPLAY_TEXT_PREFIX}${sessionId}`;
+      const existing = this.getDisplayTexts(sessionId);
+      const promptHash = this.getPromptHash(prompt);
+
+      // 이미 있는 경우 업데이트
+      const existingIndex = existing.findIndex(e => e.promptHash === promptHash);
+      if (existingIndex >= 0) {
+        existing[existingIndex].displayText = displayText;
+      } else {
+        existing.push({ promptHash, displayText });
+      }
+
+      localStorage.setItem(key, JSON.stringify(existing));
+    } catch (error) {
+      console.error('Failed to save display text:', error);
+    }
+  }
+
+  /**
+   * 세션의 모든 displayText 매핑 조회
+   */
+  static getDisplayTexts(sessionId: string): Array<{ promptHash: string; displayText: string }> {
+    try {
+      const key = `${this.DISPLAY_TEXT_PREFIX}${sessionId}`;
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Failed to get display texts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 프롬프트에 해당하는 displayText 조회
+   * @param sessionId 세션 ID
+   * @param prompt 전체 프롬프트
+   * @returns displayText 또는 null
+   */
+  static findDisplayText(sessionId: string, prompt: string): string | null {
+    try {
+      const entries = this.getDisplayTexts(sessionId);
+      const promptHash = this.getPromptHash(prompt);
+      const entry = entries.find(e => e.promptHash === promptHash);
+      return entry?.displayText || null;
+    } catch (error) {
+      console.error('Failed to find display text:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 세션의 displayText 데이터 삭제
+   */
+  static clearDisplayTexts(sessionId: string): void {
+    try {
+      const key = `${this.DISPLAY_TEXT_PREFIX}${sessionId}`;
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error('Failed to clear display texts:', error);
     }
   }
 }

@@ -236,13 +236,6 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                 {toolBadges}
               </ToolBadgeGroup>
             )}
-            
-            {/* Usage info - subtle */}
-            {msg.usage && (
-              <div className="text-xs text-muted-foreground/60">
-                {msg.usage.input_tokens + msg.usage.output_tokens} tokens
-              </div>
-            )}
           </div>
         </div>
       );
@@ -255,7 +248,20 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       const msg = message.message || message;
       let hasContent = false;
       const contentParts: React.ReactNode[] = [];
-      
+
+      // displayText가 있으면 우선 사용 (워크플로우 짧은 표시 텍스트)
+      if (message.displayText) {
+        const { icon } = getPromptDisplayInfo(message.displayText);
+        return (
+          <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <WorkflowIcon icon={icon} className="h-4 w-4" />
+              <span>{message.displayText}</span>
+            </div>
+          </div>
+        );
+      }
+
       // Handle string content
       if (typeof msg.content === 'string' || (msg.content && !Array.isArray(msg.content))) {
         const contentStr = typeof msg.content === 'string' ? msg.content : String(msg.content);
@@ -393,18 +399,13 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       );
     }
 
-    // Result message - compact metadata bar
+    // Result message - compact metadata bar (only show errors and duration)
     if (message.type === "result") {
       const isError = message.is_error || message.subtype?.includes("error");
-      const hasMetadata = message.cost_usd !== undefined || 
-                          message.total_cost_usd !== undefined || 
-                          message.duration_ms !== undefined || 
-                          message.num_turns !== undefined || 
-                          message.usage !== undefined ||
-                          message.error;
-      
+      const hasMetadata = message.duration_ms !== undefined || message.error;
+
       if (!hasMetadata && !isError) return null;
-      
+
       return (
         <div className={cn(
           "flex items-center gap-4 px-4 py-2 text-xs border-t border-border/30",
@@ -416,19 +417,10 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
           ) : (
             <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
           )}
-          
+
           {message.error && <span className="text-destructive">{message.error}</span>}
-          {(message.cost_usd !== undefined || message.total_cost_usd !== undefined) && (
-            <span>${((message.cost_usd || message.total_cost_usd)!).toFixed(4)}</span>
-          )}
           {message.duration_ms !== undefined && (
             <span>{(message.duration_ms / 1000).toFixed(1)}s</span>
-          )}
-          {message.num_turns !== undefined && (
-            <span>{message.num_turns} turns</span>
-          )}
-          {message.usage && (
-            <span>{message.usage.input_tokens + message.usage.output_tokens} tokens</span>
           )}
         </div>
       );

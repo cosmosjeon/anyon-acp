@@ -11,7 +11,6 @@ import { projectsApi } from './projects';
 import { agentsApi } from './agents';
 import { sessionsApi } from './sessions';
 import { mcpApi } from './mcp';
-import { checkpointsApi } from './checkpoints';
 import { storageApi } from './storage';
 import { usageApi } from './usage';
 import { claudeApi, claudeAuthApi as _claudeAuthApi, planningApi as _planningApi } from './claude';
@@ -21,7 +20,6 @@ export { projectsApi } from './projects';
 export { agentsApi } from './agents';
 export { sessionsApi } from './sessions';
 export { mcpApi } from './mcp';
-export { checkpointsApi } from './checkpoints';
 export { storageApi } from './storage';
 export { usageApi } from './usage';
 export { claudeApi } from './claude';
@@ -40,9 +38,6 @@ export const api = {
 
   // MCP
   ...mcpApi,
-
-  // Checkpoints
-  ...checkpointsApi,
 
   // Storage
   ...storageApi,

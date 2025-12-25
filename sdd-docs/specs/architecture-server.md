@@ -22,6 +22,9 @@
 | **Database** | better-sqlite3 | 11.8.1 | SQLite bindings |
 | **Auth** | google-auth-library | 10.5.0 | Google OAuth |
 | | jsonwebtoken | 9.0.2 | JWT tokens |
+| **AI** | @anthropic-ai/sdk | - | Claude API proxy |
+| | @google/generative-ai | - | Gemini support chat |
+| **Security** | express-rate-limit | - | Rate limiting |
 | **Utilities** | cors | 2.8.5 | CORS middleware |
 | | dotenv | 17.2.3 | Env variables |
 | | uuid | 9.0.1 | ID generation |
@@ -38,6 +41,7 @@
 | `GET` | `/auth/google/callback` | No | OAuth callback |
 | `GET` | `/auth/me` | Yes | Current user |
 | `GET` | `/auth/verify` | Yes | Validate token |
+| `POST` | `/auth/logout` | Yes | Logout (invalidate token) |
 | `POST` | `/auth/subscription` | Yes | Update subscription |
 | `POST` | `/auth/dev/login` | No | Dev quick login |
 
@@ -57,6 +61,23 @@
 | `POST` | `/dev/create-user` | No | Create test user |
 | `GET` | `/dev/users` | No | List all users |
 | `GET` | `/health` | No | Health check |
+
+### Claude API Proxy
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/v1/messages` | Yes* | Anthropic API compatible endpoint |
+| `POST` | `/api/claude/messages` | Yes | Legacy Claude chat (SSE streaming) |
+| `GET` | `/api/claude/usage` | Yes | Get daily usage statistics |
+| `GET` | `/api/claude/status` | No | Check Claude API availability |
+
+*Uses x-api-key or Authorization header with JWT
+
+### Support Chat
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/support/chat` | No | AI support chat (Gemini, SSE streaming) |
 
 ---
 
@@ -105,15 +126,52 @@ function authenticate(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
+  // Check if token is blacklisted (logged out)
+  if (tokenBlacklist.has(token)) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
   const decoded = verifyToken(token);
   if (!decoded) return res.status(401).json({ error: 'Invalid token' });
 
-  const user = users.get(decoded.userId);
+  const user = userRepository.findById(decoded.userId);
   if (!user) return res.status(401).json({ error: 'User not found' });
 
   req.user = user;
+  req.token = token; // Store token for logout
   next();
 }
+```
+
+### Rate Limiting
+
+```javascript
+// Auth routes: 100 requests per 15 minutes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+// Sensitive endpoints: 20 requests per 15 minutes
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+});
+
+app.use('/auth', authLimiter);
+app.use('/dev', strictLimiter);
+```
+
+### Token Blacklist
+
+```javascript
+// In-memory blacklist for logged out tokens
+const tokenBlacklist = new Set();
+
+// Automatic cleanup every hour
+setInterval(() => {
+  // Remove expired tokens from blacklist
+}, TOKEN_BLACKLIST_CLEANUP_INTERVAL);
 ```
 
 ---
@@ -239,6 +297,8 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 | `GOOGLE_CLIENT_ID` | Yes* | - | OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Yes* | - | OAuth secret |
 | `OAUTH_REDIRECT_URI` | No | localhost:4000/... | Callback URL |
+| `GEMINI_API_KEY` | No | - | Gemini AI for support chat |
+| `ANYON_ANTHROPIC_API_KEY` | No | - | Claude API proxy key |
 
 *Required for production
 
@@ -368,6 +428,54 @@ npm start
 
 ---
 
+## Claude API Proxy
+
+### Overview
+
+Anthropic API 호환 프록시로, Claude Code가 `ANTHROPIC_BASE_URL`로 이 서버를 사용할 수 있습니다.
+
+### Usage Tracking
+
+```javascript
+// 일일 사용량 제한
+const DAILY_LIMIT_USD = 5.0;
+
+// 모델별 토큰 비용 (USD)
+const MODEL_PRICING = {
+  'claude-sonnet-4-20250514': { input: 3.0/1M, output: 15.0/1M },
+  'claude-opus-4-20250514': { input: 15.0/1M, output: 75.0/1M },
+  'claude-3-5-sonnet-20241022': { input: 3.0/1M, output: 15.0/1M },
+  'claude-3-5-haiku-20241022': { input: 0.8/1M, output: 4.0/1M },
+};
+```
+
+### Authentication
+
+```javascript
+// x-api-key 또는 Authorization 헤더에서 JWT 추출
+function authenticateAnthropicStyle(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+  const authHeader = req.headers.authorization;
+  // JWT 검증 후 사용자 조회
+}
+```
+
+### Response Format
+
+```javascript
+// Usage endpoint response
+{
+  userId: "uuid",
+  date: "2025-12-25",
+  usedUSD: 2.5,
+  limitUSD: 5.0,
+  remainingUSD: 2.5,
+  percentUsed: 50
+}
+```
+
+---
+
 ## Security Considerations
 
 ### Production Checklist
@@ -376,9 +484,9 @@ npm start
 - [ ] Configure proper Google OAuth credentials
 - [ ] Remove `/dev/*` endpoints
 - [x] ~~Replace in-memory storage with database~~ (SQLite 구현 완료)
-- [ ] Add rate limiting
+- [x] ~~Add rate limiting~~ (express-rate-limit 구현 완료)
 - [ ] Enable HTTPS/TLS
-- [ ] Restrict CORS origins
+- [x] ~~Restrict CORS origins~~ (allowedOrigins 설정 완료)
 - [ ] Add request logging
 
 ### Token Security

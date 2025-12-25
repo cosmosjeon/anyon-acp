@@ -3,13 +3,10 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod auth_server;
-mod checkpoint;
 mod claude_binary;
 mod commands;
 mod portable_deps;
 mod process;
-
-use checkpoint::state::CheckpointState;
 use commands::agents::{
     cleanup_finished_processes, create_agent, delete_agent, execute_agent, export_agent,
     export_agent_to_file, fetch_github_agent_content, fetch_github_agents, get_agent,
@@ -21,18 +18,15 @@ use commands::agents::{
     stream_session_output, update_agent, AgentDb,
 };
 use commands::claude::{
-    cancel_claude_execution, check_anyon_installed, check_auto_checkpoint, check_claude_version,
-    cleanup_old_checkpoints, clear_checkpoint_manager, continue_claude_code,
-    create_checkpoint, create_project, execute_claude_code,
-    find_claude_md_files, fork_from_checkpoint, get_checkpoint_diff, get_checkpoint_settings,
-    get_checkpoint_state_stats, get_claude_session_output, get_claude_settings, get_home_directory,
-    get_project_sessions, get_recently_modified_files, get_session_timeline,
-    get_system_prompt, list_checkpoints, list_directory_contents, list_projects,
+    cancel_claude_execution, check_anyon_installed, check_claude_version,
+    continue_claude_code, create_project, execute_claude_code,
+    find_claude_md_files, get_claude_session_output, get_claude_settings, get_home_directory,
+    get_project_sessions,
+    get_system_prompt, list_directory_contents, list_projects,
     list_running_claude_sessions, load_session_history, open_new_session, read_claude_md_file,
-    read_file_content, check_file_exists, list_anyon_docs, restore_checkpoint, resume_claude_code,
+    read_file_content, check_file_exists, list_anyon_docs, resume_claude_code,
     run_npx_anyon_agents, check_is_git_repo, init_git_repo, git_add_all, git_commit, git_set_remote, git_push, git_status, git_current_branch, save_claude_md_file, save_claude_settings,
-    save_system_prompt, search_files, track_checkpoint_message, track_session_messages,
-    update_checkpoint_settings, ClaudeProcessState,
+    save_system_prompt, search_files, ClaudeProcessState,
 };
 use commands::mcp::{
     mcp_add, mcp_add_from_claude_desktop, mcp_add_json, mcp_get, mcp_get_server_status, mcp_list,
@@ -232,30 +226,6 @@ fn setup_database(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-/// Setup checkpoint system
-fn setup_checkpoint_system(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let checkpoint_state = CheckpointState::new();
-
-    // Set the Claude directory path
-    if let Ok(claude_dir) = dirs::home_dir()
-        .ok_or_else(|| "Could not find home directory")
-        .and_then(|home| {
-            let claude_path = home.join(".claude");
-            claude_path
-                .canonicalize()
-                .map_err(|_| "Could not find ~/.claude directory")
-        })
-    {
-        let state_clone = checkpoint_state.clone();
-        tauri::async_runtime::spawn(async move {
-            state_clone.set_claude_dir(claude_dir).await;
-        });
-    }
-
-    app.manage(checkpoint_state);
-    Ok(())
-}
-
 /// Setup process registries
 fn setup_process_registries(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(ProcessRegistryState::default());
@@ -340,7 +310,6 @@ fn setup_application(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Err
     setup_deep_links(app)?;
     setup_proxy_settings(&app.handle())?;
     setup_database(app)?;
-    setup_checkpoint_system(app)?;
     setup_process_registries(app)?;
     setup_auth_server()?;
     setup_window_effects(app)?;
@@ -359,8 +328,6 @@ macro_rules! create_handlers {
             // Claude & Project Management - Sessions
             commands::claude::sessions::open_new_session,
             commands::claude::sessions::load_session_history,
-            commands::claude::sessions::get_session_timeline,
-            commands::claude::sessions::track_session_messages,
             // Claude & Project Management - Execution
             commands::claude::execution::execute_claude_code,
             commands::claude::execution::continue_claude_code,
@@ -375,19 +342,6 @@ macro_rules! create_handlers {
             commands::claude::filesystem::write_file_content,
             commands::claude::filesystem::check_file_exists,
             commands::claude::filesystem::list_anyon_docs,
-            // Claude & Project Management - Checkpoints
-            commands::claude::checkpoints::create_checkpoint,
-            commands::claude::checkpoints::restore_checkpoint,
-            commands::claude::checkpoints::list_checkpoints,
-            commands::claude::checkpoints::fork_from_checkpoint,
-            commands::claude::checkpoints::update_checkpoint_settings,
-            commands::claude::checkpoints::get_checkpoint_diff,
-            commands::claude::checkpoints::track_checkpoint_message,
-            commands::claude::checkpoints::check_auto_checkpoint,
-            commands::claude::checkpoints::cleanup_old_checkpoints,
-            commands::claude::checkpoints::get_checkpoint_settings,
-            commands::claude::checkpoints::clear_checkpoint_manager,
-            commands::claude::checkpoints::get_checkpoint_state_stats,
             // Claude & Project Management - Settings
             commands::claude::settings::get_claude_settings,
             commands::claude::settings::save_claude_settings,
@@ -397,7 +351,6 @@ macro_rules! create_handlers {
             commands::claude::settings::find_claude_md_files,
             commands::claude::settings::read_claude_md_file,
             commands::claude::settings::save_claude_md_file,
-            commands::claude::settings::get_recently_modified_files,
             commands::claude::settings::check_anyon_installed,
             commands::claude::settings::run_npx_anyon_agents,
             commands::claude::settings::check_is_git_repo,

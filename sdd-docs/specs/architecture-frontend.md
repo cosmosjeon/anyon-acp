@@ -441,7 +441,7 @@ interface LanguageState {
 
 ## Custom Hooks
 
-Total: 8 custom hooks for state management, performance, and feature integration.
+Total: 14 custom hooks for state management, performance, and feature integration.
 
 ### Core Hooks
 
@@ -474,6 +474,7 @@ Total: 8 custom hooks for state management, performance, and feature integration
 
 | Hook | Purpose | Returns | Usage |
 |------|---------|---------|-------|
+| `useChatHistory` | Chat history management | `{ history, addMessage(), clearHistory() }` | Chat message persistence |
 | `useDevServer` | Dev server lifecycle | `{ startDevServer(), stopDevServer(), getDevServerInfo() }` | Project dev server |
 | `usePlanningDocs` | Planning doc management | `{ docs, createDoc(), updateDoc() }` | SDD docs CRUD |
 | `usePreviewMessages` | Preview iframe messaging | `{ sendMessage(), messages[] }` | iframe communication |

@@ -460,4 +460,7 @@ export const AVAILABLE_ICONS = Object.values(ICON_CATEGORIES)
 // Export icon map for easy access
 export const ICON_MAP = Object.values(ICON_CATEGORIES)
   .flat()
-  .reduce((acc, { name, icon }) => ({ ...acc, [name]: icon }), {} as Record<string, LucideIcon>); 
+  .reduce((acc, { name, icon }) => ({ ...acc, [name]: icon }), {} as Record<string, LucideIcon>);
+
+// Export type for agent icon names
+export type AgentIconName = keyof typeof ICON_MAP; 

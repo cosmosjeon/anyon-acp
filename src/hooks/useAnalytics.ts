@@ -54,9 +54,9 @@ export function useTrackEvent() {
       analytics.track(ANALYTICS_EVENTS.SESSION_COMPLETED);
     },
     
-    sessionResumed: (checkpointId: string) => {
-      const event = eventBuilders.session({ resumed: true, checkpoint_id: checkpointId });
-      analytics.track(ANALYTICS_EVENTS.SESSION_RESUMED, event.properties);
+    sessionResumed: (sessionId: string) => {
+      const event = eventBuilders.session({ resumed: true });
+      analytics.track(ANALYTICS_EVENTS.SESSION_RESUMED, { ...event.properties, session_id: sessionId });
     },
     
     // Feature usage
@@ -147,17 +147,7 @@ export function useTrackEvent() {
       const event = eventBuilders.enhancedSessionStopped(props);
       analytics.track(event.event, event.properties);
     },
-    
-    checkpointCreated: (props: Parameters<typeof eventBuilders.checkpointCreated>[0]) => {
-      const event = eventBuilders.checkpointCreated(props);
-      analytics.track(event.event, event.properties);
-    },
-    
-    checkpointRestored: (props: Parameters<typeof eventBuilders.checkpointRestored>[0]) => {
-      const event = eventBuilders.checkpointRestored(props);
-      analytics.track(event.event, event.properties);
-    },
-    
+
     toolExecuted: (props: Parameters<typeof eventBuilders.toolExecuted>[0]) => {
       const event = eventBuilders.toolExecuted(props);
       analytics.track(event.event, event.properties);

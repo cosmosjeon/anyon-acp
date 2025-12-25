@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
+import { api } from '@/lib/api';
 import {
   RefreshCw,
   Maximize,
@@ -273,9 +274,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
     const autoDetectAndStart = async () => {
       try {
-        const hasPackageJson = await invoke<boolean>('check_file_exists', {
-          filePath: `${projectPath}/package.json`
-        });
+        const hasPackageJson = await api.checkFileExists(`${projectPath}/package.json`);
 
         if (hasPackageJson) {
           if (!devServerRunning) {
@@ -288,7 +287,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         const htmlFiles = ['index.html', 'main.html', 'home.html'];
         for (const htmlFile of htmlFiles) {
           const htmlPath = `${projectPath}/${htmlFile}`;
-          const exists = await invoke<boolean>('check_file_exists', { filePath: htmlPath });
+          const exists = await api.checkFileExists(htmlPath);
           if (exists) {
             console.log('[Preview] Auto-detected HTML file:', htmlPath);
             setSourceMode('file');
@@ -300,7 +299,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
         for (const htmlFile of htmlFiles) {
           const htmlPath = `${projectPath}/src/${htmlFile}`;
-          const exists = await invoke<boolean>('check_file_exists', { filePath: htmlPath });
+          const exists = await api.checkFileExists(htmlPath);
           if (exists) {
             console.log('[Preview] Auto-detected HTML file in src/:', htmlPath);
             setSourceMode('file');
@@ -342,9 +341,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
       checkCount++;
 
       try {
-        const hasPackageJson = await invoke<boolean>('check_file_exists', {
-          filePath: `${projectPath}/package.json`
-        });
+        const hasPackageJson = await api.checkFileExists(`${projectPath}/package.json`);
 
         if (hasPackageJson) {
           console.log('[Preview] package.json detected, starting dev server automatically');

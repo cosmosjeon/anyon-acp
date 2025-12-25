@@ -1,17 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Terminal, 
-  FolderOpen, 
-  Copy, 
+import {
+  ArrowLeft,
+  Terminal,
+  FolderOpen,
   GitBranch,
   Settings,
   Hash,
   Command
 } from "@/lib/icons";
 import { Button } from '@/components/ui/button';
-import { LegacyPopover as Popover } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -19,37 +17,23 @@ import { cn } from '@/lib/utils';
 interface SessionHeaderProps {
   projectPath: string;
   claudeSessionId: string | null;
-  totalTokens: number;
-  isStreaming: boolean;
-  hasMessages: boolean;
   showTimeline: boolean;
-  copyPopoverOpen: boolean;
   onBack: () => void;
   onSelectPath: () => void;
-  onCopyAsJsonl: () => void;
-  onCopyAsMarkdown: () => void;
   onToggleTimeline: () => void;
   onProjectSettings?: () => void;
   onSlashCommandsSettings?: () => void;
-  setCopyPopoverOpen: (open: boolean) => void;
 }
 
 export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
   projectPath,
   claudeSessionId,
-  totalTokens,
-  isStreaming,
-  hasMessages,
   showTimeline,
-  copyPopoverOpen,
   onBack,
   onSelectPath,
-  onCopyAsJsonl,
-  onCopyAsMarkdown,
   onToggleTimeline,
   onProjectSettings,
-  onSlashCommandsSettings,
-  setCopyPopoverOpen
+  onSlashCommandsSettings
 }) => {
   return (
     <motion.div 
@@ -89,50 +73,10 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
 
         <div className="flex items-center gap-2">
           {claudeSessionId && (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                <Hash className="h-3 w-3 mr-1" />
-                {claudeSessionId.slice(0, 8)}
-              </Badge>
-              {totalTokens > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {totalTokens.toLocaleString()} tokens
-                </Badge>
-              )}
-            </div>
-          )}
-
-          {hasMessages && !isStreaming && (
-            <Popover
-              open={copyPopoverOpen}
-              onOpenChange={setCopyPopoverOpen}
-              trigger={
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Copy className="h-4 w-4" />
-                </Button>
-              }
-              content={
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={onCopyAsJsonl}
-                  >
-                    Copy as JSONL
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={onCopyAsMarkdown}
-                  >
-                    Copy as Markdown
-                  </Button>
-                </div>
-              }
-              className="w-48 p-2"
-            />
+            <Badge variant="outline" className="text-xs">
+              <Hash className="h-3 w-3 mr-1" />
+              {claudeSessionId.slice(0, 8)}
+            </Badge>
           )}
 
           <Button

@@ -1,10 +1,8 @@
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
-use super::helpers::{find_claude_binary, get_claude_dir, extract_first_user_message};
-use super::shared::Session;
+use super::helpers::{find_claude_binary, get_claude_dir};
 
 #[tauri::command]
 pub async fn open_new_session(app: AppHandle, path: Option<String>) -> Result<String, String> {
@@ -83,58 +81,4 @@ pub async fn load_session_history(
     }
 
     Ok(messages)
-}
-
-#[tauri::command]
-pub async fn get_session_timeline(
-    app: tauri::State<'_, crate::checkpoint::state::CheckpointState>,
-    session_id: String,
-    project_id: String,
-    project_path: String,
-) -> Result<crate::checkpoint::SessionTimeline, String> {
-    log::info!(
-        "Getting timeline for session: {} in project: {}",
-        session_id,
-        project_id
-    );
-
-    let manager = app
-        .get_or_create_manager(session_id, project_id, PathBuf::from(&project_path))
-        .await
-        .map_err(|e| format!("Failed to get checkpoint manager: {}", e))?;
-
-    Ok(manager.get_timeline().await)
-}
-
-#[tauri::command]
-pub async fn track_session_messages(
-    state: tauri::State<'_, crate::checkpoint::state::CheckpointState>,
-    session_id: String,
-    project_id: String,
-    project_path: String,
-    messages: Vec<String>,
-) -> Result<(), String> {
-    log::info!(
-        "Tracking {} messages for session {}",
-        messages.len(),
-        session_id
-    );
-
-    let manager = state
-        .get_or_create_manager(
-            session_id.clone(),
-            project_id.clone(),
-            PathBuf::from(&project_path),
-        )
-        .await
-        .map_err(|e| format!("Failed to get checkpoint manager: {}", e))?;
-
-    for message in messages {
-        manager
-            .track_message(message)
-            .await
-            .map_err(|e| format!("Failed to track message: {}", e))?;
-    }
-
-    Ok(())
 }

@@ -3,38 +3,33 @@ import { PlayCircle, Square, AlertCircle, CheckCircle2, Code, Trash2 , Loader2 }
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { DEV_WORKFLOW_SEQUENCE } from '@/constants/development';
+import { DEV_WORKFLOW_SEQUENCE, getDevWorkflowPrompt } from '@/constants/development';
+import { ANYON_DOCS } from '@/constants/paths';
 import { api } from '@/lib/api';
-
-const DEV_COMPLETE_FILE = 'anyon-docs/dev-plan/DEVELOPMENT_COMPLETE.md';
 
 interface DevDocsPanelProps {
   projectPath: string | undefined;
   isPlanningComplete: boolean;
-  onStartNewSession?: (prompt: string, displayText?: string) => void;
+  onStartWorkflow?: (workflowPrompt: string, displayText?: string) => void;
   isSessionLoading?: boolean;
 }
 
 /**
  * Get next workflow step based on current step
- * Opensource → Orchestrator → Executor → Reviewer → Executor → Reviewer ... (cycle)
+ * Orchestrator → Executor → Reviewer → Executor → Reviewer ... (cycle)
  */
 const getNextStep = (currentStepId: string): typeof DEV_WORKFLOW_SEQUENCE[0] | null => {
-  // Opensource → Orchestrator
-  if (currentStepId === 'pm-opensource') {
-    return DEV_WORKFLOW_SEQUENCE[1]; // pm-orchestrator
-  }
   // Orchestrator → Executor
   if (currentStepId === 'pm-orchestrator') {
-    return DEV_WORKFLOW_SEQUENCE[2]; // pm-executor
+    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
   }
   // Executor → Reviewer
   if (currentStepId === 'pm-executor') {
-    return DEV_WORKFLOW_SEQUENCE[3]; // pm-reviewer
+    return DEV_WORKFLOW_SEQUENCE[2]; // pm-reviewer
   }
   // Reviewer → Executor (cycle back)
   if (currentStepId === 'pm-reviewer') {
-    return DEV_WORKFLOW_SEQUENCE[2]; // pm-executor
+    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
   }
   return null;
 };
@@ -42,13 +37,13 @@ const getNextStep = (currentStepId: string): typeof DEV_WORKFLOW_SEQUENCE[0] | n
 export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
   projectPath,
   isPlanningComplete,
-  onStartNewSession,
+  onStartWorkflow,
   isSessionLoading = false,
 }) => {
   const [currentRunningStep, setCurrentRunningStep] = useState<string | null>(null);
   const prevLoadingRef = useRef(isSessionLoading);
   const isStoppedRef = useRef(false);
-  const [isStopped, setIsStopped] = useState(false);
+  const [, forceUpdate] = useState(0); // ref 변경 시 UI 업데이트용
   const [isDevComplete, setIsDevComplete] = useState(false);
   const [executionLog, setExecutionLog] = useState<Array<{
     stepId: string;
@@ -83,44 +78,48 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
       const checkAndContinue = async () => {
         if (!projectPath) return;
 
-        const completeFilePath = `${projectPath}/${DEV_COMPLETE_FILE}`;
-        const isComplete = await api.checkFileExists(completeFilePath);
+        try {
+          const completeFilePath = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/${ANYON_DOCS.DEV_FILES.COMPLETE_MARKER}`;
+          const isComplete = await api.checkFileExists(completeFilePath);
 
-        if (isComplete) {
-          setIsDevComplete(true);
-          setCurrentRunningStep(null);
-          return;
-        }
+          if (isComplete) {
+            setIsDevComplete(true);
+            setCurrentRunningStep(null);
+            return;
+          }
 
-        const nextStep = getNextStep(currentRunningStep);
-        if (nextStep) {
-          setTimeout(() => {
-            // Check again in case stop was pressed during the delay
-            if (!isStoppedRef.current) {
-              setCurrentRunningStep(nextStep.id);
-              onStartNewSession?.(nextStep.prompt, nextStep.displayText);
-            }
-          }, 500);
+          const nextStep = getNextStep(currentRunningStep);
+          if (nextStep) {
+            setTimeout(() => {
+              // Check again in case stop was pressed during the delay
+              if (!isStoppedRef.current) {
+                setCurrentRunningStep(nextStep.id);
+                onStartWorkflow?.(getDevWorkflowPrompt(nextStep), nextStep.displayText);
+              }
+            }, 500);
+          }
+        } catch (error) {
+          console.error('[DevDocsPanel] Error checking workflow completion:', error);
         }
       };
 
       checkAndContinue();
     }
-  }, [isSessionLoading, currentRunningStep, onStartNewSession, projectPath]);
+  }, [isSessionLoading, currentRunningStep, onStartWorkflow, projectPath]);
 
   // Start a step (clicking any step starts and continues from there)
-  const handleStart = (stepId: string, prompt: string, displayText?: string) => {
+  const handleStart = (stepId: string, workflowPrompt: string, displayText?: string) => {
     isStoppedRef.current = false;
-    setIsStopped(false);
+    forceUpdate(n => n + 1); // UI 업데이트 트리거
     setIsDevComplete(false);
     setCurrentRunningStep(stepId);
-    onStartNewSession?.(prompt, displayText);
+    onStartWorkflow?.(workflowPrompt, displayText);
   };
 
   // Stop - prevents next step from running
   const handleStop = () => {
     isStoppedRef.current = true;
-    setIsStopped(true);
+    forceUpdate(n => n + 1); // UI 업데이트 트리거
     if (currentRunningStep) {
       addLogEntry(currentRunningStep, 'error');
     }
@@ -173,7 +172,7 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
             <StatusBadge variant="success">완료</StatusBadge>
           ) : isRunningWorkflow ? (
             <StatusBadge variant="info" pulse>실행중</StatusBadge>
-          ) : isStopped ? (
+          ) : isStoppedRef.current ? (
             <StatusBadge variant="warning">중지됨</StatusBadge>
           ) : (
             <StatusBadge variant="muted">대기</StatusBadge>
@@ -197,8 +196,8 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
             return (
               <React.Fragment key={step.id}>
                 <button
-                  onClick={() => handleStart(step.id, step.prompt, step.displayText)}
-                  disabled={!onStartNewSession || isRunningWorkflow}
+                  onClick={() => handleStart(step.id, getDevWorkflowPrompt(step), step.displayText)}
+                  disabled={!onStartWorkflow || isRunningWorkflow}
                   className={cn(
                     'flex flex-col items-center gap-1.5 px-4 py-3 rounded-lg transition-all',
                     'border hover:shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed',
@@ -268,9 +267,9 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
                   <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-2" />
                   <p className="text-green-600 dark:text-green-400 font-medium">개발이 완료되었습니다</p>
                 </div>
-              ) : !currentRunningStep && !isStopped ? (
+              ) : !currentRunningStep && !isStoppedRef.current ? (
                 <p>워크플로우 단계를 클릭하여 시작하세요</p>
-              ) : !currentRunningStep && isStopped ? (
+              ) : !currentRunningStep && isStoppedRef.current ? (
                 <p>중지됨 - 다시 시작하려면 단계를 클릭하세요</p>
               ) : null}
             </div>

@@ -6,10 +6,9 @@
 //! - `shared`: Common types and structures used across modules
 //! - `helpers`: Internal helper functions
 //! - `projects`: Project management (list, create, get sessions)
-//! - `sessions`: Session management (open, load history, timeline)
+//! - `sessions`: Session management (open, load history)
 //! - `execution`: Claude process execution (execute, continue, resume, cancel)
 //! - `filesystem`: File operations (list, search, read)
-//! - `checkpoints`: Checkpoint management (create, restore, fork, diff)
 //! - `settings`: Settings and configuration (Claude settings, system prompt, git operations)
 
 // Submodules
@@ -19,7 +18,6 @@ pub mod projects;
 pub mod sessions;
 pub mod execution;
 pub mod filesystem;
-pub mod checkpoints;
 pub mod settings;
 
 // Re-export shared types
@@ -42,8 +40,6 @@ pub use projects::{
 pub use sessions::{
     open_new_session,
     load_session_history,
-    get_session_timeline,
-    track_session_messages,
 };
 
 // Execution
@@ -66,22 +62,6 @@ pub use filesystem::{
     list_anyon_docs,
 };
 
-// Checkpoints
-pub use checkpoints::{
-    create_checkpoint,
-    restore_checkpoint,
-    list_checkpoints,
-    fork_from_checkpoint,
-    update_checkpoint_settings,
-    get_checkpoint_diff,
-    track_checkpoint_message,
-    check_auto_checkpoint,
-    cleanup_old_checkpoints,
-    get_checkpoint_settings,
-    clear_checkpoint_manager,
-    get_checkpoint_state_stats,
-};
-
 // Settings
 pub use settings::{
     get_claude_settings,
@@ -92,7 +72,6 @@ pub use settings::{
     find_claude_md_files,
     read_claude_md_file,
     save_claude_md_file,
-    get_recently_modified_files,
     check_anyon_installed,
     run_npx_anyon_agents,
     check_is_git_repo,

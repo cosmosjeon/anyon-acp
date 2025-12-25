@@ -426,12 +426,12 @@ export const claudeAuthApi = {
 export const planningApi = {
   /**
    * Check if a file exists at the given path
-   * @param filePath - The absolute path to check
+   * @param path - The absolute path to check
    * @returns Promise resolving to true if file exists
    */
-  async checkFileExists(filePath: string): Promise<boolean> {
+  async checkFileExists(path: string): Promise<boolean> {
     try {
-      return await apiCall<boolean>('check_file_exists', { filePath });
+      return await apiCall<boolean>('check_file_exists', { path });
     } catch (error) {
       console.error('Failed to check file exists:', error);
       return false;
