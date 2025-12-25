@@ -728,7 +728,7 @@ pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), 
         serde_json::Value::String(config.server_url.clone())
     );
     env.insert(
-        "ANTHROPIC_AUTH_TOKEN".to_string(),
+        "ANTHROPIC_API_KEY".to_string(),
         serde_json::Value::String(config.jwt_token.clone())
     );
 
@@ -770,7 +770,7 @@ pub async fn claude_auth_disable_anyon_api() -> Result<(), String> {
     // env에서 ANYON 관련 설정 제거
     if let Some(env) = settings.get_mut("env").and_then(|e| e.as_object_mut()) {
         env.remove("ANTHROPIC_BASE_URL");
-        env.remove("ANTHROPIC_AUTH_TOKEN");
+        env.remove("ANTHROPIC_API_KEY");
 
         // env가 비어있으면 전체 제거
         if env.is_empty() {
