@@ -9,10 +9,10 @@
 | **React Components** | 70 |
 | **UI Components** | 20 |
 | **Widget Components** | 29 |
-| **Preview Components** | 6 |
+| **Preview Components** | 8 |
 | **Claude Session Components** | 4 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 14 |
+| **Custom Hooks** | 15 |
 | **Context Providers** | 3 |
 
 > Last synced: 2025-12-26
@@ -50,15 +50,15 @@
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
-| `ClaudeCodeSession` | ~1330 | Main chat interface with streaming, queued prompts, preview |
+| `ClaudeCodeSession` | ~1383 | Main chat interface with streaming, queued prompts, preview |
 | `MessageList` | ~200 | Message display (claude-code-session/) |
 | `PromptQueue` | ~150 | Queue management (claude-code-session/) |
 | `SessionHeader` | ~120 | Session header (claude-code-session/) |
-| `StreamMessage` | ~720 | Stream message renderer with tool widgets |
+| `StreamMessage` | ~774 | Stream message renderer with tool widgets |
 | `StreamingText` | ~100 | Streaming text animation |
 | `SessionList` | ~200 | Session list display |
 | `SessionOutputViewer` | ~180 | Session output viewer |
-| `FloatingPromptInput` | ~920 | ChatGPT-style prompt input with file/slash pickers |
+| `FloatingPromptInput` | ~1057 | ChatGPT-style prompt input with file/slash pickers |
 | `RunningClaudeSessions` | ~150 | Running sessions list |
 | `ToolsMenu` | ~485 | Model/thinking/execution mode menu popover |
 | `ExecutionControlBar` | ~85 | Floating execution control bar (stop, elapsed time) |
@@ -67,13 +67,15 @@
 
 | Module | Lines | Purpose |
 |--------|-------|---------|
-| `promptHandlers.ts` | ~720 | Extracted handlers for handleSendPrompt (validation, queue, stream, completion) |
+| `promptHandlers.ts` | ~744 | Extracted handlers for handleSendPrompt (validation, queue, stream, completion) |
 
 ### Preview
 
 | Component | Lines | Purpose |
 |-----------|-------|---------|
-| `EnhancedPreviewPanel` | ~500 | Multi-mode preview |
+| `EnhancedPreviewPanel` | ~1041 | Multi-mode preview with dev server, routing, component selector |
+| `WebviewPreview` | ~423 | Webview-based preview for native experience |
+| `PreviewPromptDialog` | ~234 | Preview prompt dialog for URL entry |
 | `PreviewPanel` | ~150 | Basic preview panel |
 | `ActionHeader` | ~100 | Preview action header |
 | `Console` | ~120 | Console output display |
@@ -337,8 +339,9 @@ Located in `src/hooks/` (12 hooks):
 |------|------|---------|
 | `useChatHistory` | `src/hooks/useChatHistory.ts` | Chat history management |
 | `useComponentSelectorShortcut` | `src/hooks/useComponentSelectorShortcut.ts` | Component selector shortcuts |
-| `useWorkflowPreview` | `src/hooks/useWorkflowPreview.ts` | Preview detection |
-| `useDevServer` | `src/hooks/useDevServer.ts` | Dev server management |
+| `useWorkflowPreview` | `src/hooks/useWorkflowPreview.ts` | Preview detection (~148 lines) |
+| `useDevServer` | `src/hooks/useDevServer.ts` | Dev server management (~392 lines) |
+| `usePortVerification` | `src/hooks/usePortVerification.ts` | Port verification for dev server (~186 lines) |
 | `usePlanningDocs` | `src/hooks/usePlanningDocs.ts` | Planning docs integration |
 | `usePreviewMessages` | `src/hooks/usePreviewMessages.ts` | Preview message handling |
 
@@ -367,6 +370,50 @@ Located in `src/hooks/` (12 hooks):
 | `MaintenanceWorkspace` | `src/components/MaintenanceWorkspace.tsx` | Maintenance mode workspace |
 | `MvpWorkspace` | `src/components/MvpWorkspace.tsx` | MVP development workspace |
 
+### Settings Components
+
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| `ClaudeAuthSettings` | `src/components/ClaudeAuthSettings.tsx` | ~1031 | Claude authentication manager with 3 methods |
+
+**ClaudeAuthSettings Features**:
+- **3-Tab Interface**: ANYON API, OAuth, API Key
+- **Mutual Exclusivity**: Auto-disables conflicting auth methods
+- **OAuth Direct Login**: PKCE flow with browser callback
+- **Terminal Login Fallback**: Polling-based login detection
+- **ANYON API Mode**: Server proxy with usage tracking ($5 daily limit)
+- **Platform Detection**: Web mode / Windows detection for conditional features
+- **Event Listeners**: `claude-auth-success`, `claude-auth-timeout`
+- **Auto-Cleanup**: Removes conflicting credentials on method switch
+
+**State Management**:
+```typescript
+// Active auth detection (priority-based)
+getActiveAuthMethod(): AuthMethod | null {
+  // 1. OAuth (highest)
+  // 2. ANYON API
+  // 3. API Key
+}
+
+// Tab switch with conflict check
+handleMethodSwitch(method: AuthMethod) {
+  // Blocks if different method active
+  // Shows warning toast
+}
+```
+
+**ANYON API Integration**:
+```typescript
+interface AnyonApiUsage {
+  userId: string;
+  date: string;
+  usedUSD: number;
+  limitUSD: number;
+  remainingUSD: number;
+  percentUsed: number;
+}
+```
+
 ### Help Components
 
 | Component | File | Purpose |
@@ -380,7 +427,8 @@ Located in `src/hooks/` (12 hooks):
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `PlanningDocsPanel` | `src/components/planning/PlanningDocsPanel.tsx` | 6-step workflow progress panel (~380 lines) |
+| `PlanningDocsPanel` | `src/components/planning/PlanningDocsPanel.tsx` | 6-step workflow progress panel (~412 lines) |
+| `UXPreviewPanel` | `src/components/planning/UXPreviewPanel.tsx` | UX preview panel (~168 lines) |
 | `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
 
 ### Constants

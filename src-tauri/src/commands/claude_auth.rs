@@ -3,13 +3,35 @@ use std::fs;
 use std::process::Command;
 use crate::claude_binary::find_claude_binary;
 
-const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+// Claude Code CLI가 사용하는 Keychain 서비스명 (OAuth 토큰 저장)
+const CLAUDE_CODE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+// Legacy Claude Safe Storage (구버전 호환용)
+const CLAUDE_LEGACY_SERVICE: &str = "Claude Safe Storage";
+const CLAUDE_LEGACY_ACCOUNT: &str = "Claude Key";
+
+// ANYON 앱 전용 Keychain 서비스명 (API 키 저장)
 const ANYON_SERVICE_NAME: &str = "anyon-claude";
 const API_KEY_ACCOUNT: &str = "anthropic_api_key";
 
+// macOS/Linux에서 시도할 계정 이름 목록 (사용자명 → default 순서)
+fn get_account_candidates() -> Vec<String> {
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "default".to_string());
+
+    if username == "default" {
+        vec!["default".to_string()]
+    } else {
+        vec![username, "default".to_string()]
+    }
+}
+
 // Windows에서 시도할 Credential Manager 계정 이름들
 #[cfg(target_os = "windows")]
-const WINDOWS_ACCOUNT_CANDIDATES: &[&str] = &["default", "claude", "Claude Code", "claude-code"];
+fn get_windows_account_candidates() -> Vec<String> {
+    let username = std::env::var("USERNAME").unwrap_or_else(|_| "default".to_string());
+    vec![username, "default".to_string(), "claude".to_string(), "Claude Code".to_string(), "claude-code".to_string()]
+}
 
 // ============================================================
 // 데이터 구조
@@ -175,23 +197,41 @@ fn read_claude_credentials() -> Result<(ClaudeCredentials, Option<String>), Stri
 // macOS: Keychain에서 credentials 읽기
 // ============================================================
 
+/// Keychain에서 특정 서비스/계정의 credentials 조회 시도
 #[cfg(target_os = "macos")]
-fn read_credentials_macos() -> Result<(ClaudeCredentials, Option<String>), String> {
+fn try_keychain_lookup(service: &str, account: &str) -> Option<ClaudeCredentials> {
     let output = Command::new("security")
-        .args(["find-generic-password", "-s", CLAUDE_KEYCHAIN_SERVICE, "-w"])
+        .args(["find-generic-password", "-s", service, "-a", account, "-w"])
         .output()
-        .map_err(|e| format!("Keychain 명령 실행 실패: {}", e))?;
+        .ok()?;
 
     if !output.status.success() {
-        // Keychain에 없음 = 로그인 안 됨 (에러가 아님)
-        return Ok((ClaudeCredentials { claude_ai_oauth: None }, None));
+        return None;
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);
-    let credentials = serde_json::from_str(json_str.trim())
-        .map_err(|e| format!("Credentials JSON 파싱 실패: {}", e))?;
+    serde_json::from_str(json_str.trim()).ok()
+}
 
-    Ok((credentials, None))
+#[cfg(target_os = "macos")]
+fn read_credentials_macos() -> Result<(ClaudeCredentials, Option<String>), String> {
+    // 1차: Claude Code-credentials + 현재 사용자명 / default
+    for account in get_account_candidates() {
+        if let Some(creds) = try_keychain_lookup(CLAUDE_CODE_KEYCHAIN_SERVICE, &account) {
+            log::info!("Found credentials: service={}, account={}", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+            return Ok((creds, Some(format!("Keychain (account: {})", account))));
+        }
+    }
+
+    // 2차: Legacy Claude Safe Storage
+    if let Some(creds) = try_keychain_lookup(CLAUDE_LEGACY_SERVICE, CLAUDE_LEGACY_ACCOUNT) {
+        log::info!("Found credentials: service={} (legacy)", CLAUDE_LEGACY_SERVICE);
+        return Ok((creds, Some("Keychain (legacy)".to_string())));
+    }
+
+    // 인증 정보 없음
+    log::info!("No Claude credentials found in Keychain");
+    Ok((ClaudeCredentials { claude_ai_oauth: None }, None))
 }
 
 // ============================================================
@@ -205,7 +245,7 @@ fn read_credentials_linux() -> Result<(ClaudeCredentials, Option<String>), Strin
 
     let creds_path = home.join(".claude").join(".credentials.json");
 
-    // 1. 먼저 파일에서 읽기 시도
+    // 1순위: 파일에서 읽기 (~/.claude/.credentials.json)
     if creds_path.exists() {
         let content = fs::read_to_string(&creds_path)
             .map_err(|e| format!("Credentials 파일 읽기 실패: {}", e))?;
@@ -213,25 +253,32 @@ fn read_credentials_linux() -> Result<(ClaudeCredentials, Option<String>), Strin
         let credentials = serde_json::from_str(&content)
             .map_err(|e| format!("Credentials JSON 파싱 실패: {}", e))?;
 
-        return Ok((credentials, None));
+        log::info!("Found credentials in file: {:?}", creds_path);
+        return Ok((credentials, Some("파일에서 읽음".to_string())));
     }
 
-    // 2. 파일이 없으면 secret-tool 시도 (GNOME 환경)
-    if let Ok(output) = Command::new("secret-tool")
-        .args(["lookup", "service", CLAUDE_KEYCHAIN_SERVICE])
-        .output()
-    {
-        if output.status.success() {
-            let json_str = String::from_utf8_lossy(&output.stdout);
-            if !json_str.trim().is_empty() {
-                let credentials = serde_json::from_str(json_str.trim())
-                    .map_err(|e| format!("secret-tool JSON 파싱 실패: {}", e))?;
-                return Ok((credentials, Some("secret-tool에서 읽음".to_string())));
+    // 2순위: secret-tool 시도 (GNOME Secret Service)
+    // Claude Code-credentials 서비스를 먼저 시도
+    let services_to_try = vec![CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE];
+
+    for service in services_to_try {
+        if let Ok(output) = Command::new("secret-tool")
+            .args(["lookup", "service", service])
+            .output()
+        {
+            if output.status.success() {
+                let json_str = String::from_utf8_lossy(&output.stdout);
+                if !json_str.trim().is_empty() {
+                    if let Ok(credentials) = serde_json::from_str(json_str.trim()) {
+                        log::info!("Found credentials via secret-tool: service={}", service);
+                        return Ok((credentials, Some(format!("secret-tool ({})", service))));
+                    }
+                }
             }
         }
     }
 
-    // 3. 둘 다 없음 - secret-tool 미설치 안내
+    // 3순위: 둘 다 없음 - secret-tool 미설치 안내
     let has_secret_tool = Command::new("which")
         .arg("secret-tool")
         .output()
@@ -244,6 +291,7 @@ fn read_credentials_linux() -> Result<(ClaudeCredentials, Option<String>), Strin
         None
     };
 
+    log::info!("No Claude credentials found on Linux");
     Ok((ClaudeCredentials { claude_ai_oauth: None }, note))
 }
 
@@ -265,20 +313,27 @@ fn read_credentials_windows() -> Result<(ClaudeCredentials, Option<String>), Str
         let credentials = serde_json::from_str(&content)
             .map_err(|e| format!("Credentials JSON 파싱 실패: {}", e))?;
 
+        log::info!("Found credentials in file: {:?}", creds_path);
         return Ok((credentials, Some("파일에서 읽음".to_string())));
     }
 
-    // 2순위: Credential Manager에서 읽기 (여러 계정 이름 시도)
-    for account in WINDOWS_ACCOUNT_CANDIDATES {
-        if let Ok(entry) = keyring::Entry::new(CLAUDE_KEYCHAIN_SERVICE, account) {
-            if let Ok(password) = entry.get_password() {
-                match serde_json::from_str::<ClaudeCredentials>(&password) {
-                    Ok(credentials) => {
-                        let note = format!("Credential Manager에서 읽음 (account: {})", account);
-                        return Ok((credentials, Some(note)));
-                    }
-                    Err(e) => {
-                        log::warn!("Credential Manager JSON 파싱 실패 (account: {}): {}", account, e);
+    // 2순위: Credential Manager에서 읽기
+    // Claude Code-credentials 서비스를 먼저 시도, 그 다음 legacy 서비스
+    let services_to_try = vec![CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE];
+
+    for service in &services_to_try {
+        for account in get_windows_account_candidates() {
+            if let Ok(entry) = keyring::Entry::new(service, &account) {
+                if let Ok(password) = entry.get_password() {
+                    match serde_json::from_str::<ClaudeCredentials>(&password) {
+                        Ok(credentials) => {
+                            let note = format!("Credential Manager (service: {}, account: {})", service, account);
+                            log::info!("Found credentials: {}", note);
+                            return Ok((credentials, Some(note)));
+                        }
+                        Err(e) => {
+                            log::debug!("Credential Manager JSON 파싱 실패 (service: {}, account: {}): {}", service, account, e);
+                        }
                     }
                 }
             }
@@ -286,9 +341,10 @@ fn read_credentials_windows() -> Result<(ClaudeCredentials, Option<String>), Str
     }
 
     // 3순위: 둘 다 없음
+    log::info!("No Claude credentials found on Windows");
     Ok((
         ClaudeCredentials { claude_ai_oauth: None },
-        Some("Windows Credential Manager에서 'Claude Code-credentials'를 찾지 못했습니다. 터미널에서 claude login을 실행하거나 API 키를 사용해주세요.".to_string())
+        Some("Windows Credential Manager에서 Claude 인증 정보를 찾지 못했습니다. 터미널에서 /login을 실행하거나 API 키를 사용해주세요.".to_string())
     ))
 }
 
@@ -395,6 +451,7 @@ fn get_stored_api_key() -> Result<Option<String>, String> {
 }
 
 /// API 키 저장 및 apiKeyHelper 스크립트 설정
+/// 다른 인증 방법(ANYON API)을 자동으로 제거합니다
 #[tauri::command]
 pub async fn claude_auth_save_api_key(api_key: String) -> Result<(), String> {
     // 1. 형식 검증
@@ -402,7 +459,12 @@ pub async fn claude_auth_save_api_key(api_key: String) -> Result<(), String> {
         return Err("API 키는 'sk-ant-'로 시작해야 합니다.".to_string());
     }
 
-    // 2. Keychain/Credential Manager에 저장
+    // 2. ANYON API 설정 제거 (상호 배타적)
+    if let Err(e) = claude_auth_disable_anyon_api().await {
+        log::warn!("ANYON API 비활성화 실패 (무시): {}", e);
+    }
+
+    // 3. Keychain/Credential Manager에 저장
     let entry = keyring::Entry::new(ANYON_SERVICE_NAME, API_KEY_ACCOUNT)
         .map_err(|e| format!("Keyring Entry 생성 실패: {}", e))?;
 
@@ -601,22 +663,40 @@ pub async fn claude_auth_logout() -> Result<(), String> {
 /// macOS: Keychain에서 Claude credentials 삭제
 #[cfg(target_os = "macos")]
 fn logout_macos() -> Result<(), String> {
-    let output = Command::new("security")
-        .args(["delete-generic-password", "-s", CLAUDE_KEYCHAIN_SERVICE])
-        .output()
-        .map_err(|e| format!("Keychain 명령 실행 실패: {}", e))?;
+    let mut deleted_any = false;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // "The specified item could not be found" = 이미 없음 (에러 아님)
-        if stderr.contains("could not be found") || stderr.contains("SecKeychainSearchCopyNext") {
-            log::info!("Keychain에 Claude credentials 없음 (이미 로그아웃 상태)");
-            return Ok(());
+    // Claude Code-credentials 서비스 삭제 (모든 계정 후보)
+    for account in get_account_candidates() {
+        let output = Command::new("security")
+            .args(["delete-generic-password", "-s", CLAUDE_CODE_KEYCHAIN_SERVICE, "-a", &account])
+            .output();
+
+        if let Ok(out) = output {
+            if out.status.success() {
+                log::info!("Deleted credentials: service={}, account={}", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+                deleted_any = true;
+            }
         }
-        return Err(format!("Keychain에서 삭제 실패: {}", stderr));
     }
 
-    log::info!("macOS Keychain에서 Claude credentials 삭제 완료");
+    // Legacy 서비스도 삭제 시도
+    let output = Command::new("security")
+        .args(["delete-generic-password", "-s", CLAUDE_LEGACY_SERVICE, "-a", CLAUDE_LEGACY_ACCOUNT])
+        .output();
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            log::info!("Deleted legacy credentials: service={}", CLAUDE_LEGACY_SERVICE);
+            deleted_any = true;
+        }
+    }
+
+    if deleted_any {
+        log::info!("macOS Keychain에서 Claude credentials 삭제 완료");
+    } else {
+        log::info!("Keychain에 Claude credentials 없음 (이미 로그아웃 상태)");
+    }
+
     Ok(())
 }
 
@@ -634,13 +714,15 @@ fn logout_linux() -> Result<(), String> {
         log::info!("~/.claude/.credentials.json 삭제 완료");
     }
 
-    // 2. secret-tool에서 삭제 시도 (GNOME 환경)
-    if let Ok(output) = Command::new("secret-tool")
-        .args(["clear", "service", CLAUDE_KEYCHAIN_SERVICE])
-        .output()
-    {
-        if output.status.success() {
-            log::info!("secret-tool에서 Claude credentials 삭제 완료");
+    // 2. secret-tool에서 삭제 시도 (GNOME 환경) - 모든 서비스 삭제
+    for service in &[CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE] {
+        if let Ok(output) = Command::new("secret-tool")
+            .args(["clear", "service", service])
+            .output()
+        {
+            if output.status.success() {
+                log::info!("secret-tool에서 삭제 완료: service={}", service);
+            }
         }
     }
 
@@ -661,16 +743,20 @@ fn logout_windows() -> Result<(), String> {
         log::info!("credentials 파일 삭제 완료");
     }
 
-    // 2. Credential Manager에서 삭제 (여러 계정 이름 시도)
-    for account in WINDOWS_ACCOUNT_CANDIDATES {
-        if let Ok(entry) = keyring::Entry::new(CLAUDE_KEYCHAIN_SERVICE, account) {
-            match entry.delete_password() {
-                Ok(()) => {
-                    log::info!("Windows Credential Manager에서 삭제 완료 (account: {})", account);
-                }
-                Err(keyring::Error::NoEntry) => {}
-                Err(e) => {
-                    log::warn!("Credential Manager 삭제 실패 (account: {}): {}", account, e);
+    // 2. Credential Manager에서 삭제 (모든 서비스 및 계정 후보)
+    let services_to_try = vec![CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE];
+
+    for service in &services_to_try {
+        for account in get_windows_account_candidates() {
+            if let Ok(entry) = keyring::Entry::new(service, &account) {
+                match entry.delete_password() {
+                    Ok(()) => {
+                        log::info!("Windows Credential Manager에서 삭제 완료 (service: {}, account: {})", service, account);
+                    }
+                    Err(keyring::Error::NoEntry) => {}
+                    Err(e) => {
+                        log::debug!("Credential Manager 삭제 실패 (service: {}, account: {}): {}", service, account, e);
+                    }
                 }
             }
         }
@@ -693,8 +779,14 @@ pub struct AnyonApiConfig {
 
 /// ANYON API 모드 활성화
 /// Claude Code가 ANYON 서버 프록시를 통해 API를 사용하도록 설정
+/// 다른 인증 방법(API Key)을 자동으로 제거합니다
 #[tauri::command]
 pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), String> {
+    // 1. Keychain에서 API Key 제거 (상호 배타적)
+    if let Err(e) = claude_auth_delete_api_key().await {
+        log::warn!("API Key 제거 실패 (무시): {}", e);
+    }
+
     let home = dirs::home_dir()
         .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
@@ -858,5 +950,431 @@ fn delete_api_key_helper() -> Result<(), String> {
         }
     }
 
+    Ok(())
+}
+
+// ============================================================
+// 직접 OAuth 통합 (PKCE 방식)
+// ============================================================
+
+use sha2::{Sha256, Digest};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use rand::Rng;
+use tauri::Emitter;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+// Claude OAuth 엔드포인트
+// - Authorization: claude.ai (사용자 로그인 UI)
+// - Token exchange: console.anthropic.com (API 백엔드)
+const ANTHROPIC_AUTH_URL: &str = "https://claude.ai/oauth/authorize";
+const ANTHROPIC_TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+// Claude Code 공식 Client ID
+const CLAUDE_CODE_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+// OAuth scopes (user:sessions:claude_code 필수!)
+const OAUTH_SCOPES: &str = "org:create_api_key user:profile user:inference user:sessions:claude_code";
+
+// 폴링 중단 플래그 (전역)
+static POLL_STOP_FLAG: AtomicBool = AtomicBool::new(false);
+
+/// PKCE code_verifier 생성 (43-128자 랜덤 문자열)
+fn generate_code_verifier() -> String {
+    let bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen()).collect();
+    URL_SAFE_NO_PAD.encode(&bytes)
+}
+
+/// code_challenge 생성 (S256 해시)
+fn generate_code_challenge(verifier: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(verifier.as_bytes());
+    URL_SAFE_NO_PAD.encode(hasher.finalize())
+}
+
+/// OAuth 토큰 응답 구조체
+#[derive(Debug, Deserialize)]
+struct OAuthTokenResponse {
+    access_token: String,
+    refresh_token: Option<String>,
+    expires_in: Option<i64>,
+    token_type: String,
+    scope: Option<String>,
+}
+
+/// 직접 OAuth 플로우 시작 (브라우저에서 인증 후 콜백 수신)
+#[tauri::command]
+pub async fn claude_oauth_start(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+
+    // 1. PKCE 생성
+    let code_verifier = generate_code_verifier();
+    let code_challenge = generate_code_challenge(&code_verifier);
+    let state = uuid::Uuid::new_v4().to_string();
+
+    // 2. 로컬 콜백 서버 시작 (랜덤 포트)
+    let listener = TcpListener::bind("127.0.0.1:0").await
+        .map_err(|e| format!("로컬 서버 시작 실패: {}", e))?;
+    let port = listener.local_addr()
+        .map_err(|e| format!("포트 확인 실패: {}", e))?
+        .port();
+    let redirect_uri = format!("http://localhost:{}/callback", port);
+
+    log::info!("OAuth callback server started on port {}", port);
+
+    // 3. Authorization URL 생성 (code=true 파라미터 필수!)
+    let auth_url = format!(
+        "{}?code=true&client_id={}&response_type=code&redirect_uri={}&state={}&code_challenge={}&code_challenge_method=S256&scope={}",
+        ANTHROPIC_AUTH_URL,
+        CLAUDE_CODE_CLIENT_ID,
+        urlencoding::encode(&redirect_uri),
+        &state,
+        &code_challenge,
+        urlencoding::encode(OAUTH_SCOPES)
+    );
+
+    // 4. 브라우저 열기
+    if let Err(e) = open::that(&auth_url) {
+        return Err(format!("브라우저 열기 실패: {}", e));
+    }
+
+    log::info!("Opened browser for OAuth: {}", auth_url);
+
+    // 5. 콜백 대기 (별도 태스크에서 처리)
+    let app = app_handle.clone();
+    let verifier = code_verifier.clone();
+    let expected_state = state.clone();
+    let redirect = redirect_uri.clone();
+
+    tokio::spawn(async move {
+        // 5분 타임아웃
+        let timeout = tokio::time::timeout(
+            std::time::Duration::from_secs(300),
+            handle_oauth_callback(listener, verifier, expected_state, redirect, app)
+        ).await;
+
+        match timeout {
+            Ok(result) => {
+                if let Err(e) = result {
+                    log::error!("OAuth callback error: {}", e);
+                }
+            }
+            Err(_) => {
+                log::warn!("OAuth callback timeout");
+            }
+        }
+    });
+
+    Ok(auth_url)
+}
+
+/// OAuth 콜백 대기 및 토큰 교환
+async fn handle_oauth_callback(
+    listener: tokio::net::TcpListener,
+    code_verifier: String,
+    expected_state: String,
+    redirect_uri: String,
+    app_handle: tauri::AppHandle
+) -> Result<(), String> {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    // HTTP 요청 수신
+    let (mut socket, _) = listener.accept().await
+        .map_err(|e| format!("연결 수신 실패: {}", e))?;
+
+    // 요청 읽기
+    let mut buf = [0u8; 4096];
+    let n = socket.peek(&mut buf).await
+        .map_err(|e| format!("요청 읽기 실패: {}", e))?;
+    let request_line = String::from_utf8_lossy(&buf[..n]);
+    let first_line = request_line.lines().next().unwrap_or("");
+
+    log::info!("OAuth callback received: {}", first_line);
+
+    // URL에서 code와 state 추출
+    let (code, state) = parse_oauth_callback(first_line)?;
+
+    // State 검증
+    if state != expected_state {
+        send_http_response(&mut socket, false, "State mismatch").await?;
+        return Err("State mismatch - possible CSRF attack".to_string());
+    }
+
+    // 토큰 교환 (state도 함께 전송 - Claude CLI와 동일)
+    match exchange_token(&code, &code_verifier, &redirect_uri, &state).await {
+        Ok(token_response) => {
+            // Credentials 저장
+            save_oauth_credentials(&token_response)?;
+
+            // 성공 응답
+            send_http_response(&mut socket, true, "").await?;
+
+            // Frontend에 이벤트 발송
+            let status = ClaudeAuthStatus {
+                is_authenticated: true,
+                auth_method: "oauth".to_string(),
+                subscription_type: None,  // 토큰에서 추출 가능하면 추가
+                expires_at: token_response.expires_in.map(|e| {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_millis() as i64 + e * 1000)
+                        .unwrap_or(0)
+                }),
+                is_expired: false,
+                display_info: Some("Claude 계정으로 로그인됨".to_string()),
+                error: None,
+                platform_note: None,
+            };
+
+            let _ = app_handle.emit("claude-auth-success", status);
+            log::info!("OAuth login successful!");
+            Ok(())
+        }
+        Err(e) => {
+            send_http_response(&mut socket, false, &e).await?;
+            Err(e)
+        }
+    }
+}
+
+/// OAuth 콜백 URL 파싱
+fn parse_oauth_callback(request_line: &str) -> Result<(String, String), String> {
+    // GET /callback?code=xxx&state=yyy HTTP/1.1
+    let parts: Vec<&str> = request_line.split_whitespace().collect();
+    if parts.len() < 2 {
+        return Err("Invalid request".to_string());
+    }
+
+    let path = parts[1];
+    let query_start = path.find('?').ok_or("No query string")?;
+    let query = &path[query_start + 1..];
+
+    let mut code = None;
+    let mut state = None;
+
+    for param in query.split('&') {
+        let kv: Vec<&str> = param.split('=').collect();
+        if kv.len() == 2 {
+            match kv[0] {
+                "code" => code = Some(urlencoding::decode(kv[1]).unwrap_or_default().to_string()),
+                "state" => state = Some(urlencoding::decode(kv[1]).unwrap_or_default().to_string()),
+                _ => {}
+            }
+        }
+    }
+
+    match (code, state) {
+        (Some(c), Some(s)) => Ok((c, s)),
+        _ => Err("Missing code or state in callback".to_string()),
+    }
+}
+
+/// 토큰 교환 (authorization code → access token)
+/// Claude CLI는 JSON 형식으로 토큰 요청을 보냄
+async fn exchange_token(code: &str, code_verifier: &str, redirect_uri: &str, state: &str) -> Result<OAuthTokenResponse, String> {
+    let client = reqwest::Client::new();
+
+    // JSON 형식으로 요청 (Claude CLI와 동일)
+    let body = serde_json::json!({
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": CLAUDE_CODE_CLIENT_ID,
+        "code_verifier": code_verifier,
+        "state": state
+    });
+
+    log::info!("Exchanging token with URL: {}", ANTHROPIC_TOKEN_URL);
+
+    let response = client
+        .post(ANTHROPIC_TOKEN_URL)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("토큰 교환 요청 실패: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        log::error!("Token exchange failed: status={}, body={}", status, error_text);
+        return Err(format!("토큰 교환 실패 ({}): {}", status, error_text));
+    }
+
+    response.json::<OAuthTokenResponse>().await
+        .map_err(|e| format!("토큰 응답 파싱 실패: {}", e))
+}
+
+/// OAuth Credentials를 Keychain에 저장
+fn save_oauth_credentials(token: &OAuthTokenResponse) -> Result<(), String> {
+    let expires_at = token.expires_in.map(|e| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64 + e * 1000)
+            .unwrap_or(0)
+    }).unwrap_or(0);
+
+    let credentials = serde_json::json!({
+        "claudeAiOauth": {
+            "accessToken": token.access_token,
+            "refreshToken": token.refresh_token,
+            "expiresAt": expires_at,
+            "scopes": token.scope.as_ref().map(|s| s.split(' ').collect::<Vec<_>>()),
+            "subscriptionType": null,
+            "rateLimitTier": null
+        }
+    });
+
+    let creds_json = serde_json::to_string(&credentials)
+        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+
+    // Keychain에 저장
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "default".to_string());
+
+    let entry = keyring::Entry::new(CLAUDE_CODE_KEYCHAIN_SERVICE, &username)
+        .map_err(|e| format!("Keyring Entry 생성 실패: {}", e))?;
+
+    entry.set_password(&creds_json)
+        .map_err(|e| format!("Credentials 저장 실패: {}", e))?;
+
+    log::info!("OAuth credentials saved to keychain (account: {})", username);
+    Ok(())
+}
+
+/// HTTP 응답 전송 (성공/실패 통합)
+async fn send_http_response(socket: &mut tokio::net::TcpStream, success: bool, error_msg: &str) -> Result<(), String> {
+    use tokio::io::AsyncWriteExt;
+
+    // 먼저 요청 데이터를 읽어서 버퍼 비우기
+    let mut drain_buf = [0u8; 4096];
+    let _ = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        socket.readable()
+    ).await;
+    let _ = socket.try_read(&mut drain_buf);
+
+    let (status, html) = if success {
+        ("200 OK", r#"<!DOCTYPE html>
+<html>
+<head><title>로그인 성공</title><style>
+body{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}
+.container{text-align:center;color:#fff;padding:40px}
+h1{color:#4ade80;margin-bottom:20px}
+p{color:#a0a0a0}
+</style></head>
+<body><div class="container">
+<h1>✓ 로그인 성공!</h1>
+<p>이 창을 닫고 ANYON 앱으로 돌아가세요.</p>
+<script>setTimeout(()=>window.close(),3000)</script>
+</div></body></html>"#.to_string())
+    } else {
+        ("400 Bad Request", format!(r#"<!DOCTYPE html>
+<html>
+<head><title>로그인 실패</title><style>
+body{{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}}
+.container{{text-align:center;color:#fff;padding:40px}}
+h1{{color:#f87171;margin-bottom:20px}}
+p{{color:#a0a0a0}}
+</style></head>
+<body><div class="container">
+<h1>✗ 로그인 실패</h1>
+<p>{}</p>
+</div></body></html>"#, error_msg))
+    };
+
+    let response = format!(
+        "HTTP/1.1 {}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        status,
+        html.len(),
+        html
+    );
+
+    socket.write_all(response.as_bytes()).await
+        .map_err(|e| format!("응답 전송 실패: {}", e))?;
+    socket.flush().await
+        .map_err(|e| format!("응답 플러시 실패: {}", e))?;
+
+    Ok(())
+}
+
+// ============================================================
+// 폴링 기반 로그인 감지 (터미널 로그인 후 사용)
+// ============================================================
+
+/// 터미널 로그인 후 폴링 시작
+/// Keychain을 2초마다 확인하여 로그인 감지 시 이벤트 발송
+#[tauri::command]
+pub async fn claude_auth_poll_for_login(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // 기존 폴링 중단
+    POLL_STOP_FLAG.store(false, Ordering::SeqCst);
+
+    let app = app_handle.clone();
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+        let max_attempts = 150; // 5분 제한
+
+        for attempt in 0..max_attempts {
+            interval.tick().await;
+
+            // 중단 플래그 확인
+            if POLL_STOP_FLAG.load(Ordering::SeqCst) {
+                log::info!("Login poll stopped by user");
+                break;
+            }
+
+            // Credentials 확인
+            match read_claude_credentials() {
+                Ok((creds, platform_note)) => {
+                    if let Some(oauth) = creds.claude_ai_oauth {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_millis() as i64)
+                            .unwrap_or(0);
+
+                        if oauth.expires_at > now {
+                            log::info!("Login detected via polling (attempt {})", attempt + 1);
+
+                            let status = ClaudeAuthStatus {
+                                is_authenticated: true,
+                                auth_method: "oauth".to_string(),
+                                subscription_type: oauth.subscription_type.clone(),
+                                expires_at: Some(oauth.expires_at),
+                                is_expired: false,
+                                display_info: oauth.subscription_type.as_ref().map(|t| {
+                                    match t.as_str() {
+                                        "max" => "Claude Max".to_string(),
+                                        "pro" => "Claude Pro".to_string(),
+                                        "free" => "무료 플랜".to_string(),
+                                        other => other.to_string(),
+                                    }
+                                }),
+                                error: None,
+                                platform_note,
+                            };
+
+                            let _ = app.emit("claude-auth-success", status);
+                            return;
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::debug!("Poll check failed (attempt {}): {}", attempt + 1, e);
+                }
+            }
+        }
+
+        log::info!("Login poll timeout after {} attempts", max_attempts);
+        let _ = app.emit("claude-auth-timeout", ());
+    });
+
+    Ok(())
+}
+
+/// 폴링 중단
+#[tauri::command]
+pub async fn claude_auth_stop_polling() -> Result<(), String> {
+    POLL_STOP_FLAG.store(true, Ordering::SeqCst);
+    log::info!("Login polling stop requested");
     Ok(())
 }
