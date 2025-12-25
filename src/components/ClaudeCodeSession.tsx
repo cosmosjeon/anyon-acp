@@ -16,6 +16,7 @@ import {
   X,
   Loader2,
   AlertCircle,
+  Plus,
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { api, type Session } from "@/lib/api";
@@ -766,7 +767,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         addUserMessageToUI({ prompt, setMessages });
       }
 
-      // 7. Update first message if needed
+      // 8. Update first message if needed
       updateSessionFirstMessage({
         isFirstPrompt,
         tabType,
@@ -1022,10 +1023,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                 top: virtualItem.start,
               }}
             >
-              <StreamMessage 
-                message={message} 
+              <StreamMessage
+                message={message}
                 streamMessages={messages}
                 onLinkDetected={handleLinkDetected}
+                messageIndex={virtualItem.index}
+                sessionId={claudeSessionId || undefined}
+                isSessionLoading={isLoading}
               />
             </div>
           );
@@ -1299,6 +1303,19 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               projectPath={projectPath}
               embedded={embedded}
               showExecutionMode={tabType === "maintenance"}
+              extraMenuItems={[
+                {
+                  icon: <Plus className="h-4 w-4" />,
+                  label: "New Session",
+                  onClick: () => {
+                    setMessages([]);
+                    setError(null);
+                    setIsFirstPrompt(true);
+                    setTotalTokens(0);
+                    currentSessionIdRef.current = null;
+                  }
+                }
+              ]}
             />
           </div>
 
@@ -1321,6 +1338,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           </DialogContent>
         </Dialog>
       )}
+
       </div>
     </TooltipProvider>
   );

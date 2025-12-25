@@ -36,6 +36,7 @@ use commands::mcp::{
 use commands::claude_auth::{
     claude_auth_check, claude_auth_open_terminal, claude_auth_save_api_key,
     claude_auth_delete_api_key, claude_auth_validate_api_key, claude_auth_logout,
+    claude_auth_enable_anyon_api, claude_auth_disable_anyon_api, claude_auth_get_anyon_api_status,
 };
 
 use commands::preview::scan_ports;
@@ -443,6 +444,15 @@ macro_rules! create_handlers {
             claude_auth_delete_api_key,
             claude_auth_validate_api_key,
             claude_auth_logout,
+            // ANYON API Mode
+            claude_auth_enable_anyon_api,
+            claude_auth_disable_anyon_api,
+            claude_auth_get_anyon_api_status,
+            // Git Operations
+            commands::git::get_git_head_sha,
+            commands::git::has_git_uncommitted_changes,
+            commands::git::git_reset_hard,
+            commands::git::get_git_diff_summary,
         ]
     };
 }
@@ -455,6 +465,9 @@ fn main() {
 
     plugins(tauri::Builder::default())
         .setup(setup_application)
+        // Note: Drag-drop events are handled automatically by Tauri 2.x
+        // when dragDropEnabled: true in tauri.conf.json
+        // Frontend uses window.onDragDropEvent() to receive events
         .invoke_handler(create_handlers!())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

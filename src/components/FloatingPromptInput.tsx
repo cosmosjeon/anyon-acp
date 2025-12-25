@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDropzone } from "react-dropzone";
 import {
   Send,
   Square,
+  Image as ImageIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,18 +17,17 @@ import { SelectedComponentsDisplay } from "./preview/SelectedComponentsDisplay";
 import { ToolsMenu, THINKING_MODES, type ThinkingMode, type ExecutionMode } from "./ToolsMenu";
 import { type FileEntry, type SlashCommand } from "@/lib/api";
 
-// Conditional import for Tauri webview window
-let tauriGetCurrentWebviewWindow: any;
+// Conditional import for Tauri APIs
+let tauriGetCurrentWindow: any;
+let tauriReadFile: any;
 try {
   if (typeof window !== 'undefined' && window.__TAURI__) {
-    tauriGetCurrentWebviewWindow = require("@tauri-apps/api/webviewWindow").getCurrentWebviewWindow;
+    tauriGetCurrentWindow = require("@tauri-apps/api/window").getCurrentWindow;
+    tauriReadFile = require("@tauri-apps/plugin-fs").readFile;
   }
 } catch (e) {
-  console.log('[FloatingPromptInput] Tauri webview API not available, using web mode');
+  console.log('[FloatingPromptInput] Tauri API not available, using web mode');
 }
-
-// Web-compatible replacement
-const getCurrentWebviewWindow = tauriGetCurrentWebviewWindow || (() => ({ listen: () => Promise.resolve(() => {}) }));
 
 // Re-export ExecutionMode for external use
 export type { ExecutionMode } from "./ToolsMenu";
@@ -125,6 +126,51 @@ const FloatingPromptInputInner = (
   const [textareaHeight, setTextareaHeight] = useState<number>(44);
   const isIMEComposingRef = useRef(false);
 
+  // Convert file to base64 data URL
+  const fileToBase64 = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  // Handle dropped/pasted image files
+  const handleImageFiles = useCallback(async (files: File[]) => {
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+    for (const file of imageFiles) {
+      try {
+        const base64 = await fileToBase64(file);
+
+        // Add to embeddedImages for preview only (don't add to prompt text)
+        setEmbeddedImages(prev => [...prev, base64]);
+      } catch (error) {
+        console.error('Failed to process image:', error);
+      }
+    }
+  }, [fileToBase64]);
+
+  // Setup react-dropzone
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    open: openFilePicker,
+  } = useDropzone({
+    onDrop: handleImageFiles,
+    accept: { 'image/*': [] },
+    disabled: disabled || isLoading,
+    noClick: true,
+    noKeyboard: true,
+  });
+
+  // Update dragActive state based on dropzone
+  useEffect(() => {
+    setDragActive(isDragActive);
+  }, [isDragActive]);
+
   // Expose a method to add images programmatically
   React.useImperativeHandle(
     ref,
@@ -211,23 +257,51 @@ const FloatingPromptInputInner = (
     }
   }, [prompt, projectPath]);
 
-  // Set up Tauri drag-drop event listener
+  // Set up Tauri drag-drop event listener using Tauri 2.x official API
   useEffect(() => {
     let lastDropTime = 0;
 
+    console.log('[DragDrop] useEffect triggered, tauriGetCurrentWindow available:', !!tauriGetCurrentWindow);
+
     const setupListener = async () => {
+      if (!tauriGetCurrentWindow) {
+        console.log('[DragDrop] Tauri window API not available - skipping');
+        return;
+      }
+
       try {
         if (unlistenDragDropRef.current) {
           unlistenDragDropRef.current();
         }
 
-        const webview = getCurrentWebviewWindow();
-        unlistenDragDropRef.current = await webview.onDragDropEvent((event: any) => {
-          if (event.payload.type === 'enter' || event.payload.type === 'over') {
+        console.log('[DragDrop] Getting current window...');
+        const currentWindow = tauriGetCurrentWindow();
+        console.log('[DragDrop] Got window instance:', currentWindow);
+        console.log('[DragDrop] onDragDropEvent method exists:', typeof currentWindow.onDragDropEvent);
+
+        if (typeof currentWindow.onDragDropEvent !== 'function') {
+          console.error('[DragDrop] onDragDropEvent is not a function!');
+          return;
+        }
+
+        console.log('[DragDrop] Registering onDragDropEvent listener...');
+
+        // Use Tauri 2.x official onDragDropEvent API
+        unlistenDragDropRef.current = await currentWindow.onDragDropEvent(async (event: any) => {
+          console.log('[DragDrop] *** EVENT RECEIVED ***:', event);
+
+          const payload = event.payload;
+          if (!payload) return;
+
+          // Handle different event types
+          const eventType = payload.type;
+          const paths = payload.paths;
+
+          if (eventType === 'enter' || eventType === 'over' || eventType === 'hover') {
             setDragActive(true);
-          } else if (event.payload.type === 'leave') {
+          } else if (eventType === 'leave' || eventType === 'cancel') {
             setDragActive(false);
-          } else if (event.payload.type === 'drop' && event.payload.paths) {
+          } else if (eventType === 'drop' && paths && paths.length > 0) {
             setDragActive(false);
 
             const currentTime = Date.now();
@@ -236,36 +310,39 @@ const FloatingPromptInputInner = (
             }
             lastDropTime = currentTime;
 
-            const droppedPaths = event.payload.paths as string[];
+            const droppedPaths = paths as string[];
             const imagePaths = droppedPaths.filter(isImageFile);
 
-            if (imagePaths.length > 0) {
-              setPrompt(currentPrompt => {
-                const existingPaths = extractImagePaths(currentPrompt);
-                const newPaths = imagePaths.filter(p => !existingPaths.includes(p));
+            console.log('[DragDrop] Dropped paths:', droppedPaths, 'Image paths:', imagePaths);
 
-                if (newPaths.length === 0) {
-                  return currentPrompt;
+            if (imagePaths.length > 0 && tauriReadFile) {
+              // Read image files and convert to base64
+              for (const imagePath of imagePaths) {
+                try {
+                  const fileData = await tauriReadFile(imagePath);
+                  const ext = imagePath.split('.').pop()?.toLowerCase() || 'png';
+                  const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+                  const base64 = btoa(
+                    new Uint8Array(fileData).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                  );
+                  const dataUrl = `data:${mimeType};base64,${base64}`;
+
+                  // Add to embeddedImages for preview only (don't add to prompt text)
+                  setEmbeddedImages(prev => [...prev, dataUrl]);
+                  console.log('[DragDrop] Image added successfully');
+                } catch (err) {
+                  console.error('Failed to read image file:', imagePath, err);
                 }
+              }
 
-                const mentionsToAdd = newPaths.map(p => {
-                  if (p.includes(' ')) {
-                    return `@"${p}"`;
-                  }
-                  return `@${p}`;
-                }).join(' ');
-                const newPrompt = currentPrompt + (currentPrompt.endsWith(' ') || currentPrompt === '' ? '' : ' ') + mentionsToAdd + ' ';
-
-                setTimeout(() => {
-                  textareaRef.current?.focus();
-                  textareaRef.current?.setSelectionRange(newPrompt.length, newPrompt.length);
-                }, 0);
-
-                return newPrompt;
-              });
+              setTimeout(() => {
+                textareaRef.current?.focus();
+              }, 0);
             }
           }
         });
+
+        console.log('[DragDrop] Listener setup complete with onDragDropEvent');
       } catch (error) {
         console.error('Failed to set up Tauri drag-drop listener:', error);
       }
@@ -572,6 +649,13 @@ const FloatingPromptInputInner = (
       return;
     }
 
+    // Shift+Tab: Toggle Plan/Execute mode
+    if (e.key === "Tab" && e.shiftKey) {
+      e.preventDefault();
+      setSelectedExecutionMode(prev => prev === "execute" ? "plan" : "execute");
+      return;
+    }
+
     if (
       e.key === "Enter" &&
       !e.shiftKey &&
@@ -590,59 +674,33 @@ const FloatingPromptInputInner = (
     const items = e.clipboardData?.items;
     if (!items) return;
 
+    const imageFiles: File[] = [];
     for (const item of items) {
       if (item.type.startsWith('image/')) {
-        e.preventDefault();
-
-        const blob = item.getAsFile();
-        if (!blob) continue;
-
-        try {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const base64Data = reader.result as string;
-
-            setPrompt(currentPrompt => {
-              const mention = `@"${base64Data}"`;
-              const newPrompt = currentPrompt + (currentPrompt.endsWith(' ') || currentPrompt === '' ? '' : ' ') + mention + ' ';
-
-              setTimeout(() => {
-                textareaRef.current?.focus();
-                textareaRef.current?.setSelectionRange(newPrompt.length, newPrompt.length);
-              }, 0);
-
-              return newPrompt;
-            });
-          };
-
-          reader.readAsDataURL(blob);
-        } catch (error) {
-          console.error('Failed to paste image:', error);
+        const file = item.getAsFile();
+        if (file) {
+          imageFiles.push(file);
         }
       }
     }
-  };
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      await handleImageFiles(imageFiles);
+      textareaRef.current?.focus();
+    }
   };
 
   const handleRemoveImage = (index: number) => {
     const imagePath = embeddedImages[index];
 
+    // For base64 images (pasted/dropped), just remove from embeddedImages
     if (imagePath.startsWith('data:')) {
-      const quotedPath = `@"${imagePath}"`;
-      const newPrompt = prompt.replace(quotedPath, '').trim();
-      setPrompt(newPrompt);
+      setEmbeddedImages(prev => prev.filter((_, i) => i !== index));
       return;
     }
 
+    // For file path images, also remove from prompt text
     const escapedPath = imagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedRelativePath = imagePath.replace(projectPath + '/', '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -720,31 +778,27 @@ const FloatingPromptInputInner = (
             : "fixed bottom-0 left-0 right-0 z-40 px-4 pb-4",
           className
         )}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
       >
         <div
+          {...getRootProps()}
           className={cn(
-            "mx-auto max-w-3xl",
+            "mx-auto max-w-3xl relative",
             // Background with theme support
             "bg-card",
             // Smooth rounded corners
             "rounded-2xl",
-            // Border with theme support
-            "border-2 border-border",
-            // Outer ring for more definition
-            "ring-1 ring-border/50",
-            // Plan mode: violet glow
-            showExecutionMode && selectedExecutionMode === "plan" && "border-violet-500/70 ring-violet-500/30",
-            // Focus state: primary glow
-            isFocused && "border-primary/50 ring-primary/20",
+            // Border - changes based on mode
+            "border-2",
+            selectedExecutionMode === "plan"
+              ? "border-violet-500 ring-2 ring-violet-500/40"
+              : "border-border ring-1 ring-border/50",
+            // Focus state
+            isFocused && selectedExecutionMode !== "plan" && "border-primary/50 ring-primary/20",
             // Drag active
             dragActive && "ring-2 ring-primary/50 border-primary",
             // Smooth transition
             "transition-all duration-300 ease-out",
-            // Drop shadow classes for theme support
+            // Drop shadow
             "drop-shadow-lg",
             isFocused && "drop-shadow-xl"
           )}
@@ -753,6 +807,20 @@ const FloatingPromptInputInner = (
             boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.05)"
           }}
         >
+          <input {...getInputProps()} />
+
+          {/* Drag overlay */}
+          {isDragActive && (
+            <div className="absolute inset-0 z-50 bg-primary/90 border-2 border-dashed border-primary-foreground/50 rounded-2xl flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <ImageIcon className="h-12 w-12 mx-auto mb-2 text-primary-foreground" />
+                <p className="text-lg font-medium text-primary-foreground">
+                  이미지를 여기에 놓으세요
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Selected Components Display */}
           <SelectedComponentsDisplay />
 
@@ -781,6 +849,8 @@ const FloatingPromptInputInner = (
                 disabled={disabled}
                 onFilePickerTrigger={handleFilePickerTrigger}
                 onSlashCommandTrigger={handleSlashCommandTrigger}
+                onImageAttach={openFilePicker}
+                extraMenuItems={extraMenuItems}
               />
 
               {/* Textarea Container */}
@@ -855,8 +925,8 @@ const FloatingPromptInputInner = (
                     className={cn(
                       "h-10 w-10 rounded-xl transition-all duration-200",
                       !prompt.trim() && !isLoading && "bg-muted/80 text-muted-foreground/60 hover:bg-muted/90 hover:text-muted-foreground",
-                      prompt.trim() && !isLoading && "bg-primary shadow-lg shadow-primary/25 hover:shadow-primary/40",
-                      isLoading && "bg-destructive shadow-lg shadow-destructive/25"
+                      prompt.trim() && !isLoading && "bg-primary",
+                      isLoading && "bg-destructive"
                     )}
                   >
                     {isLoading ? (
@@ -869,37 +939,43 @@ const FloatingPromptInputInner = (
               </TooltipSimple>
             </div>
 
-            {/* Bottom Bar - Mode badges only (if any selected) */}
-            {(selectedThinkingMode !== "auto" || (showExecutionMode && selectedExecutionMode === "plan") || extraMenuItems) && (
-              <div className="flex items-center justify-between mt-2 px-1">
-                <div className="flex items-center gap-1.5">
-                  {/* Thinking Mode Badge */}
-                  {selectedThinkingMode !== "auto" && (
-                    <span className={cn(
-                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium",
-                      "bg-primary/10 text-primary"
-                    )}>
-                      {selectedThinkingData.icon}
-                      {selectedThinkingData.name}
-                    </span>
+            {/* Bottom Bar - Execution mode toggle & badges */}
+            <div className="flex items-center justify-between mt-2 px-1">
+              <div className="flex items-center gap-2">
+                {/* Execution Mode Badge - Always visible, clickable to toggle */}
+                <button
+                  onClick={() => setSelectedExecutionMode(prev => prev === "execute" ? "plan" : "execute")}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200",
+                    selectedExecutionMode === "plan"
+                      ? "bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 ring-1 ring-violet-500/30"
+                      : "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 ring-1 ring-emerald-500/20"
                   )}
+                >
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    selectedExecutionMode === "plan" ? "bg-violet-400" : "bg-emerald-500"
+                  )} />
+                  {selectedExecutionMode === "plan" ? "계획 세우기" : "개발 모드"}
+                </button>
 
-                  {/* Plan Mode Badge */}
-                  {showExecutionMode && selectedExecutionMode === "plan" && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-500/10 text-violet-500">
-                      Plan
-                    </span>
-                  )}
-                </div>
-
-                {/* Extra menu items */}
-                {extraMenuItems && (
-                  <div className="flex items-center gap-1">
-                    {extraMenuItems}
-                  </div>
+                {/* Thinking Mode Badge */}
+                {selectedThinkingMode !== "auto" && (
+                  <span className={cn(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium",
+                    "bg-primary/10 text-primary"
+                  )}>
+                    {selectedThinkingData.icon}
+                    {selectedThinkingData.name}
+                  </span>
                 )}
               </div>
-            )}
+
+              {/* Shortcut hint */}
+              <span className="text-[10px] text-muted-foreground/50">
+                Shift+Tab 모드 전환
+              </span>
+            </div>
           </div>
         </div>
       </div>
