@@ -718,18 +718,37 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
     // Collect inherited environment variables
     let mut env_vars = get_inherited_env_vars();
 
-    // First, try to load env vars from ~/.claude/settings.local.json
+    // Priority 1: Check if Claude OAuth is active
+    // If OAuth is active, don't inject any API keys - let Claude CLI handle it
+    if is_claude_oauth_active() {
+        info!("Claude OAuth is active - using OAuth authentication");
+        return CommandEnvConfig {
+            env_vars,
+            modified_path: compute_modified_path(program, &std::env::var("PATH").unwrap_or_default()),
+        };
+    }
+
+    // Priority 2: Check for ANYON API mode (settings.local.json with ANTHROPIC_BASE_URL)
     if let Some(claude_env_vars) = get_claude_settings_env_vars() {
-        for (key, value) in claude_env_vars {
-            info!("Injecting env var from Claude settings: {}", key);
-            env_vars.push((key, value));
+        // Only use settings.local.json if ANTHROPIC_BASE_URL is present (indicates ANYON API mode)
+        let has_base_url = claude_env_vars.iter().any(|(k, _)| k == "ANTHROPIC_BASE_URL");
+        if has_base_url {
+            info!("ANYON API mode detected - using proxy authentication");
+            for (key, value) in claude_env_vars {
+                info!("Injecting env var from Claude settings: {}", key);
+                env_vars.push((key, value));
+            }
+            return CommandEnvConfig {
+                env_vars,
+                modified_path: compute_modified_path(program, &std::env::var("PATH").unwrap_or_default()),
+            };
         }
     }
 
-    // If ANTHROPIC_API_KEY is still not set, try to get from keychain
+    // Priority 3: Fall back to keychain API key
     if !env_vars.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY") {
         if let Some(api_key) = get_api_key_from_keychain() {
-            info!("Injecting ANTHROPIC_API_KEY from keychain");
+            info!("Using API key from keychain");
             env_vars.push(("ANTHROPIC_API_KEY".to_string(), api_key));
         }
     }
@@ -757,6 +776,108 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
 const ANYON_SERVICE_NAME: &str = "anyon-claude";
 /// Account name for API key in keychain
 const API_KEY_ACCOUNT: &str = "anthropic_api_key";
+/// Claude Code keychain service name for OAuth
+const CLAUDE_CODE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+/// Legacy Claude Safe Storage service name
+const CLAUDE_LEGACY_SERVICE: &str = "Claude Safe Storage";
+const CLAUDE_LEGACY_ACCOUNT: &str = "Claude Key";
+
+/// Get account candidates to try (username first, then default)
+fn get_oauth_account_candidates() -> Vec<String> {
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "default".to_string());
+
+    if username == "default" {
+        vec!["default".to_string()]
+    } else {
+        vec![username, "default".to_string()]
+    }
+}
+
+/// Check if OAuth credentials are valid in the given JSON
+fn check_oauth_valid(creds_json: &str) -> bool {
+    if let Ok(creds) = serde_json::from_str::<serde_json::Value>(creds_json) {
+        if let Some(oauth) = creds.get("claudeAiOauth") {
+            if let Some(expires_at) = oauth.get("expiresAt").and_then(|v| v.as_i64()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+
+                return expires_at > now;
+            }
+        }
+    }
+    false
+}
+
+/// Check if Claude OAuth is active by reading keychain
+fn is_claude_oauth_active() -> bool {
+    #[cfg(not(target_os = "windows"))]
+    {
+        use keyring::Entry;
+
+        // Try Claude Code-credentials with multiple account names
+        for account in get_oauth_account_candidates() {
+            if let Ok(entry) = Entry::new(CLAUDE_CODE_KEYCHAIN_SERVICE, &account) {
+                if let Ok(creds_json) = entry.get_password() {
+                    if check_oauth_valid(&creds_json) {
+                        debug!("Claude OAuth found (service: {}, account: {}), valid: true", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Try legacy Claude Safe Storage
+        if let Ok(entry) = Entry::new(CLAUDE_LEGACY_SERVICE, CLAUDE_LEGACY_ACCOUNT) {
+            if let Ok(creds_json) = entry.get_password() {
+                if check_oauth_valid(&creds_json) {
+                    debug!("Claude OAuth found (legacy service), valid: true");
+                    return true;
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use keyring::Entry;
+        use std::fs;
+
+        // 1. Try credentials file first
+        if let Some(home) = dirs::home_dir() {
+            let creds_path = home.join(".claude").join(".credentials.json");
+            if let Ok(content) = fs::read_to_string(&creds_path) {
+                if check_oauth_valid(&content) {
+                    debug!("Claude OAuth found (file), valid: true");
+                    return true;
+                }
+            }
+        }
+
+        // 2. Try Credential Manager
+        let accounts_to_try = get_oauth_account_candidates();
+        let services_to_try = vec![CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE];
+
+        for service in &services_to_try {
+            for account in &accounts_to_try {
+                if let Ok(entry) = Entry::new(service, account) {
+                    if let Ok(creds_json) = entry.get_password() {
+                        if check_oauth_valid(&creds_json) {
+                            debug!("Claude OAuth found (service: {}, account: {}), valid: true", service, account);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    debug!("No valid Claude OAuth found");
+    false
+}
 
 /// Get environment variables from ~/.claude/settings.local.json
 fn get_claude_settings_env_vars() -> Option<Vec<(String, String)>> {

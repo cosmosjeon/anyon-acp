@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Key,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { claudeAuthApi, type ClaudeAuthStatus, type AnyonApiUsage } from "@/lib/api";
 import { useTranslation } from "@/hooks";
 import { useAuthStore } from "@/stores/authStore";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 interface ClaudeAuthSettingsProps {
   className?: string;
@@ -55,6 +56,10 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
   const [anyonApiAvailable, setAnyonApiAvailable] = useState(false);
   const [loadingAnyonStatus, setLoadingAnyonStatus] = useState(false);
   const [enablingAnyon, setEnablingAnyon] = useState(false);
+
+  // OAuth direct login state
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const unlistenRef = useRef<UnlistenFn[]>([]);
 
   // Server URL from environment
   const ANYON_SERVER_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
@@ -89,15 +94,56 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
     checkPlatform();
   }, []);
 
+  // Set up OAuth event listeners
+  useEffect(() => {
+    if (isWebMode) return;
+
+    const setupListeners = async () => {
+      try {
+        // Listen for OAuth success
+        const unlistenSuccess = await listen<ClaudeAuthStatus>('claude-auth-success', (event) => {
+          console.log('[ClaudeAuthSettings] OAuth success event received:', event.payload);
+          setOauthLoading(false);
+          setAuthStatus(event.payload);
+          setToast?.({ message: '로그인 성공!', type: 'success' });
+        });
+        unlistenRef.current.push(unlistenSuccess);
+
+        // Listen for OAuth timeout
+        const unlistenTimeout = await listen('claude-auth-timeout', () => {
+          console.log('[ClaudeAuthSettings] OAuth timeout event received');
+          setOauthLoading(false);
+          setToast?.({ message: '로그인 시간 초과. 다시 시도해주세요.', type: 'error' });
+        });
+        unlistenRef.current.push(unlistenTimeout);
+      } catch (err) {
+        console.error('Failed to set up event listeners:', err);
+      }
+    };
+
+    setupListeners();
+
+    return () => {
+      // Cleanup listeners
+      unlistenRef.current.forEach(unlisten => unlisten());
+      unlistenRef.current = [];
+      // Stop polling if it was running
+      claudeAuthApi.stopLoginPolling().catch(() => {});
+    };
+  }, [isWebMode, setToast]);
+
   // Load auth status
   const loadAuthStatus = useCallback(async () => {
     try {
       setLoading(true);
       const status = await claudeAuthApi.check();
+      console.log("[ClaudeAuthSettings] Auth Status:", status);
+      console.log("[ClaudeAuthSettings] - subscription_type:", status.subscription_type);
+      console.log("[ClaudeAuthSettings] - display_info:", status.display_info);
       setAuthStatus(status);
 
-      // Auto-select method based on current auth
-      if (status.is_authenticated) {
+      // Auto-select method based on current auth (only on initial load)
+      if (status.is_authenticated && !selectedMethod) {
         setSelectedMethod(status.auth_method === "api_key" ? "api-key" : "oauth");
       }
     } catch (err) {
@@ -111,7 +157,7 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedMethod]);
 
   useEffect(() => {
     loadAuthStatus();
@@ -149,6 +195,75 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
   useEffect(() => {
     loadAnyonApiStatus();
   }, [loadAnyonApiStatus]);
+
+  // Auto-cleanup conflicting auth methods on load
+  useEffect(() => {
+    const cleanup = async () => {
+      if (!authStatus || !anyonApiEnabled) return;
+
+      // If OAuth is active and ANYON API is also enabled, disable ANYON API
+      if (authStatus.is_authenticated && authStatus.auth_method === "oauth" && anyonApiEnabled) {
+        console.log("[ClaudeAuthSettings] Detected OAuth + ANYON API conflict, disabling ANYON API");
+        try {
+          await claudeAuthApi.disableAnyonApi();
+          setAnyonApiEnabled(false);
+          setToast?.({ message: 'OAuth가 우선 적용되어 ANYON API가 자동으로 비활성화되었습니다', type: 'success' });
+        } catch (err) {
+          console.error('Failed to auto-disable ANYON API:', err);
+        }
+      }
+
+      // If OAuth is active and API Key is also present, delete API Key
+      if (authStatus.is_authenticated && authStatus.auth_method === "oauth") {
+        // The backend will handle this automatically, no need to do anything
+      }
+    };
+
+    cleanup();
+  }, [authStatus, anyonApiEnabled]);
+
+  // Check which authentication method is actually active (based on priority)
+  // Priority: 1. OAuth, 2. ANYON API, 3. API Key
+  const getActiveAuthMethod = (): AuthMethod | null => {
+    // Priority 1: OAuth (highest priority)
+    if (authStatus?.is_authenticated && authStatus.auth_method === "oauth") {
+      return "oauth";
+    }
+
+    // Priority 2: ANYON API
+    if (anyonApiEnabled) {
+      return "anyon-api";
+    }
+
+    // Priority 3: API Key
+    if (authStatus?.is_authenticated && authStatus.auth_method === "api_key") {
+      return "api-key";
+    }
+
+    return null;
+  };
+
+  // Handle tab switch with conflict check
+  const handleMethodSwitch = (method: AuthMethod) => {
+    const activeMethod = getActiveAuthMethod();
+
+    if (activeMethod && activeMethod !== method) {
+      // Show warning that switching will disable the current method
+      const methodNames = {
+        "oauth": "Claude 계정 로그인",
+        "anyon-api": "ANYON API",
+        "api-key": "API 키"
+      };
+
+      setToast?.({
+        message: `${methodNames[activeMethod]}이(가) 활성화되어 있습니다. 먼저 로그아웃하거나 비활성화해주세요.`,
+        type: 'error'
+      });
+      return;
+    }
+
+    setSelectedMethod(method);
+  };
 
   // Handle ANYON API enable
   const handleEnableAnyonApi = async () => {
@@ -189,7 +304,25 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
     }
   };
 
-  // Handle terminal login
+  // Handle OAuth direct login
+  const handleOAuthLogin = async () => {
+    console.log("[ClaudeAuthSettings] handleOAuthLogin called");
+
+    try {
+      setOauthLoading(true);
+      const authUrl = await claudeAuthApi.startOAuth();
+      console.log("[ClaudeAuthSettings] OAuth started, auth URL:", authUrl);
+      setToast?.({ message: '브라우저에서 로그인을 완료해주세요...', type: 'success' });
+    } catch (err) {
+      console.error("[ClaudeAuthSettings] Failed to start OAuth:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setToast?.({ message: `로그인 시작 실패: ${errorMessage}`, type: "error" });
+      setOauthLoading(false);
+    }
+    // Note: setOauthLoading(false) will be called by the event listener on success/timeout
+  };
+
+  // Handle terminal login with polling
   const handleTerminalLogin = async () => {
     console.log("[ClaudeAuthSettings] handleTerminalLogin called");
     console.log("[ClaudeAuthSettings] isWebMode:", isWebMode);
@@ -200,6 +333,11 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
       console.log("[ClaudeAuthSettings] Calling claudeAuthApi.openTerminal()...");
       await claudeAuthApi.openTerminal();
       console.log("[ClaudeAuthSettings] Terminal opened successfully");
+
+      // Start polling for login completion
+      await claudeAuthApi.startLoginPolling();
+      console.log("[ClaudeAuthSettings] Login polling started");
+
       setToast?.({ message: t('settings.claudeAuth.terminalOpened') || "Terminal opened - please complete login", type: "success" });
     } catch (err) {
       console.error("[ClaudeAuthSettings] Failed to open terminal:", err);
@@ -468,43 +606,88 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
         </div>
       )}
 
+      {/* Active Auth Warning */}
+      {getActiveAuthMethod() !== null && getActiveAuthMethod() !== selectedMethod && (
+        <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20">
+          <div className="flex gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-1">
+                {getActiveAuthMethod() === "oauth" && "Claude 계정 로그인이 활성화되어 있습니다"}
+                {getActiveAuthMethod() === "anyon-api" && "ANYON API가 활성화되어 있습니다"}
+                {getActiveAuthMethod() === "api-key" && "API 키가 저장되어 있습니다"}
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                {getActiveAuthMethod() === "oauth" && "다른 인증 방법을 사용하려면 먼저 로그아웃하세요."}
+                {getActiveAuthMethod() === "anyon-api" && "다른 인증 방법을 사용하려면 먼저 ANYON API를 비활성화하세요."}
+                {getActiveAuthMethod() === "api-key" && "다른 인증 방법을 사용하려면 먼저 API 키를 삭제하세요."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Auth Method Tabs */}
       <div className="flex gap-2 p-1 rounded-lg bg-muted/50">
         <button
-          onClick={() => setSelectedMethod("anyon-api")}
+          onClick={() => handleMethodSwitch("anyon-api")}
+          disabled={getActiveAuthMethod() !== null && getActiveAuthMethod() !== "anyon-api"}
+          title={getActiveAuthMethod() !== null && getActiveAuthMethod() !== "anyon-api"
+            ? "다른 인증 방법이 활성화되어 있습니다"
+            : ""}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors relative",
             selectedMethod === "anyon-api"
               ? "bg-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+            getActiveAuthMethod() !== null && getActiveAuthMethod() !== "anyon-api" && "opacity-50 cursor-not-allowed"
           )}
         >
           <Zap className="h-4 w-4" />
           ANYON API
+          {anyonApiEnabled && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+          )}
         </button>
         <button
-          onClick={() => setSelectedMethod("oauth")}
+          onClick={() => handleMethodSwitch("oauth")}
+          disabled={getActiveAuthMethod() !== null && getActiveAuthMethod() !== "oauth"}
+          title={getActiveAuthMethod() !== null && getActiveAuthMethod() !== "oauth"
+            ? "다른 인증 방법이 활성화되어 있습니다"
+            : ""}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors relative",
             selectedMethod === "oauth"
               ? "bg-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+            getActiveAuthMethod() !== null && getActiveAuthMethod() !== "oauth" && "opacity-50 cursor-not-allowed"
           )}
         >
           <User className="h-4 w-4" />
           {t('settings.claudeAuth.claudeAccount')}
+          {authStatus?.is_authenticated && authStatus.auth_method === "oauth" && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+          )}
         </button>
         <button
-          onClick={() => setSelectedMethod("api-key")}
+          onClick={() => handleMethodSwitch("api-key")}
+          disabled={getActiveAuthMethod() !== null && getActiveAuthMethod() !== "api-key"}
+          title={getActiveAuthMethod() !== null && getActiveAuthMethod() !== "api-key"
+            ? "다른 인증 방법이 활성화되어 있습니다"
+            : ""}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+            "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors relative",
             selectedMethod === "api-key"
               ? "bg-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+            getActiveAuthMethod() !== null && getActiveAuthMethod() !== "api-key" && "opacity-50 cursor-not-allowed"
           )}
         >
           <Key className="h-4 w-4" />
           {t('settings.claudeAuth.apiKey')}
+          {authStatus?.is_authenticated && authStatus.auth_method === "api_key" && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+          )}
         </button>
       </div>
 
@@ -673,62 +856,94 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
             exit={{ opacity: 0, y: -10 }}
             className="space-y-4"
           >
-            {/* Terminal Login */}
-            <div className="p-4 rounded-xl bg-muted/40 space-y-4">
+            {/* OAuth Direct Login (Primary) */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 space-y-4">
               <div className="flex items-center gap-3">
-                <Terminal className="h-5 w-5 text-muted-foreground" />
+                <div className="p-2 rounded-lg bg-blue-500/20">
+                  <User className="h-5 w-5 text-blue-500" />
+                </div>
                 <div>
-                  <h4 className="text-sm font-semibold">{t('settings.claudeAuth.terminalLogin')}</h4>
+                  <h4 className="text-sm font-semibold">Claude 계정으로 로그인</h4>
                   <p className="text-xs text-muted-foreground">
-                    {t('settings.claudeAuth.terminalLoginDesc')}
+                    한 번 클릭으로 브라우저에서 안전하게 로그인
                   </p>
                 </div>
               </div>
 
               <Button
-                onClick={handleTerminalLogin}
-                disabled={openingTerminal || isWebMode}
-                className="w-full gap-2"
+                onClick={handleOAuthLogin}
+                disabled={oauthLoading || isWebMode}
+                className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
               >
-                {openingTerminal ? (
+                {oauthLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {t('settings.claudeAuth.openingTerminal')}
+                    로그인 대기 중...
                   </>
                 ) : (
                   <>
-                    <Terminal className="h-4 w-4" />
-                    {t('settings.claudeAuth.terminalLogin')}
+                    <ExternalLink className="h-4 w-4" />
+                    Claude 계정으로 로그인
                   </>
                 )}
               </Button>
+
+              {oauthLoading && (
+                <p className="text-xs text-muted-foreground text-center">
+                  브라우저에서 로그인을 완료하면 자동으로 연결됩니다
+                </p>
+              )}
             </div>
 
-            {/* Login Steps */}
+            {/* Terminal Login (Fallback) */}
+            <div className="p-4 rounded-xl bg-muted/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Terminal className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground">터미널로 로그인</h4>
+                    <p className="text-xs text-muted-foreground">
+                      브라우저 로그인이 안 될 때 사용
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTerminalLogin}
+                  disabled={openingTerminal || isWebMode || oauthLoading}
+                  className="gap-1"
+                >
+                  {openingTerminal ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Terminal className="h-3 w-3" />
+                  )}
+                  터미널 열기
+                </Button>
+              </div>
+            </div>
+
+            {/* Benefits */}
             <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
-              <h4 className="text-sm font-semibold">{t('settings.claudeAuth.loginSteps')}</h4>
-              <ol className="space-y-2 text-sm text-muted-foreground">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4 text-blue-500" />
+                Claude 계정 로그인 장점
+              </h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">1</span>
-                  {t('settings.claudeAuth.step1')}
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>별도의 API 키 발급 불필요</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">2</span>
-                  {t('settings.claudeAuth.step2')}
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>Claude 구독 플랜에 따른 사용량 제공</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">3</span>
-                  {t('settings.claudeAuth.step3')}
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span>안전한 OAuth 인증 방식</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">4</span>
-                  {t('settings.claudeAuth.step4')}
-                </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">5</span>
-                  {t('settings.claudeAuth.step5')}
-                </li>
-              </ol>
+              </ul>
             </div>
 
             {/* Recommendation */}
