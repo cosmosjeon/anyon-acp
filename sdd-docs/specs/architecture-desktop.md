@@ -418,25 +418,8 @@ pub struct ProcessInfo {
 
 ### Checkpoint System
 
-```rust
-// checkpoint/mod.rs
-
-pub struct Checkpoint {
-    id: i64,
-    session_id: String,
-    parent_id: Option<i64>,
-    name: String,
-    created_at: DateTime<Utc>,
-    message_index: i64,
-    file_snapshots: Vec<FileSnapshot>,
-}
-
-pub struct FileSnapshot {
-    path: String,
-    content_hash: String,
-    metadata: FileMetadata,
-}
-```
+> **Note**: Checkpoint system has been removed from the codebase (2025-12-25).
+> The `checkpoint/` module (mod.rs, manager.rs, state.rs, storage.rs) has been deleted.
 
 ---
 

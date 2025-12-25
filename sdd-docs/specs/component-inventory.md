@@ -6,19 +6,19 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 75 |
+| **React Components** | 70 |
 | **UI Components** | 20 |
 | **Widget Components** | 29 |
 | **Preview Components** | 6 |
-| **Claude Session Components** | 12 |
+| **Claude Session Components** | 4 |
 | **Zustand Stores** | 5 |
 | **Custom Hooks** | 14 |
-| **Context Providers** | 2 |
+| **Context Providers** | 3 |
 
-> Last synced: 2025-12-25
+> Last synced: 2025-12-26
 > Note: Checkpoint system fully removed (CheckpointSettings, TimelineNavigator deleted; checkpoint/ Rust module deleted)
-> Added: ToolsMenu, ExecutionControlBar, promptHandlers.ts, support.ts constants
-> Updated: useChatHistory hook added
+> Note: Many components refactored/consolidated. git.rs added for Git operations.
+> Note: RetryContext added as new context provider
 
 ---
 
@@ -298,6 +298,19 @@ interface ThemeContextValue {
   theme: 'light' | 'dark' | 'system';
   setTheme(theme: string): void;
   resolvedTheme: 'light' | 'dark';
+}
+```
+
+### RetryContext
+
+```typescript
+// src/contexts/RetryContext.tsx
+
+interface RetryContextValue {
+  retryCount: number;
+  maxRetries: number;
+  retry(): void;
+  reset(): void;
 }
 ```
 

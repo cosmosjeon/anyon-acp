@@ -437,11 +437,19 @@ interface LanguageState {
 - System preference detection
 - Persistence via API
 
+#### RetryContext
+- Retry count tracking
+- Max retries configuration
+- Retry/reset actions
+
 ---
 
 ## Custom Hooks
 
 Total: 14 custom hooks for state management, performance, and feature integration.
+
+> Removed: useApiCall, useDebounce, useLoadingState, usePagination (consolidated or unused)
+> Added: useDevWorkflow hook
 
 ### Core Hooks
 
@@ -693,7 +701,7 @@ src/
 | **Widgets** | 29 | Tool execution displays (~3400 lines) |
 | **Custom Hooks** | 21 | Core, analytics, feature, utility |
 | **Zustand Stores** | 5 | Auth, session, agent, preview, language |
-| **Context Providers** | 3 | Tab, theme, output cache |
+| **Context Providers** | 4 | Tab, theme, output cache, retry |
 | **UI Components** | 23 | Radix-based primitives |
 | **Dependencies** | 50+ | React ecosystem + Tauri |
 
