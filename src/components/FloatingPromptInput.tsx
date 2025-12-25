@@ -1272,7 +1272,7 @@ const FloatingPromptInputInner = (
                               {selectedModelData.icon}
                             </span>
                             <span className="font-medium">
-                              {selectedModelData.shortName === "S" ? "Sonnet" : "Opus"}
+                              {selectedModelData.name}
                             </span>
                             <ChevronUp className="h-3 w-3 opacity-50" />
                           </Button>

@@ -87,7 +87,7 @@ export function usePlanningDocs(projectPath: string | undefined): UsePlanningDoc
     } finally {
       setIsLoading(false);
     }
-  }, [projectPath, docsDir]);
+  }, [projectPath]);
 
   // Initial load and polling (every 2 seconds - same as anyon-mvp)
   useEffect(() => {

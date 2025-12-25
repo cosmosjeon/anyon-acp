@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Crown, ChevronDown } from "@/lib/icons";
+import { LogOut, User, Crown } from "@/lib/icons";
 import { useAuthStore } from '@/stores/authStore';
 
 interface UserProfileDropdownProps {
@@ -74,10 +74,27 @@ export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ onSett
     setIsOpen(false);
   };
 
-  // Get user initials for avatar
-
-
-  if (!user) return null;
+  // If no user, show a basic avatar button (for dev/unauthenticated state)
+  if (!user) {
+    return showName ? (
+      // Expanded mode - matches theme/settings button style
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors text-xs"
+      >
+        <User className="w-4 h-4 flex-shrink-0" />
+        <span>Guest</span>
+      </motion.button>
+    ) : (
+      // Collapsed mode - matches theme/settings button style
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+      >
+        <User className="w-4 h-4" />
+      </motion.button>
+    );
+  }
 
   const dropdownMenu = (
     <AnimatePresence>
@@ -144,35 +161,33 @@ export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ onSett
   );
 
   return (
-    <div className="relative">
+    <>
       {/* Profile Button */}
-      <motion.button
-        ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
-        whileTap={{ scale: 0.97 }}
-        className={`flex items-center gap-2 p-1.5 rounded-md hover:bg-accent transition-colors ${showName ? 'pr-2.5' : ''}`}
-      >
-        {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-border flex-shrink-0">
-          <User className="w-4 h-4 text-primary" />
-        </div>
-
-        {/* User Name - Only when showName is true */}
-        {showName && user?.name && (
-          <span className="text-sm truncate max-w-[120px]">{user.name}</span>
-        )}
-
-        {/* Chevron - Only when showName is true */}
-        {showName && (
-          <ChevronDown
-            size={12}
-            className={`text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
-          />
-        )}
-      </motion.button>
+      {showName ? (
+        // Expanded mode - matches theme/settings button style
+        <motion.button
+          ref={buttonRef}
+          onClick={() => setIsOpen(!isOpen)}
+          whileTap={{ scale: 0.95 }}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors text-xs"
+        >
+          <User className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">{user.name}</span>
+        </motion.button>
+      ) : (
+        // Collapsed mode - matches theme/settings button style
+        <motion.button
+          ref={buttonRef}
+          onClick={() => setIsOpen(!isOpen)}
+          whileTap={{ scale: 0.95 }}
+          className="p-2 rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+        >
+          <User className="w-4 h-4" />
+        </motion.button>
+      )}
 
       {/* Dropdown Menu - Rendered via Portal */}
       {createPortal(dropdownMenu, document.body)}
-    </div>
+    </>
   );
 };

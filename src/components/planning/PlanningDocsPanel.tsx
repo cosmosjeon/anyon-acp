@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText , Loader2 } from '@/lib/icons';
 import prdIcon from '@/assets/prd-icon.png';
 import uiuxIcon from '@/assets/uiux-icon.png';
@@ -15,8 +15,9 @@ import { PlanningDocViewer } from './PlanningDocViewer';
 
 interface PlanningDocsPanelProps {
   projectPath: string | undefined;
-  onStartNewWorkflow: (workflowPrompt: string, displayText?: string) => void;
+  onStartWorkflow: (workflowPrompt: string, displayText?: string) => void;
   isSessionLoading?: boolean;
+  onPlanningComplete?: () => void;
 }
 
 /**
@@ -25,12 +26,27 @@ interface PlanningDocsPanelProps {
  */
 export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   projectPath,
-  onStartNewWorkflow,
+  onStartWorkflow,
   isSessionLoading = false,
+  onPlanningComplete,
 }) => {
   const { documents, isLoading, progress } = usePlanningDocs(projectPath);
   const [activeDocId, setActiveDocId] = useState<string>('prd');
   const [activeWorkflows, setActiveWorkflows] = useState<Set<string>>(new Set());
+  const hasTriggeredComplete = useRef(false);
+
+  // Trigger completion modal once when all planning is complete
+  useEffect(() => {
+    if (progress.isAllComplete && onPlanningComplete && !hasTriggeredComplete.current) {
+      hasTriggeredComplete.current = true;
+      onPlanningComplete();
+    }
+  }, [progress.isAllComplete, onPlanningComplete]);
+
+  // Reset trigger when project changes
+  useEffect(() => {
+    hasTriggeredComplete.current = false;
+  }, [projectPath]);
 
   // Clear active workflows when documents are created
   React.useEffect(() => {
@@ -74,17 +90,19 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       console.warn('[PlanningDocsPanel] handleStartWorkflow called with invalid step');
       return;
     }
-    
-    setActiveWorkflows(prev => new Set(prev).add(step.id));
-    // 내재화된 prompt가 있으면 사용, 없으면 슬래시 커맨드 사용
+
+    // 프롬프트 체크를 먼저 수행 - 없으면 조기 종료
     const workflowPrompt = getWorkflowPrompt(step);
-    if (workflowPrompt) {
-      onStartNewWorkflow(workflowPrompt, step.displayText);
-    } else {
+    if (!workflowPrompt) {
       console.warn('[PlanningDocsPanel] No workflow prompt for step:', step.id);
+      return;
     }
+
+    // 프롬프트가 있을 때만 상태 업데이트
+    setActiveWorkflows(prev => new Set(prev).add(step.id));
+    onStartWorkflow(workflowPrompt, step.displayText);
     setActiveDocId(step.id);
-  }, [onStartNewWorkflow]);
+  }, [onStartWorkflow]);
 
   // Navigate to next/prev document
   const handleNavigate = useCallback((direction: 'prev' | 'next') => {
@@ -126,7 +144,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       {/* 상단 통일 헤더 */}
       <PanelHeader
         icon={<FileText className="w-4 h-4" />}
-        title={activeStep?.title || 'PRD'}
+        title={activeStep?.title || 'Document'}
         subtitle={`${activeStepIndex + 1}/${WORKFLOW_SEQUENCE.length}`}
         badge={
           activeDoc?.exists ? (

@@ -6,16 +6,16 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 63 |
+| **React Components** | 73 |
 | **UI Components** | 20 |
 | **Widget Components** | 29 |
 | **Preview Components** | 6 |
 | **Claude Session Components** | 1 |
 | **Zustand Stores** | 5 |
-| **Custom Hooks** | 12 |
+| **Custom Hooks** | 13 |
 | **Context Providers** | 2 |
 
-> Last synced: 2025-12-23
+> Last synced: 2025-12-25
 
 ---
 
@@ -336,6 +336,20 @@ Located in `src/hooks/` (12 hooks):
 | `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
 | `ProjectSettings` | `src/components/ProjectSettings.tsx` | Project-specific settings (Slash Commands) |
 | `SlashCommandsManager` | `src/components/SlashCommandsManager.tsx` | Slash command CRUD interface |
+| `IconPicker` | `src/components/IconPicker.tsx` | Icon selection component |
+| `SlashCommandPicker` | `src/components/SlashCommandPicker.tsx` | Slash command selection picker |
+| `UserProfileDropdown` | `src/components/UserProfileDropdown.tsx` | User profile dropdown menu |
+| `MaintenanceWorkspace` | `src/components/MaintenanceWorkspace.tsx` | Maintenance mode workspace |
+| `MvpWorkspace` | `src/components/MvpWorkspace.tsx` | MVP development workspace |
+
+### Help Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `AIChatModal` | `src/components/help/AIChatModal.tsx` | AI-powered help chat modal |
+| `FloatingHelpButton` | `src/components/help/FloatingHelpButton.tsx` | Floating help button component |
+| `PlanningCompleteModal` | `src/components/help/PlanningCompleteModal.tsx` | Planning completion modal |
+| `PreviewWelcomeModal` | `src/components/help/PreviewWelcomeModal.tsx` | Preview welcome modal |
 
 ---
 

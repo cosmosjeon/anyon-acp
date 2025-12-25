@@ -3,6 +3,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuth2Client } from 'google-auth-library';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -52,6 +53,31 @@ const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.OAUTH_REDIRECT_URI || 'http://localhost:4000/auth/google/callback'
 );
+
+// Gemini AI Client for Support Chat
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
+
+const SUPPORT_SYSTEM_PROMPT = `당신은 Anyon 서비스의 AI 서포트입니다.
+사용자가 AI 자동 개발 도구를 사용하다가 막히거나 궁금한 점이 있을 때 도움을 줍니다.
+
+역할:
+- 에러 메시지 분석 및 해결 방법 안내
+- 워크플로우 사용법 설명
+- 기획문서 작성 팁 제공
+- 개발 진행 상황 관련 질문 답변
+
+톤:
+- 친근하고 격려하는 톤 유지
+- 기술 용어는 쉽게 풀어서 설명
+- 모르는 것은 솔직히 "잘 모르겠어요"라고 답변
+- 복잡한 문제는 카카오톡 상담 권유
+
+제약:
+- 코드를 직접 작성해주지 않음 (개발 워크플로우가 처리)
+- 외부 서비스 관련 질문은 답변 불가
+- 민감한 정보 요청 거부`;
 
 // CORS Configuration - only allow specific origins
 const allowedOrigins = [
@@ -355,11 +381,67 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ============================================
+// AI Support Chat Endpoint (Gemini + SSE)
+// ============================================
+
+app.post('/api/support/chat', async (req, res) => {
+  const { messages } = req.body;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Messages array is required' });
+  }
+
+  if (!genAI) {
+    return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY.' });
+  }
+
+  // SSE 헤더 설정
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // nginx 버퍼링 비활성화
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+    // 대화 히스토리 변환 (마지막 메시지 제외)
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+    const chat = model.startChat({
+      history,
+      systemInstruction: SUPPORT_SYSTEM_PROMPT,
+    });
+
+    // 마지막 메시지로 스트리밍 응답 생성
+    const lastMessage = messages[messages.length - 1];
+    const result = await chat.sendMessageStream(lastMessage.content);
+
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('❌ Support chat error:', error);
+    res.write(`data: ${JSON.stringify({ error: 'Failed to get AI response' })}\n\n`);
+    res.end();
+  }
+});
+
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 Auth Server running on http://localhost:${PORT}`);
   console.log(`📦 Environment: ${NODE_ENV}`);
   console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✅ Configured' : '❌ Not configured'}`);
+  console.log(`🤖 Gemini AI: ${process.env.GEMINI_API_KEY ? '✅ Configured' : '❌ Not configured'}`);
   console.log(`\n📝 Development endpoints:`);
   console.log(`   POST /dev/create-user - Create test user`);
   console.log(`   GET  /dev/users - List all users`);
@@ -372,7 +454,9 @@ const server = app.listen(PORT, () => {
   console.log(`   GET    /api/settings - Get user settings`);
   console.log(`   POST   /api/settings - Save user settings`);
   console.log(`   PATCH  /api/settings/:key - Update specific setting`);
-  console.log(`   DELETE /api/settings/:key - Delete specific setting\n`);
+  console.log(`   DELETE /api/settings/:key - Delete specific setting`);
+  console.log(`\n🤖 Support Chat endpoints:`);
+  console.log(`   POST /api/support/chat - AI support chat (SSE streaming)\n`);
 });
 
 // Graceful shutdown

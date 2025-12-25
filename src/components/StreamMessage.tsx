@@ -255,7 +255,20 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       const msg = message.message || message;
       let hasContent = false;
       const contentParts: React.ReactNode[] = [];
-      
+
+      // displayText가 있으면 우선 사용 (워크플로우 짧은 표시 텍스트)
+      if (message.displayText) {
+        const { icon } = getPromptDisplayInfo(message.displayText);
+        return (
+          <div className={cn("py-3 px-4 bg-muted/30 rounded-lg", className)}>
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <WorkflowIcon icon={icon} className="h-4 w-4" />
+              <span>{message.displayText}</span>
+            </div>
+          </div>
+        );
+      }
+
       // Handle string content
       if (typeof msg.content === 'string' || (msg.content && !Array.isArray(msg.content))) {
         const contentStr = typeof msg.content === 'string' ? msg.content : String(msg.content);

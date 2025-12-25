@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { api } from '@/lib/api';
+import { ANYON_DOCS } from '@/constants/paths';
 
 /**
  * 워크플로우별 프리뷰 파일 매핑
  * 워크플로우 ID -> 생성되는 프리뷰 파일 경로 (프로젝트 루트 기준)
  */
 const WORKFLOW_PREVIEW_FILES: Record<string, string> = {
-  'startup-ux': 'anyon-docs/planning/ui-ux.html',
+  'startup-ux': `${ANYON_DOCS.PLANNING}/${ANYON_DOCS.PLANNING_FILES.UX}`,
   // 향후 다른 워크플로우 추가 가능
-  // 'startup-ui': 'anyon-docs/planning/ui-design.html',
+  // 'startup-ui': `${ANYON_DOCS.PLANNING}/ui-design.html`,
 };
 
 /**
@@ -71,7 +72,7 @@ export function useWorkflowPreview({
         const fullPath = `${projectPath}/${relativePath}`;
 
         // 파일 존재 여부 확인
-        const exists = await invoke<boolean>('check_file_exists', { filePath: fullPath });
+        const exists = await api.checkFileExists(fullPath);
 
         if (exists && !detectedFilesRef.current.has(fullPath)) {
           // 새로 생성된 파일 감지

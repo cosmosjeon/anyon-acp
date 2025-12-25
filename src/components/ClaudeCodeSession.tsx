@@ -493,12 +493,15 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
 
   const loadSessionHistory = async () => {
     if (!session) return;
-    
+
+    console.log('[ClaudeCodeSession] loadSessionHistory called with session:', session.id, session.project_id);
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const history = await api.loadSessionHistory(session.id, session.project_id);
+      console.log('[ClaudeCodeSession] Loaded history:', history?.length, 'messages');
       
       // Save session data for restoration
       if (history && history.length > 0) {
@@ -510,15 +513,38 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         );
       }
       
-      // Convert history to messages format
-      const loadedMessages: ClaudeStreamMessage[] = history.map(entry => ({
-        ...entry,
-        type: entry.type || "assistant"
-      }));
-      
+      // Convert history to messages format with displayText enrichment
+      const loadedMessages: ClaudeStreamMessage[] = history.map(entry => {
+        const message: ClaudeStreamMessage = {
+          ...entry,
+          type: entry.type || "assistant"
+        };
+
+        // user 메시지에 displayText 복원 시도
+        if (message.type === "user" && message.message?.content && !message.displayText) {
+          // content가 배열인 경우에만 find 사용
+          if (Array.isArray(message.message.content)) {
+            const textContent = message.message.content.find((c: any) => c.type === "text");
+            if (textContent?.text) {
+              // localStorage에서 저장된 displayText 찾기
+              const storedDisplayText = SessionPersistenceService.findDisplayText(
+                session.id,
+                textContent.text
+              );
+              if (storedDisplayText) {
+                message.displayText = storedDisplayText;
+              }
+            }
+          }
+        }
+
+        return message;
+      });
+
+      console.log('[ClaudeCodeSession] Setting messages:', loadedMessages.length);
       setMessages(loadedMessages);
       setRawJsonlOutput(history.map(h => JSON.stringify(h)));
-      
+
       // After loading history, we're continuing a conversation
       setIsFirstPrompt(false);
       
@@ -537,7 +563,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       });
     } catch (err) {
       logger.error("Failed to load session history:", err);
-      setError("Failed to load session history");
+      // Don't show error - just start fresh without history
+      // The session data might be corrupted or the backend session might not exist
+      setMessages([]);
     } finally {
       setIsLoading(false);
     }
@@ -650,8 +678,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       setTotalTokens(0);
 
       // Add display message to UI if provided (for workflow prompts)
+      // userMessage는 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
       if (userMessage) {
-        addUserMessageToUI({ prompt: userMessage, setMessages });
+        addUserMessageToUI({
+          prompt: userMessage,
+          displayText: userMessage,  // displayText로도 저장하여 세션 복원 시 사용
+          setMessages
+        });
       }
 
       // Send the backend prompt (full workflow prompt) to Claude

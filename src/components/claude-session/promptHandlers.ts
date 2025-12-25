@@ -316,7 +316,7 @@ export async function handleSessionInit(
             undefined, // firstMessage will be updated later
             options.messages.length
           );
-          SessionPersistenceService.saveLastSessionForTab(options.projectPath, options.tabType, message.session_id);
+          SessionPersistenceService.saveLastSessionForTab(options.projectPath, options.tabType, message.session_id, projectId);
         } else {
           SessionPersistenceService.saveSession(
             message.session_id,
@@ -325,6 +325,20 @@ export async function handleSessionInit(
             options.messages.length
           );
         }
+
+        // 세션 생성 시 기존 메시지들의 displayText를 localStorage에 저장
+        options.messages.forEach(msg => {
+          if (msg.type === 'user' && msg.displayText && msg.message?.content) {
+            const textContent = msg.message.content.find((c: any) => c.type === 'text');
+            if (textContent?.text) {
+              SessionPersistenceService.saveDisplayText(
+                message.session_id,
+                textContent.text,
+                msg.displayText
+              );
+            }
+          }
+        });
 
         // Notify parent about new session
         options.onSessionCreated?.(message.session_id);
@@ -701,12 +715,15 @@ export async function executePromptCommand(options: CommandExecutionOptions): Pr
 
 export interface UserMessageOptions {
   prompt: string;
+  /** 워크플로우 짧은 표시 텍스트 (예: "PRD 문서 작성 시작") */
+  displayText?: string;
   setMessages: React.Dispatch<React.SetStateAction<ClaudeStreamMessage[]>>;
 }
 
 export function addUserMessageToUI(options: UserMessageOptions): void {
   const userMessage: ClaudeStreamMessage = {
     type: "user",
+    displayText: options.displayText,
     message: {
       content: [
         {

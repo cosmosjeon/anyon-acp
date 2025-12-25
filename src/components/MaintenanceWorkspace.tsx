@@ -49,7 +49,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [sessionKey, setSessionKey] = useState(0);
+  const [sessionKey, _setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
 
   // Sidebar state - collapsed by default
@@ -183,36 +183,19 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
     }
   };
 
-  const handleSessionSelect = useCallback((session: Session | null) => {
-    setCurrentSession(session);
-    setSessionKey(prev => prev + 1);
-    if (session?.id && project?.path) {
-      try {
-        SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', session.id);
-      } catch (err) {
-        console.error('[MaintenanceWorkspace] Failed to save session:', err);
-      }
-    }
-  }, [project?.path]);
-
   const handleSessionCreated = useCallback((sessionId: string) => {
     if (!sessionId) {
       console.warn('[MaintenanceWorkspace] handleSessionCreated called with empty sessionId');
       return;
     }
-    if (project?.path) {
+    if (project?.path && project?.id) {
       try {
-        SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId);
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId, project.id);
       } catch (err) {
         console.error('[MaintenanceWorkspace] Failed to save session:', err);
       }
     }
-  }, [project?.path]);
-
-  const handleNewSession = useCallback(() => {
-    setCurrentSession(null);
-    setSessionKey(prev => prev + 1);
-  }, []);
+  }, [project?.path, project?.id]);
 
   const projectName = project?.path.split('/').pop() || 'Project';
 
@@ -243,9 +226,6 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
         <WorkspaceSidebar
           projectPath={project?.path || ''}
           tabType="maintenance"
-          currentSessionId={currentSession?.id}
-          onNewSession={handleNewSession}
-          onSessionSelect={handleSessionSelect}
           onLogoClick={() => setShowSettings(false)}
           onSettingsClick={() => setShowSettings(false)}
           collapsed={sidebarCollapsed}
@@ -260,13 +240,10 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
 
   return (
     <div ref={containerRef} className="h-full flex overflow-hidden bg-background">
-      {/* Sidebar with Sessions */}
+      {/* Sidebar */}
       <WorkspaceSidebar
         projectPath={project?.path || ''}
         tabType="maintenance"
-        currentSessionId={currentSession?.id}
-        onNewSession={handleNewSession}
-        onSessionSelect={handleSessionSelect}
         onLogoClick={goToProjectList}
         onSettingsClick={() => setShowSettings(true)}
         collapsed={sidebarCollapsed}

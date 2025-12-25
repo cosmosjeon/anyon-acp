@@ -253,6 +253,18 @@ export const useAuthStore = create<AuthState>()(
         accessToken: isDev ? 'dev-token' : state.accessToken,
         isAuthenticated: isDev ? true : state.isAuthenticated,
       }),
+      // Merge function to ensure dev user is always used in development mode
+      merge: (persistedState, currentState) => {
+        const merged = { ...currentState, ...(persistedState as Partial<AuthState>) };
+        // In dev mode, always override with dev user regardless of persisted state
+        if (isDev) {
+          merged.user = DEV_USER;
+          merged.subscription = DEV_SUBSCRIPTION;
+          merged.accessToken = 'dev-token';
+          merged.isAuthenticated = true;
+        }
+        return merged;
+      },
     }
   )
 );

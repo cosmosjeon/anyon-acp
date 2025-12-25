@@ -55,6 +55,8 @@ interface AgentExecutionProps {
 export interface ClaudeStreamMessage {
   type: "system" | "assistant" | "user" | "result";
   subtype?: string;
+  /** 워크플로우 짧은 표시 텍스트 (예: "PRD 문서 작성 시작") */
+  displayText?: string;
   message?: {
     content?: any[];
     usage?: {

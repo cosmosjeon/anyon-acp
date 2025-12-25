@@ -29,7 +29,7 @@ export const getPromptDisplayInfo = (prompt: string): PromptDisplayInfo => {
   }
 
   // Check development workflows
-  const devStep = DEV_WORKFLOW_SEQUENCE.find((s) => s.prompt === prompt || prompt.includes(s.prompt));
+  const devStep = DEV_WORKFLOW_SEQUENCE.find((s) => s.prompt === prompt || (s.prompt && prompt.includes(s.prompt)));
   if (devStep) {
     return { text: devStep.displayText, icon: devStep.icon };
   }
