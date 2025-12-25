@@ -52,8 +52,6 @@ export type EventName =
   // New session events
   | 'prompt_submitted'
   | 'session_stopped'
-  | 'checkpoint_created'
-  | 'checkpoint_restored'
   | 'tool_executed'
   // New agent events
   | 'agent_started'
@@ -118,7 +116,6 @@ export interface SessionProperties {
   model?: string;
   source?: string;
   resumed?: boolean;
-  checkpoint_id?: string;
 }
 
 export interface ModelProperties {
@@ -189,8 +186,6 @@ export interface EnhancedSessionStoppedProperties extends SessionStoppedProperti
   
   // Session context
   model: string;
-  has_checkpoints: boolean;
-  checkpoint_count?: number;
   was_resumed: boolean;
   
   // Agent context (if applicable)
@@ -203,16 +198,6 @@ export interface EnhancedSessionStoppedProperties extends SessionStoppedProperti
   final_state: 'success' | 'partial' | 'failed' | 'cancelled';
   has_pending_prompts: boolean;
   pending_prompts_count?: number;
-}
-
-export interface CheckpointCreatedProperties {
-  checkpoint_number: number;
-  session_duration_at_checkpoint: number;
-}
-
-export interface CheckpointRestoredProperties {
-  checkpoint_id: string;
-  time_since_checkpoint_ms: number;
 }
 
 export interface ToolExecutedProperties {

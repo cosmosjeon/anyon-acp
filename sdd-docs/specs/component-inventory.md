@@ -6,7 +6,7 @@
 
 | Category | Count |
 |----------|-------|
-| **React Components** | 73 |
+| **React Components** | 71 |
 | **UI Components** | 20 |
 | **Widget Components** | 29 |
 | **Preview Components** | 6 |
@@ -16,6 +16,7 @@
 | **Context Providers** | 2 |
 
 > Last synced: 2025-12-25
+> Note: CheckpointSettings and TimelineNavigator components removed (checkpoint system deprecated)
 
 ---
 

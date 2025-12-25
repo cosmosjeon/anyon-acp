@@ -13,16 +13,12 @@ const logger = createLogger('ClaudeCodeSession');
 import {
   Copy,
   ChevronDown,
-  GitBranch,
   ChevronUp,
   X,
-  Wrench,
   Loader2,
   AlertCircle
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type Session } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -38,10 +34,8 @@ import { StreamMessage } from "./StreamMessage";
 import { StreamingText } from "./StreamingText";
 import { FloatingPromptInput, type FloatingPromptInputRef, type ExecutionMode } from "./FloatingPromptInput";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { TimelineNavigator } from "./TimelineNavigator";
-import { CheckpointSettings } from "./CheckpointSettings";
 import { SlashCommandsManager } from "./SlashCommandsManager";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TooltipProvider, TooltipSimple } from "@/components/ui/tooltip-modern";
 import { SplitPane } from "@/components/ui/split-pane";
 import { WebviewPreview } from "./WebviewPreview";
@@ -157,14 +151,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
   const [claudeSessionId, setClaudeSessionId] = useState<string | null>(null);
-  const [showTimeline, setShowTimeline] = useState(false);
-  const [timelineVersion, setTimelineVersion] = useState(0);
-  const [timelinePanelWidth, setTimelinePanelWidth] = useState(384); // 384px = w-96
-  const [showSettings, setShowSettings] = useState(false);
-  const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSlashCommandsSettings, setShowSlashCommandsSettings] = useState(false);
-  const [forkCheckpointId, setForkCheckpointId] = useState<string | null>(null);
-  const [forkSessionName, setForkSessionName] = useState("");
   
   // Queued prompts state
   const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
@@ -187,7 +174,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const isMountedRef = useRef(true);
   const isListeningRef = useRef(false);
   const sessionStartTime = useRef<number>(Date.now());
-  const isIMEComposingRef = useRef(false);
   const currentSessionIdRef = useRef<string | null>(null);
   
   // Session metrics state for enhanced analytics
@@ -203,7 +189,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     errorsEncountered: 0,
     lastActivityTime: Date.now(),
     toolExecutionTimes: [] as number[],
-    checkpointCount: 0,
     wasResumed: !!session,
     modelChanges: [] as Array<{ from: string; to: string; timestamp: number }>,
   });
@@ -760,12 +745,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           totalTokens,
           queuedPrompts,
           trackEvent,
-          api,
-          setTimelineVersion,
           setQueuedPrompts,
-          handleSendPrompt,
-          prompt,
-          projectPath
+          handleSendPrompt
         });
 
         // Setup all event listeners
@@ -909,18 +890,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     setCopyPopoverOpen(false);
   };
 
-  const handleCheckpointSelect = async () => {
-    // Reload messages from the checkpoint
-    await loadSessionHistory();
-    // Ensure timeline reloads to highlight current checkpoint
-    setTimelineVersion((v) => v + 1);
-  };
-  
-  const handleCheckpointCreated = () => {
-    // Update checkpoint count in session metrics
-    sessionMetrics.current.checkpointCount += 1;
-  };
-
   const handleCancelExecution = async () => {
     if (!claudeSessionId) {
       logger.warn('Cannot cancel: no active session');
@@ -974,10 +943,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         
         // Session context
         model: metrics.modelChanges.length > 0 
-          ? metrics.modelChanges[metrics.modelChanges.length - 1].to 
+          ? metrics.modelChanges[metrics.modelChanges.length - 1].to
           : 'sonnet', // Default to sonnet
-        has_checkpoints: metrics.checkpointCount > 0,
-        checkpoint_count: metrics.checkpointCount,
         was_resumed: metrics.wasResumed,
         
         // Agent context (if applicable)
@@ -1035,67 +1002,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       hasActiveSessionRef.current = false;
       isListeningRef.current = false;
       setError(null);
-    }
-  };
-
-  const handleFork = (checkpointId: string) => {
-    setForkCheckpointId(checkpointId);
-    setForkSessionName(`Fork-${new Date().toISOString().slice(0, 10)}`);
-    setShowForkDialog(true);
-  };
-
-  const handleCompositionStart = () => {
-    isIMEComposingRef.current = true;
-  };
-
-  const handleCompositionEnd = () => {
-    setTimeout(() => {
-      isIMEComposingRef.current = false;
-    }, 0);
-  };
-
-  const handleConfirmFork = async () => {
-    if (!forkCheckpointId) {
-      logger.warn('Cannot fork: no checkpoint ID');
-      return;
-    }
-    if (!forkSessionName?.trim()) {
-      logger.warn('Cannot fork: no session name');
-      return;
-    }
-    if (!effectiveSession) {
-      logger.warn('Cannot fork: no effective session');
-      setError("Cannot fork: no active session");
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const newSessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await api.forkFromCheckpoint(
-        forkCheckpointId,
-        effectiveSession.id,
-        effectiveSession.project_id,
-        projectPath,
-        newSessionId,
-        forkSessionName
-      );
-
-
-      // Open the new forked session
-      // You would need to implement navigation to the new session
-      logger.log("Forked to new session:", newSessionId);
-
-      setShowForkDialog(false);
-      setForkCheckpointId(null);
-      setForkSessionName("");
-    } catch (err) {
-      logger.error("Failed to fork checkpoint:", err);
-      setError("Failed to fork checkpoint");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -1169,13 +1075,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       // Clean up listeners
       unlistenRefs.current.forEach(unlisten => unlisten());
       unlistenRefs.current = [];
-      
-      // Clear checkpoint manager when session ends
-      if (effectiveSession) {
-        api.clearCheckpointManager(effectiveSession.id).catch(err => {
-          logger.error("Failed to clear checkpoint manager:", err);
-        });
-      }
     };
   }, [effectiveSession, projectPath]);
 
@@ -1485,23 +1384,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               showExecutionMode={tabType === "maintenance"}
               extraMenuItems={
                 <>
-                  {effectiveSession && (
-                    <TooltipSimple content="Session Timeline" side="top">
-                      <motion.div
-                        whileTap={{ scale: 0.97 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowTimeline(!showTimeline)}
-                          className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                        >
-                          <GitBranch className={cn("h-3.5 w-3.5", showTimeline && "text-primary")} />
-                        </Button>
-                      </motion.div>
-                    </TooltipSimple>
-                  )}
                   {messages.length > 0 && (
                     <Popover
                       trigger={
@@ -1546,170 +1428,13 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
                       align="end"
                     />
                   )}
-                  <TooltipSimple content="Checkpoint Settings" side="top">
-                    <motion.div
-                      whileTap={{ scale: 0.97 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowSettings(!showSettings)}
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      >
-                        <Wrench className={cn("h-3.5 w-3.5", showSettings && "text-primary")} />
-                      </Button>
-                    </motion.div>
-                  </TooltipSimple>
                 </>
               }
             />
           </div>
 
         </ErrorBoundary>
-
-        {/* Timeline Overlay */}
-        <AnimatePresence>
-          {showTimeline && effectiveSession && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="fixed inset-0 bg-black/20 z-40"
-                onClick={() => setShowTimeline(false)}
-              />
-              {/* Panel */}
-              <motion.div
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="fixed right-0 top-9 h-[calc(100%-2.25rem)] bg-background border-l border-border shadow-xl z-50 overflow-hidden"
-                style={{ width: `${timelinePanelWidth}px`, minWidth: '280px', maxWidth: '800px' }}
-              >
-                {/* Resize Handle */}
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/50 active:bg-primary/70 transition-colors z-10"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    const startX = e.clientX;
-                    const startWidth = timelinePanelWidth;
-                    
-                    const handleMouseMove = (moveEvent: MouseEvent) => {
-                      const delta = startX - moveEvent.clientX;
-                      const newWidth = Math.min(800, Math.max(280, startWidth + delta));
-                      setTimelinePanelWidth(newWidth);
-                    };
-                    
-                    const handleMouseUp = () => {
-                      document.removeEventListener('mousemove', handleMouseMove);
-                      document.removeEventListener('mouseup', handleMouseUp);
-                    };
-                    
-                    document.addEventListener('mousemove', handleMouseMove);
-                    document.addEventListener('mouseup', handleMouseUp);
-                  }}
-                />
-                <div className="h-full flex flex-col">
-                  {/* Timeline Header */}
-                  <div className="flex items-center justify-between p-4 border-b border-border tauri-no-drag">
-                    <h3 className="text-lg font-semibold">작업 히스토리</h3>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowTimeline(false)}
-                      className="h-8 w-8"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  {/* Timeline Content */}
-                  <div className="flex-1 overflow-y-auto p-4">
-                    <TimelineNavigator
-                      sessionId={effectiveSession.id}
-                      projectId={effectiveSession.project_id}
-                      projectPath={projectPath}
-                      currentMessageIndex={messages.length - 1}
-                      onCheckpointSelect={handleCheckpointSelect}
-                      onFork={handleFork}
-                      onCheckpointCreated={handleCheckpointCreated}
-                      refreshVersion={timelineVersion}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
       </div>
-
-      {/* Fork Dialog */}
-      <Dialog open={showForkDialog} onOpenChange={setShowForkDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Fork Session</DialogTitle>
-            <DialogDescription>
-              Create a new session branch from the selected checkpoint.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="fork-name">New Session Name</Label>
-              <Input
-                id="fork-name"
-                placeholder="e.g., Alternative approach"
-                value={forkSessionName}
-                onChange={(e) => setForkSessionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isLoading) {
-                    if (e.nativeEvent.isComposing || isIMEComposingRef.current) {
-                      return;
-                    }
-                    handleConfirmFork();
-                  }
-                }}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowForkDialog(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmFork}
-              disabled={isLoading || !forkSessionName.trim()}
-            >
-              Create Fork
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Settings Dialog */}
-      {showSettings && effectiveSession && (
-        <Dialog open={showSettings} onOpenChange={setShowSettings}>
-          <DialogContent className="max-w-2xl">
-            <CheckpointSettings
-              sessionId={effectiveSession.id}
-              projectId={effectiveSession.project_id}
-              projectPath={projectPath}
-              onClose={() => setShowSettings(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Slash Commands Settings Dialog */}
       {showSlashCommandsSettings && (

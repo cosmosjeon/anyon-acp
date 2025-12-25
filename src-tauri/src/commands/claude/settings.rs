@@ -310,42 +310,6 @@ pub async fn save_claude_md_file(file_path: String, content: String) -> Result<S
 }
 
 #[tauri::command]
-pub async fn get_recently_modified_files(
-    app: tauri::State<'_, crate::checkpoint::state::CheckpointState>,
-    session_id: String,
-    project_id: String,
-    project_path: String,
-    minutes: i64,
-) -> Result<Vec<String>, String> {
-    use chrono::{Duration, Utc};
-
-    log::info!(
-        "Getting files modified in the last {} minutes for session: {}",
-        minutes,
-        session_id
-    );
-
-    let manager = app
-        .get_or_create_manager(session_id, project_id, PathBuf::from(project_path))
-        .await
-        .map_err(|e| format!("Failed to get checkpoint manager: {}", e))?;
-
-    let since = Utc::now() - Duration::minutes(minutes);
-    let modified_files = manager.get_files_modified_since(since).await;
-
-    // Also log the last modification time
-    if let Some(last_mod) = manager.get_last_modification_time().await {
-        log::info!("Last file modification was at: {}", last_mod);
-    }
-
-    Ok(modified_files
-        .into_iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect())
-}
-
-
-#[tauri::command]
 pub async fn check_anyon_installed(project_path: String) -> Result<AnyonInstallationStatus, String> {
     let path = PathBuf::from(&project_path);
     

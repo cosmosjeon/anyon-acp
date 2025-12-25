@@ -377,7 +377,6 @@ export interface CompletionHandlerOptions {
     errorsEncountered: number;
     lastActivityTime: number;
     toolExecutionTimes: number[];
-    checkpointCount: number;
     wasResumed: boolean;
     modelChanges: Array<{ from: string; to: string; timestamp: number }>;
     promptsSent: number;
@@ -388,15 +387,8 @@ export interface CompletionHandlerOptions {
   trackEvent: {
     enhancedSessionStopped: (params: any) => void;
   };
-  api: {
-    getCheckpointSettings: (sessionId: string, projectId: string, projectPath: string) => Promise<any>;
-    checkAutoCheckpoint: (sessionId: string, projectId: string, projectPath: string, prompt: string) => Promise<boolean>;
-  };
-  setTimelineVersion: React.Dispatch<React.SetStateAction<number>>;
   setQueuedPrompts: React.Dispatch<React.SetStateAction<QueuedPrompt[]>>;
   handleSendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus") => Promise<void>;
-  prompt: string;
-  projectPath: string;
 }
 
 export function createCompletionHandler(options: CompletionHandlerOptions) {
@@ -450,8 +442,6 @@ export function createCompletionHandler(options: CompletionHandlerOptions) {
         model: metrics.modelChanges.length > 0
           ? metrics.modelChanges[metrics.modelChanges.length - 1].to
           : 'sonnet',
-        has_checkpoints: metrics.checkpointCount > 0,
-        checkpoint_count: metrics.checkpointCount,
         was_resumed: metrics.wasResumed,
 
         // Agent context (if applicable)
@@ -465,29 +455,6 @@ export function createCompletionHandler(options: CompletionHandlerOptions) {
         has_pending_prompts: options.queuedPrompts.length > 0,
         pending_prompts_count: options.queuedPrompts.length,
       });
-    }
-
-    if (options.effectiveSession && success) {
-      try {
-        const settings = await options.api.getCheckpointSettings(
-          options.effectiveSession.id,
-          options.effectiveSession.project_id,
-          options.projectPath
-        );
-
-        if (settings.auto_checkpoint_enabled) {
-          await options.api.checkAutoCheckpoint(
-            options.effectiveSession.id,
-            options.effectiveSession.project_id,
-            options.projectPath,
-            options.prompt
-          );
-          // Reload timeline to show new checkpoint
-          options.setTimelineVersion((v) => v + 1);
-        }
-      } catch (err) {
-        console.error('Failed to check auto checkpoint:', err);
-      }
     }
 
     // Process queued prompts after completion
