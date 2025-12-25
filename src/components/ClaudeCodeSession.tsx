@@ -1303,19 +1303,23 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               projectPath={projectPath}
               embedded={embedded}
               showExecutionMode={tabType === "maintenance"}
-              extraMenuItems={[
-                {
-                  icon: <Plus className="h-4 w-4" />,
-                  label: "New Session",
-                  onClick: () => {
+              extraMenuItems={
+                <button
+                  onClick={() => {
                     setMessages([]);
                     setError(null);
                     setIsFirstPrompt(true);
                     setTotalTokens(0);
                     currentSessionIdRef.current = null;
-                  }
-                }
-              ]}
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/80 transition-colors w-full"
+                >
+                  <span className="p-1.5 rounded-lg bg-muted/80">
+                    <Plus className="h-4 w-4 text-primary" />
+                  </span>
+                  <span className="flex-1 text-left text-sm">새 세션</span>
+                </button>
+              }
             />
           </div>
 
