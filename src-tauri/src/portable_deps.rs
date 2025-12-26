@@ -1,6 +1,24 @@
 use std::path::PathBuf;
 use tauri::Manager;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = std::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    std::process::Command::new(program)
+}
+
 /// Get the path to the bundled Git executable
 ///
 /// This function searches for Git in the following order:
@@ -24,10 +42,7 @@ pub fn get_git_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     }
 
     // Fallback to system Git
-    if let Ok(output) = std::process::Command::new("where")
-        .arg("git")
-        .output()
-    {
+    if let Ok(output) = create_hidden_command("where").arg("git").output() {
         if output.status.success() {
             let path_str = String::from_utf8_lossy(&output.stdout);
             let first_path = path_str.lines().next().unwrap_or("").trim();
@@ -39,7 +54,10 @@ pub fn get_git_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    Err("Git not found. Please ensure Git is installed or bundled with the application.".to_string())
+    Err(
+        "Git not found. Please ensure Git is installed or bundled with the application."
+            .to_string(),
+    )
 }
 
 /// Get the path to the bundled Node.js executable
@@ -64,10 +82,7 @@ pub fn get_node_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     }
 
     // Fallback to system Node
-    if let Ok(output) = std::process::Command::new("where")
-        .arg("node")
-        .output()
-    {
+    if let Ok(output) = create_hidden_command("where").arg("node").output() {
         if output.status.success() {
             let path_str = String::from_utf8_lossy(&output.stdout);
             let first_path = path_str.lines().next().unwrap_or("").trim();
@@ -79,7 +94,10 @@ pub fn get_node_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    Err("Node.js not found. Please ensure Node.js is installed or bundled with the application.".to_string())
+    Err(
+        "Node.js not found. Please ensure Node.js is installed or bundled with the application."
+            .to_string(),
+    )
 }
 
 /// Get the path to the bundled NPX executable
@@ -104,10 +122,7 @@ pub fn get_npx_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     }
 
     // Fallback to system NPX
-    if let Ok(output) = std::process::Command::new("where")
-        .arg("npx")
-        .output()
-    {
+    if let Ok(output) = create_hidden_command("where").arg("npx").output() {
         if output.status.success() {
             let path_str = String::from_utf8_lossy(&output.stdout);
             let first_path = path_str.lines().next().unwrap_or("").trim();
@@ -119,16 +134,17 @@ pub fn get_npx_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    Err("NPX not found. Please ensure Node.js is installed or bundled with the application.".to_string())
+    Err(
+        "NPX not found. Please ensure Node.js is installed or bundled with the application."
+            .to_string(),
+    )
 }
 
 /// Get the directory containing bundled Node.js binaries
 /// This is useful for setting up the PATH environment variable
 pub fn get_node_bin_dir(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     if let Ok(resource_path) = app_handle.path().resource_dir() {
-        let node_dir = resource_path
-            .join("resources")
-            .join("node-portable");
+        let node_dir = resource_path.join("resources").join("node-portable");
 
         if node_dir.exists() {
             return Some(node_dir);

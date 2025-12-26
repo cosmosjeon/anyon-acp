@@ -9,6 +9,28 @@ use std::process::Command;
 use tauri::Manager;
 use tokio::process::Command as TokioCommand;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+// ============================================================================
+// Windows Hidden Command Helper
+// ============================================================================
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> Command {
+    Command::new(program)
+}
+
 /// Type of Claude installation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum InstallationType {
@@ -171,7 +193,7 @@ fn discover_system_installations() -> Vec<ClaudeInstallation> {
 fn try_which_command() -> Option<ClaudeInstallation> {
     debug!("Trying 'which claude' to find binary...");
 
-    match Command::new("which").arg("claude").output() {
+    match create_hidden_command("which").arg("claude").output() {
         Ok(output) if output.status.success() => {
             let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -215,7 +237,7 @@ fn try_which_command() -> Option<ClaudeInstallation> {
 fn try_which_command() -> Option<ClaudeInstallation> {
     debug!("Trying 'where claude' to find binary...");
 
-    match Command::new("where").arg("claude").output() {
+    match create_hidden_command("where").arg("claude").output() {
         Ok(output) if output.status.success() => {
             let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -413,7 +435,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
     }
 
     // Also check if claude is available in PATH (without full path)
-    if let Ok(output) = Command::new("claude").arg("--version").output() {
+    if let Ok(output) = create_hidden_command("claude").arg("--version").output() {
         if output.status.success() {
             debug!("claude is available in PATH");
             let version = extract_version_from_output(&output.stdout);
@@ -482,7 +504,10 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
     }
 
     // Also check if claude is available in PATH (without full path)
-    if let Ok(output) = Command::new("claude.exe").arg("--version").output() {
+    if let Ok(output) = create_hidden_command("claude.exe")
+        .arg("--version")
+        .output()
+    {
         if output.status.success() {
             debug!("claude.exe is available in PATH");
             let version = extract_version_from_output(&output.stdout);
@@ -501,7 +526,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
 
 /// Get Claude version by running --version command
 fn get_claude_version(path: &str) -> Result<Option<String>, String> {
-    match Command::new(path).arg("--version").output() {
+    match create_hidden_command(path).arg("--version").output() {
         Ok(output) => {
             if output.status.success() {
                 Ok(extract_version_from_output(&output.stdout))
@@ -724,14 +749,19 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
         info!("Claude OAuth is active - using OAuth authentication");
         return CommandEnvConfig {
             env_vars,
-            modified_path: compute_modified_path(program, &std::env::var("PATH").unwrap_or_default()),
+            modified_path: compute_modified_path(
+                program,
+                &std::env::var("PATH").unwrap_or_default(),
+            ),
         };
     }
 
     // Priority 2: Check for ANYON API mode (settings.local.json with ANTHROPIC_BASE_URL)
     if let Some(claude_env_vars) = get_claude_settings_env_vars() {
         // Only use settings.local.json if ANTHROPIC_BASE_URL is present (indicates ANYON API mode)
-        let has_base_url = claude_env_vars.iter().any(|(k, _)| k == "ANTHROPIC_BASE_URL");
+        let has_base_url = claude_env_vars
+            .iter()
+            .any(|(k, _)| k == "ANTHROPIC_BASE_URL");
         if has_base_url {
             info!("ANYON API mode detected - using proxy authentication");
             for (key, value) in claude_env_vars {
@@ -740,7 +770,10 @@ fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
             }
             return CommandEnvConfig {
                 env_vars,
-                modified_path: compute_modified_path(program, &std::env::var("PATH").unwrap_or_default()),
+                modified_path: compute_modified_path(
+                    program,
+                    &std::env::var("PATH").unwrap_or_default(),
+                ),
             };
         }
     }
@@ -823,7 +856,10 @@ fn is_claude_oauth_active() -> bool {
             if let Ok(entry) = Entry::new(CLAUDE_CODE_KEYCHAIN_SERVICE, &account) {
                 if let Ok(creds_json) = entry.get_password() {
                     if check_oauth_valid(&creds_json) {
-                        debug!("Claude OAuth found (service: {}, account: {}), valid: true", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+                        debug!(
+                            "Claude OAuth found (service: {}, account: {}), valid: true",
+                            CLAUDE_CODE_KEYCHAIN_SERVICE, account
+                        );
                         return true;
                     }
                 }
@@ -866,7 +902,10 @@ fn is_claude_oauth_active() -> bool {
                 if let Ok(entry) = Entry::new(service, account) {
                     if let Ok(creds_json) = entry.get_password() {
                         if check_oauth_valid(&creds_json) {
-                            debug!("Claude OAuth found (service: {}, account: {}), valid: true", service, account);
+                            debug!(
+                                "Claude OAuth found (service: {}, account: {}), valid: true",
+                                service, account
+                            );
                             return true;
                         }
                     }
@@ -899,7 +938,11 @@ fn get_claude_settings_env_vars() -> Option<Vec<(String, String)>> {
 
     for (key, value) in env_obj {
         if let Some(val_str) = value.as_str() {
-            debug!("Found env var in Claude settings: {}={}", key, &val_str[..val_str.len().min(20)]);
+            debug!(
+                "Found env var in Claude settings: {}={}",
+                key,
+                &val_str[..val_str.len().min(20)]
+            );
             env_vars.push((key.clone(), val_str.to_string()));
         }
     }

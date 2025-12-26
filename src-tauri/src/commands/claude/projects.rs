@@ -2,7 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::helpers::{get_claude_dir, get_project_path_from_sessions, decode_project_path, extract_first_user_message};
+use super::helpers::{
+    decode_project_path, extract_first_user_message, get_claude_dir, get_project_path_from_sessions,
+};
 use super::shared::{Project, Session};
 
 #[tauri::command]
@@ -58,34 +60,33 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
             let project_path = if meta_file.exists() {
                 // Read from metadata file
                 match fs::read_to_string(&meta_file) {
-                    Ok(content) => {
-                        match serde_json::from_str::<serde_json::Value>(&content) {
-                            Ok(meta) => {
-                                meta.get("path")
-                                    .and_then(|p| p.as_str())
-                                    .map(|s| s.to_string())
-                                    .unwrap_or_else(|| {
-                                        log::warn!("Invalid metadata file format, falling back to sessions");
-                                        match get_project_path_from_sessions(&path) {
-                                            Ok(path) => path,
-                                            Err(_) => decode_project_path(dir_name)
-                                        }
-                                    })
-                            }
-                            Err(_) => {
-                                log::warn!("Failed to parse metadata file, falling back to sessions");
+                    Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+                        Ok(meta) => meta
+                            .get("path")
+                            .and_then(|p| p.as_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| {
+                                log::warn!(
+                                    "Invalid metadata file format, falling back to sessions"
+                                );
                                 match get_project_path_from_sessions(&path) {
                                     Ok(path) => path,
-                                    Err(_) => decode_project_path(dir_name)
+                                    Err(_) => decode_project_path(dir_name),
                                 }
+                            }),
+                        Err(_) => {
+                            log::warn!("Failed to parse metadata file, falling back to sessions");
+                            match get_project_path_from_sessions(&path) {
+                                Ok(path) => path,
+                                Err(_) => decode_project_path(dir_name),
                             }
                         }
-                    }
+                    },
                     Err(_) => {
                         log::warn!("Failed to read metadata file, falling back to sessions");
                         match get_project_path_from_sessions(&path) {
                             Ok(path) => path,
-                            Err(_) => decode_project_path(dir_name)
+                            Err(_) => decode_project_path(dir_name),
                         }
                     }
                 }
@@ -102,7 +103,10 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
 
             // Check if the actual project folder still exists
             if !PathBuf::from(&project_path).exists() {
-                log::warn!("Project folder no longer exists: {}, skipping", project_path);
+                log::warn!(
+                    "Project folder no longer exists: {}, skipping",
+                    project_path
+                );
                 continue;
             }
 
@@ -202,8 +206,11 @@ pub async fn create_project(path: String) -> Result<Project, String> {
         "path": path,
         "project_id": project_id,
     });
-    fs::write(&meta_file, serde_json::to_string_pretty(&meta_data).unwrap())
-        .map_err(|e| format!("Failed to write project metadata: {}", e))?;
+    fs::write(
+        &meta_file,
+        serde_json::to_string_pretty(&meta_data).unwrap(),
+    )
+    .map_err(|e| format!("Failed to write project metadata: {}", e))?;
 
     // Get creation time
     let metadata = fs::metadata(&project_dir)

@@ -12,75 +12,44 @@
 //! - `settings`: Settings and configuration (Claude settings, system prompt, git operations)
 
 // Submodules
-mod shared;
+pub mod execution;
+pub mod filesystem;
 mod helpers;
 pub mod projects;
 pub mod sessions;
-pub mod execution;
-pub mod filesystem;
 pub mod settings;
+mod shared;
 
 // Re-export shared types
 pub use shared::{
-    ClaudeProcessState, Project, Session, ClaudeSettings,
-    ClaudeVersionStatus, ClaudeMdFile, FileEntry,
+    ClaudeMdFile, ClaudeProcessState, ClaudeSettings, ClaudeVersionStatus, FileEntry, Project,
+    Session,
 };
 
 // Re-export all public functions
 
 // Projects
-pub use projects::{
-    get_home_directory,
-    list_projects,
-    create_project,
-    get_project_sessions,
-};
+pub use projects::{create_project, get_home_directory, get_project_sessions, list_projects};
 
 // Sessions
-pub use sessions::{
-    open_new_session,
-    load_session_history,
-};
+pub use sessions::{load_session_history, open_new_session};
 
 // Execution
 pub use execution::{
-    execute_claude_code,
-    continue_claude_code,
-    resume_claude_code,
-    cancel_claude_execution,
-    list_running_claude_sessions,
-    get_claude_session_output,
+    cancel_claude_execution, continue_claude_code, execute_claude_code, get_claude_session_output,
+    list_running_claude_sessions, resume_claude_code,
 };
 
 // Filesystem
 pub use filesystem::{
-    list_directory_contents,
-    search_files,
-    read_file_content,
-    write_file_content,
-    check_file_exists,
-    get_file_metadata,
-    list_anyon_docs,
+    check_file_exists, get_file_metadata, list_anyon_docs, list_directory_contents,
+    read_file_content, search_files, write_file_content,
 };
 
 // Settings
 pub use settings::{
-    get_claude_settings,
-    save_claude_settings,
-    get_system_prompt,
-    save_system_prompt,
-    check_claude_version,
-    find_claude_md_files,
-    read_claude_md_file,
-    save_claude_md_file,
-    check_anyon_installed,
-    run_npx_anyon_agents,
-    check_is_git_repo,
-    init_git_repo,
-    git_add_all,
-    git_commit,
-    git_set_remote,
-    git_push,
-    git_status,
-    git_current_branch,
+    check_anyon_installed, check_claude_version, check_is_git_repo, find_claude_md_files,
+    get_claude_settings, get_system_prompt, git_add_all, git_commit, git_current_branch, git_push,
+    git_set_remote, git_status, init_git_repo, read_claude_md_file, run_npx_anyon_agents,
+    save_claude_md_file, save_claude_settings, save_system_prompt,
 };

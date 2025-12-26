@@ -1,11 +1,29 @@
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> Command {
+    Command::new(program)
+}
+
 /// Get the current HEAD commit SHA of a git repository
 #[tauri::command]
 pub async fn get_git_head_sha(project_path: String) -> Result<String, String> {
     log::info!("Getting git HEAD SHA for: {}", project_path);
 
-    let output = Command::new("git")
+    let output = create_hidden_command("git")
         .args(["rev-parse", "HEAD"])
         .current_dir(&project_path)
         .output()
@@ -27,21 +45,21 @@ pub async fn has_git_uncommitted_changes(project_path: String) -> Result<bool, S
     log::info!("Checking for uncommitted changes in: {}", project_path);
 
     // Check for staged changes
-    let staged = Command::new("git")
+    let staged = create_hidden_command("git")
         .args(["diff", "--cached", "--quiet"])
         .current_dir(&project_path)
         .status()
         .map_err(|e| format!("Failed to execute git diff --cached: {}", e))?;
 
     // Check for unstaged changes
-    let unstaged = Command::new("git")
+    let unstaged = create_hidden_command("git")
         .args(["diff", "--quiet"])
         .current_dir(&project_path)
         .status()
         .map_err(|e| format!("Failed to execute git diff: {}", e))?;
 
     // Check for untracked files
-    let untracked = Command::new("git")
+    let untracked = create_hidden_command("git")
         .args(["ls-files", "--others", "--exclude-standard"])
         .current_dir(&project_path)
         .output()
@@ -61,7 +79,7 @@ pub async fn git_reset_hard(project_path: String, commit_sha: String) -> Result<
     log::info!("Resetting {} to commit {}", project_path, commit_sha);
 
     // First, clean untracked files
-    let clean_output = Command::new("git")
+    let clean_output = create_hidden_command("git")
         .args(["clean", "-fd"])
         .current_dir(&project_path)
         .output()
@@ -73,7 +91,7 @@ pub async fn git_reset_hard(project_path: String, commit_sha: String) -> Result<
     }
 
     // Then reset to the specified commit
-    let reset_output = Command::new("git")
+    let reset_output = create_hidden_command("git")
         .args(["reset", "--hard", &commit_sha])
         .current_dir(&project_path)
         .output()
@@ -101,7 +119,7 @@ pub async fn get_git_diff_summary(
     );
 
     // Get the number of commits that would be rolled back
-    let log_output = Command::new("git")
+    let log_output = create_hidden_command("git")
         .args([
             "rev-list",
             "--count",
@@ -121,7 +139,7 @@ pub async fn get_git_diff_summary(
     };
 
     // Get file change statistics
-    let diff_stat = Command::new("git")
+    let diff_stat = create_hidden_command("git")
         .args(["diff", "--stat", &target_commit_sha, "HEAD"])
         .current_dir(&project_path)
         .output()
@@ -130,7 +148,7 @@ pub async fn get_git_diff_summary(
     let stat_output = String::from_utf8_lossy(&diff_stat.stdout).to_string();
 
     // Get list of changed files
-    let diff_files = Command::new("git")
+    let diff_files = create_hidden_command("git")
         .args(["diff", "--name-only", &target_commit_sha, "HEAD"])
         .current_dir(&project_path)
         .output()

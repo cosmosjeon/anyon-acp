@@ -219,18 +219,20 @@ pub async fn read_file_content(file_path: String) -> Result<String, String> {
     }
 
     // Check file size to prevent reading very large files
-    let metadata = fs::metadata(&path)
-        .map_err(|e| format!("Failed to read file metadata: {}", e))?;
+    let metadata =
+        fs::metadata(&path).map_err(|e| format!("Failed to read file metadata: {}", e))?;
 
     const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB limit
     if metadata.len() > MAX_FILE_SIZE {
         log::warn!("File is too large: {} bytes", metadata.len());
-        return Err(format!("File is too large (max {}MB)", MAX_FILE_SIZE / 1024 / 1024));
+        return Err(format!(
+            "File is too large (max {}MB)",
+            MAX_FILE_SIZE / 1024 / 1024
+        ));
     }
 
     // Read the file content
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
 
     Ok(content)
 }
@@ -257,8 +259,7 @@ pub async fn write_file_content(file_path: String, content: String) -> Result<()
     }
 
     // Write the file content
-    fs::write(&path, &content)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    fs::write(&path, &content).map_err(|e| format!("Failed to write file: {}", e))?;
 
     log::info!("Successfully wrote {} bytes to file", content.len());
     Ok(())
@@ -284,8 +285,7 @@ pub async fn get_file_metadata(file_path: String) -> Result<Option<FileMetadata>
         return Ok(None);
     }
 
-    let metadata = fs::metadata(&path)
-        .map_err(|e| format!("Failed to get metadata: {}", e))?;
+    let metadata = fs::metadata(&path).map_err(|e| format!("Failed to get metadata: {}", e))?;
 
     let modified = metadata
         .modified()
@@ -302,7 +302,9 @@ pub async fn get_file_metadata(file_path: String) -> Result<Option<FileMetadata>
 
 #[tauri::command]
 pub async fn list_anyon_docs(project_path: String) -> Result<Vec<String>, String> {
-    let docs_path = PathBuf::from(&project_path).join("anyon-docs").join("planning");
+    let docs_path = PathBuf::from(&project_path)
+        .join("anyon-docs")
+        .join("planning");
 
     if !docs_path.exists() {
         return Ok(vec![]);

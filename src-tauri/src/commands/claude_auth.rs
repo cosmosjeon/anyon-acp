@@ -1,7 +1,7 @@
+use crate::claude_binary::find_claude_binary;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::process::Command;
-use crate::claude_binary::find_claude_binary;
 
 // Claude Code CLI가 사용하는 Keychain 서비스명 (OAuth 토큰 저장)
 const CLAUDE_CODE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
@@ -30,7 +30,13 @@ fn get_account_candidates() -> Vec<String> {
 #[cfg(target_os = "windows")]
 fn get_windows_account_candidates() -> Vec<String> {
     let username = std::env::var("USERNAME").unwrap_or_else(|_| "default".to_string());
-    vec![username, "default".to_string(), "claude".to_string(), "Claude Code".to_string(), "claude-code".to_string()]
+    vec![
+        username,
+        "default".to_string(),
+        "claude".to_string(),
+        "Claude Code".to_string(),
+        "claude-code".to_string(),
+    ]
 }
 
 // ============================================================
@@ -115,48 +121,44 @@ pub async fn claude_auth_check(_app_handle: tauri::AppHandle) -> Result<ClaudeAu
 
     // 2. Claude Code OAuth 토큰 확인
     match read_claude_credentials() {
-        Ok((credentials, platform_note)) => {
-            match credentials.claude_ai_oauth {
-                Some(oauth) => {
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis() as i64)
-                        .unwrap_or(0);
+        Ok((credentials, platform_note)) => match credentials.claude_ai_oauth {
+            Some(oauth) => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
 
-                    let is_expired = oauth.expires_at < now;
+                let is_expired = oauth.expires_at < now;
 
-                    let display_info = oauth.subscription_type.as_ref().map(|t| {
-                        match t.as_str() {
-                            "max" => "Claude Max".to_string(),
-                            "pro" => "Claude Pro".to_string(),
-                            "free" => "무료 플랜".to_string(),
-                            other => other.to_string(),
-                        }
-                    });
+                let display_info = oauth.subscription_type.as_ref().map(|t| match t.as_str() {
+                    "max" => "Claude Max".to_string(),
+                    "pro" => "Claude Pro".to_string(),
+                    "free" => "무료 플랜".to_string(),
+                    other => other.to_string(),
+                });
 
-                    Ok(ClaudeAuthStatus {
-                        is_authenticated: !is_expired,
-                        auth_method: "oauth".to_string(),
-                        subscription_type: oauth.subscription_type,
-                        expires_at: Some(oauth.expires_at),
-                        is_expired,
-                        display_info,
-                        error: None,
-                        platform_note,
-                    })
-                }
-                None => Ok(ClaudeAuthStatus {
-                    is_authenticated: false,
-                    auth_method: "none".to_string(),
-                    subscription_type: None,
-                    expires_at: None,
-                    is_expired: false,
-                    display_info: None,
+                Ok(ClaudeAuthStatus {
+                    is_authenticated: !is_expired,
+                    auth_method: "oauth".to_string(),
+                    subscription_type: oauth.subscription_type,
+                    expires_at: Some(oauth.expires_at),
+                    is_expired,
+                    display_info,
                     error: None,
                     platform_note,
-                }),
+                })
             }
-        }
+            None => Ok(ClaudeAuthStatus {
+                is_authenticated: false,
+                auth_method: "none".to_string(),
+                subscription_type: None,
+                expires_at: None,
+                is_expired: false,
+                display_info: None,
+                error: None,
+                platform_note,
+            }),
+        },
         Err(e) => {
             // Keychain/Credential Manager 접근 실패 등은 "인증 안됨"으로 처리
             log::warn!("Credentials 읽기 실패: {}", e);
@@ -218,20 +220,32 @@ fn read_credentials_macos() -> Result<(ClaudeCredentials, Option<String>), Strin
     // 1차: Claude Code-credentials + 현재 사용자명 / default
     for account in get_account_candidates() {
         if let Some(creds) = try_keychain_lookup(CLAUDE_CODE_KEYCHAIN_SERVICE, &account) {
-            log::info!("Found credentials: service={}, account={}", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+            log::info!(
+                "Found credentials: service={}, account={}",
+                CLAUDE_CODE_KEYCHAIN_SERVICE,
+                account
+            );
             return Ok((creds, Some(format!("Keychain (account: {})", account))));
         }
     }
 
     // 2차: Legacy Claude Safe Storage
     if let Some(creds) = try_keychain_lookup(CLAUDE_LEGACY_SERVICE, CLAUDE_LEGACY_ACCOUNT) {
-        log::info!("Found credentials: service={} (legacy)", CLAUDE_LEGACY_SERVICE);
+        log::info!(
+            "Found credentials: service={} (legacy)",
+            CLAUDE_LEGACY_SERVICE
+        );
         return Ok((creds, Some("Keychain (legacy)".to_string())));
     }
 
     // 인증 정보 없음
     log::info!("No Claude credentials found in Keychain");
-    Ok((ClaudeCredentials { claude_ai_oauth: None }, None))
+    Ok((
+        ClaudeCredentials {
+            claude_ai_oauth: None,
+        },
+        None,
+    ))
 }
 
 // ============================================================
@@ -240,8 +254,7 @@ fn read_credentials_macos() -> Result<(ClaudeCredentials, Option<String>), Strin
 
 #[cfg(target_os = "linux")]
 fn read_credentials_linux() -> Result<(ClaudeCredentials, Option<String>), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     let creds_path = home.join(".claude").join(".credentials.json");
 
@@ -292,7 +305,12 @@ fn read_credentials_linux() -> Result<(ClaudeCredentials, Option<String>), Strin
     };
 
     log::info!("No Claude credentials found on Linux");
-    Ok((ClaudeCredentials { claude_ai_oauth: None }, note))
+    Ok((
+        ClaudeCredentials {
+            claude_ai_oauth: None,
+        },
+        note,
+    ))
 }
 
 // ============================================================
@@ -301,8 +319,7 @@ fn read_credentials_linux() -> Result<(ClaudeCredentials, Option<String>), Strin
 
 #[cfg(target_os = "windows")]
 fn read_credentials_windows() -> Result<(ClaudeCredentials, Option<String>), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     // 1순위: 파일에서 읽기 (%USERPROFILE%\.claude\.credentials.json)
     let creds_path = home.join(".claude").join(".credentials.json");
@@ -327,12 +344,20 @@ fn read_credentials_windows() -> Result<(ClaudeCredentials, Option<String>), Str
                 if let Ok(password) = entry.get_password() {
                     match serde_json::from_str::<ClaudeCredentials>(&password) {
                         Ok(credentials) => {
-                            let note = format!("Credential Manager (service: {}, account: {})", service, account);
+                            let note = format!(
+                                "Credential Manager (service: {}, account: {})",
+                                service, account
+                            );
                             log::info!("Found credentials: {}", note);
                             return Ok((credentials, Some(note)));
                         }
                         Err(e) => {
-                            log::debug!("Credential Manager JSON 파싱 실패 (service: {}, account: {}): {}", service, account, e);
+                            log::debug!(
+                                "Credential Manager JSON 파싱 실패 (service: {}, account: {}): {}",
+                                service,
+                                account,
+                                e
+                            );
                         }
                     }
                 }
@@ -357,8 +382,12 @@ fn read_credentials_windows() -> Result<(ClaudeCredentials, Option<String>), Str
 #[tauri::command]
 pub async fn claude_auth_open_terminal(app_handle: tauri::AppHandle) -> Result<(), String> {
     // 1. Claude binary 경로 확인
-    let claude_path = find_claude_binary(&app_handle)
-        .map_err(|e| format!("Claude Code CLI를 찾을 수 없습니다: {}. Claude Code가 설치되어 있는지 확인해주세요.", e))?;
+    let claude_path = find_claude_binary(&app_handle).map_err(|e| {
+        format!(
+            "Claude Code CLI를 찾을 수 없습니다: {}. Claude Code가 설치되어 있는지 확인해주세요.",
+            e
+        )
+    })?;
 
     log::info!("Found Claude binary at: {}", claude_path);
 
@@ -369,9 +398,7 @@ pub async fn claude_auth_open_terminal(app_handle: tauri::AppHandle) -> Result<(
 #[cfg(target_os = "macos")]
 fn open_terminal_with_login(claude_path: &str) -> Result<(), String> {
     // 경로에 공백/특수문자가 있을 수 있으므로 따옴표로 감싸고 이스케이프
-    let escaped_path = claude_path
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"");
+    let escaped_path = claude_path.replace("\\", "\\\\").replace("\"", "\\\"");
 
     // Claude Code를 시작하고 /login을 입력하라는 안내 메시지 표시
     // 터미널에서 claude를 실행하고 사용자가 /login을 입력하도록 유도
@@ -398,18 +425,41 @@ fn open_terminal_with_login(claude_path: &str) -> Result<(), String> {
 
     // 여러 터미널 에뮬레이터 시도
     let terminals: Vec<(&str, Vec<String>)> = vec![
-        ("gnome-terminal", vec!["--".to_string(), "bash".to_string(), "-c".to_string(), login_cmd.clone()]),
-        ("konsole", vec!["-e".to_string(), "bash".to_string(), "-c".to_string(), login_cmd.clone()]),
-        ("xfce4-terminal", vec!["-e".to_string(), format!("bash -c \"{}\"", login_cmd)]),
-        ("xterm", vec!["-e".to_string(), "bash".to_string(), "-c".to_string(), login_cmd.clone()]),
+        (
+            "gnome-terminal",
+            vec![
+                "--".to_string(),
+                "bash".to_string(),
+                "-c".to_string(),
+                login_cmd.clone(),
+            ],
+        ),
+        (
+            "konsole",
+            vec![
+                "-e".to_string(),
+                "bash".to_string(),
+                "-c".to_string(),
+                login_cmd.clone(),
+            ],
+        ),
+        (
+            "xfce4-terminal",
+            vec!["-e".to_string(), format!("bash -c \"{}\"", login_cmd)],
+        ),
+        (
+            "xterm",
+            vec![
+                "-e".to_string(),
+                "bash".to_string(),
+                "-c".to_string(),
+                login_cmd.clone(),
+            ],
+        ),
     ];
 
     for (terminal, args) in &terminals {
-        if Command::new(terminal)
-            .args(args)
-            .spawn()
-            .is_ok()
-        {
+        if Command::new(terminal).args(args).spawn().is_ok() {
             log::info!("터미널 열림: {}", terminal);
             return Ok(());
         }
@@ -468,7 +518,8 @@ pub async fn claude_auth_save_api_key(api_key: String) -> Result<(), String> {
     let entry = keyring::Entry::new(ANYON_SERVICE_NAME, API_KEY_ACCOUNT)
         .map_err(|e| format!("Keyring Entry 생성 실패: {}", e))?;
 
-    entry.set_password(&api_key)
+    entry
+        .set_password(&api_key)
         .map_err(|e| format!("API 키 저장 실패: {}", e))?;
 
     // 3. apiKeyHelper 스크립트 생성 (Windows는 스킵하고 안내 메시지만)
@@ -480,7 +531,9 @@ pub async fn claude_auth_save_api_key(api_key: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        log::info!("Windows에서는 API Key Helper 스크립트가 지원되지 않습니다. Keychain에만 저장됩니다.");
+        log::info!(
+            "Windows에서는 API Key Helper 스크립트가 지원되지 않습니다. Keychain에만 저장됩니다."
+        );
     }
 
     log::info!("API 키가 저장되었습니다.");
@@ -512,11 +565,15 @@ pub async fn claude_auth_delete_api_key() -> Result<(), String> {
 
 /// API 키 유효성 검증 (Anthropic API 호출)
 #[tauri::command]
-pub async fn claude_auth_validate_api_key(api_key: String) -> Result<ApiKeyValidationResult, String> {
+pub async fn claude_auth_validate_api_key(
+    api_key: String,
+) -> Result<ApiKeyValidationResult, String> {
     if !api_key.starts_with("sk-ant-") {
         return Ok(ApiKeyValidationResult {
             valid: false,
-            error: Some("API 키 형식이 올바르지 않습니다. 'sk-ant-'로 시작해야 합니다.".to_string()),
+            error: Some(
+                "API 키 형식이 올바르지 않습니다. 'sk-ant-'로 시작해야 합니다.".to_string(),
+            ),
         });
     }
 
@@ -530,7 +587,10 @@ pub async fn claude_auth_validate_api_key(api_key: String) -> Result<ApiKeyValid
         .map_err(|e| format!("API 호출 실패: {}", e))?;
 
     match response.status().as_u16() {
-        200 => Ok(ApiKeyValidationResult { valid: true, error: None }),
+        200 => Ok(ApiKeyValidationResult {
+            valid: true,
+            error: None,
+        }),
         401 => Ok(ApiKeyValidationResult {
             valid: false,
             error: Some("API 키가 유효하지 않습니다.".to_string()),
@@ -557,12 +617,10 @@ pub async fn claude_auth_validate_api_key(api_key: String) -> Result<ApiKeyValid
 /// apiKeyHelper 스크립트 생성 (macOS/Linux only)
 #[cfg(not(target_os = "windows"))]
 fn create_api_key_helper_script() -> Result<(), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     let claude_dir = home.join(".claude");
-    fs::create_dir_all(&claude_dir)
-        .map_err(|e| format!("~/.claude 디렉토리 생성 실패: {}", e))?;
+    fs::create_dir_all(&claude_dir).map_err(|e| format!("~/.claude 디렉토리 생성 실패: {}", e))?;
 
     let script_path = claude_dir.join("anyon_api_key_helper.sh");
 
@@ -578,8 +636,7 @@ fn create_api_key_helper_script() -> Result<(), String> {
         ANYON_SERVICE_NAME, API_KEY_ACCOUNT, ANYON_SERVICE_NAME, API_KEY_ACCOUNT
     );
 
-    fs::write(&script_path, content)
-        .map_err(|e| format!("스크립트 파일 생성 실패: {}", e))?;
+    fs::write(&script_path, content).map_err(|e| format!("스크립트 파일 생성 실패: {}", e))?;
 
     // 실행 권한 설정
     #[cfg(unix)]
@@ -600,8 +657,7 @@ fn create_api_key_helper_script() -> Result<(), String> {
 /// Claude settings.local.json에 apiKeyHelper 설정 추가 (기존 설정 유지하며 병합)
 #[cfg(not(target_os = "windows"))]
 fn update_claude_settings_api_key_helper() -> Result<(), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     let settings_path = home.join(".claude").join("settings.local.json");
     let script_path = home.join(".claude").join("anyon_api_key_helper.sh");
@@ -619,13 +675,13 @@ fn update_claude_settings_api_key_helper() -> Result<(), String> {
     if let Some(obj) = settings.as_object_mut() {
         obj.insert(
             "apiKeyHelper".to_string(),
-            serde_json::Value::String(script_path.to_string_lossy().to_string())
+            serde_json::Value::String(script_path.to_string_lossy().to_string()),
         );
     }
 
     // 저장
-    let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(&settings).map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
 
     fs::write(&settings_path, content)
         .map_err(|e| format!("settings.local.json 저장 실패: {}", e))?;
@@ -668,12 +724,22 @@ fn logout_macos() -> Result<(), String> {
     // Claude Code-credentials 서비스 삭제 (모든 계정 후보)
     for account in get_account_candidates() {
         let output = Command::new("security")
-            .args(["delete-generic-password", "-s", CLAUDE_CODE_KEYCHAIN_SERVICE, "-a", &account])
+            .args([
+                "delete-generic-password",
+                "-s",
+                CLAUDE_CODE_KEYCHAIN_SERVICE,
+                "-a",
+                &account,
+            ])
             .output();
 
         if let Ok(out) = output {
             if out.status.success() {
-                log::info!("Deleted credentials: service={}, account={}", CLAUDE_CODE_KEYCHAIN_SERVICE, account);
+                log::info!(
+                    "Deleted credentials: service={}, account={}",
+                    CLAUDE_CODE_KEYCHAIN_SERVICE,
+                    account
+                );
                 deleted_any = true;
             }
         }
@@ -681,12 +747,21 @@ fn logout_macos() -> Result<(), String> {
 
     // Legacy 서비스도 삭제 시도
     let output = Command::new("security")
-        .args(["delete-generic-password", "-s", CLAUDE_LEGACY_SERVICE, "-a", CLAUDE_LEGACY_ACCOUNT])
+        .args([
+            "delete-generic-password",
+            "-s",
+            CLAUDE_LEGACY_SERVICE,
+            "-a",
+            CLAUDE_LEGACY_ACCOUNT,
+        ])
         .output();
 
     if let Ok(out) = output {
         if out.status.success() {
-            log::info!("Deleted legacy credentials: service={}", CLAUDE_LEGACY_SERVICE);
+            log::info!(
+                "Deleted legacy credentials: service={}",
+                CLAUDE_LEGACY_SERVICE
+            );
             deleted_any = true;
         }
     }
@@ -703,14 +778,12 @@ fn logout_macos() -> Result<(), String> {
 /// Linux: secret-tool + 파일 삭제
 #[cfg(target_os = "linux")]
 fn logout_linux() -> Result<(), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     // 1. ~/.claude/.credentials.json 파일 삭제
     let creds_path = home.join(".claude").join(".credentials.json");
     if creds_path.exists() {
-        fs::remove_file(&creds_path)
-            .map_err(|e| format!("credentials 파일 삭제 실패: {}", e))?;
+        fs::remove_file(&creds_path).map_err(|e| format!("credentials 파일 삭제 실패: {}", e))?;
         log::info!("~/.claude/.credentials.json 삭제 완료");
     }
 
@@ -732,14 +805,12 @@ fn logout_linux() -> Result<(), String> {
 /// Windows: Credential Manager + 파일 삭제
 #[cfg(target_os = "windows")]
 fn logout_windows() -> Result<(), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     // 1. credentials 파일 삭제
     let creds_path = home.join(".claude").join(".credentials.json");
     if creds_path.exists() {
-        fs::remove_file(&creds_path)
-            .map_err(|e| format!("credentials 파일 삭제 실패: {}", e))?;
+        fs::remove_file(&creds_path).map_err(|e| format!("credentials 파일 삭제 실패: {}", e))?;
         log::info!("credentials 파일 삭제 완료");
     }
 
@@ -751,11 +822,20 @@ fn logout_windows() -> Result<(), String> {
             if let Ok(entry) = keyring::Entry::new(service, &account) {
                 match entry.delete_password() {
                     Ok(()) => {
-                        log::info!("Windows Credential Manager에서 삭제 완료 (service: {}, account: {})", service, account);
+                        log::info!(
+                            "Windows Credential Manager에서 삭제 완료 (service: {}, account: {})",
+                            service,
+                            account
+                        );
                     }
                     Err(keyring::Error::NoEntry) => {}
                     Err(e) => {
-                        log::debug!("Credential Manager 삭제 실패 (service: {}, account: {}): {}", service, account, e);
+                        log::debug!(
+                            "Credential Manager 삭제 실패 (service: {}, account: {}): {}",
+                            service,
+                            account,
+                            e
+                        );
                     }
                 }
             }
@@ -787,12 +867,10 @@ pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), 
         log::warn!("API Key 제거 실패 (무시): {}", e);
     }
 
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     let claude_dir = home.join(".claude");
-    fs::create_dir_all(&claude_dir)
-        .map_err(|e| format!("~/.claude 디렉토리 생성 실패: {}", e))?;
+    fs::create_dir_all(&claude_dir).map_err(|e| format!("~/.claude 디렉토리 생성 실패: {}", e))?;
 
     let settings_path = claude_dir.join("settings.local.json");
 
@@ -817,11 +895,11 @@ pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), 
     // ANYON 프록시 설정 추가
     env.insert(
         "ANTHROPIC_BASE_URL".to_string(),
-        serde_json::Value::String(config.server_url.clone())
+        serde_json::Value::String(config.server_url.clone()),
     );
     env.insert(
         "ANTHROPIC_API_KEY".to_string(),
-        serde_json::Value::String(config.jwt_token.clone())
+        serde_json::Value::String(config.jwt_token.clone()),
     );
 
     // apiKeyHelper 제거 (ANYON API 모드에서는 사용 안 함)
@@ -830,8 +908,8 @@ pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), 
     }
 
     // 저장
-    let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(&settings).map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
 
     fs::write(&settings_path, content)
         .map_err(|e| format!("settings.local.json 저장 실패: {}", e))?;
@@ -844,8 +922,7 @@ pub async fn claude_auth_enable_anyon_api(config: AnyonApiConfig) -> Result<(), 
 /// Claude Code 설정에서 ANYON 관련 환경변수 제거
 #[tauri::command]
 pub async fn claude_auth_disable_anyon_api() -> Result<(), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     let settings_path = home.join(".claude").join("settings.local.json");
 
@@ -853,11 +930,11 @@ pub async fn claude_auth_disable_anyon_api() -> Result<(), String> {
         return Ok(());
     }
 
-    let content = fs::read_to_string(&settings_path)
-        .map_err(|e| format!("설정 파일 읽기 실패: {}", e))?;
+    let content =
+        fs::read_to_string(&settings_path).map_err(|e| format!("설정 파일 읽기 실패: {}", e))?;
 
-    let mut settings: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("JSON 파싱 실패: {}", e))?;
+    let mut settings: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("JSON 파싱 실패: {}", e))?;
 
     // env에서 ANYON 관련 설정 제거
     if let Some(env) = settings.get_mut("env").and_then(|e| e.as_object_mut()) {
@@ -873,11 +950,10 @@ pub async fn claude_auth_disable_anyon_api() -> Result<(), String> {
     }
 
     // 저장
-    let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(&settings).map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
 
-    fs::write(&settings_path, content)
-        .map_err(|e| format!("설정 파일 저장 실패: {}", e))?;
+    fs::write(&settings_path, content).map_err(|e| format!("설정 파일 저장 실패: {}", e))?;
 
     log::info!("ANYON API 모드 비활성화");
     Ok(())
@@ -886,8 +962,7 @@ pub async fn claude_auth_disable_anyon_api() -> Result<(), String> {
 /// 현재 ANYON API 모드 상태 확인
 #[tauri::command]
 pub async fn claude_auth_get_anyon_api_status() -> Result<Option<String>, String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     let settings_path = home.join(".claude").join("settings.local.json");
 
@@ -895,11 +970,11 @@ pub async fn claude_auth_get_anyon_api_status() -> Result<Option<String>, String
         return Ok(None);
     }
 
-    let content = fs::read_to_string(&settings_path)
-        .map_err(|e| format!("설정 파일 읽기 실패: {}", e))?;
+    let content =
+        fs::read_to_string(&settings_path).map_err(|e| format!("설정 파일 읽기 실패: {}", e))?;
 
-    let settings: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("JSON 파싱 실패: {}", e))?;
+    let settings: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("JSON 파싱 실패: {}", e))?;
 
     // ANTHROPIC_BASE_URL 확인
     if let Some(base_url) = settings
@@ -916,14 +991,12 @@ pub async fn claude_auth_get_anyon_api_status() -> Result<Option<String>, String
 /// Helper 스크립트 및 설정 제거 (macOS/Linux only)
 #[cfg(not(target_os = "windows"))]
 fn delete_api_key_helper() -> Result<(), String> {
-    let home = dirs::home_dir()
-        .ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
+    let home = dirs::home_dir().ok_or("홈 디렉토리를 찾을 수 없습니다.")?;
 
     // 스크립트 삭제
     let script_path = home.join(".claude").join("anyon_api_key_helper.sh");
     if script_path.exists() {
-        fs::remove_file(&script_path)
-            .map_err(|e| format!("스크립트 삭제 실패: {}", e))?;
+        fs::remove_file(&script_path).map_err(|e| format!("스크립트 삭제 실패: {}", e))?;
     }
 
     // settings.local.json에서 apiKeyHelper만 제거 (다른 설정 유지)
@@ -957,11 +1030,11 @@ fn delete_api_key_helper() -> Result<(), String> {
 // 직접 OAuth 통합 (PKCE 방식)
 // ============================================================
 
-use sha2::{Sha256, Digest};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use rand::Rng;
-use tauri::Emitter;
+use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::Emitter;
 
 // Claude OAuth 엔드포인트
 // - Authorization: claude.ai (사용자 로그인 UI)
@@ -971,7 +1044,8 @@ const ANTHROPIC_TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token"
 // Claude Code 공식 Client ID
 const CLAUDE_CODE_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 // OAuth scopes (user:sessions:claude_code 필수!)
-const OAUTH_SCOPES: &str = "org:create_api_key user:profile user:inference user:sessions:claude_code";
+const OAUTH_SCOPES: &str =
+    "org:create_api_key user:profile user:inference user:sessions:claude_code";
 
 // 폴링 중단 플래그 (전역)
 static POLL_STOP_FLAG: AtomicBool = AtomicBool::new(false);
@@ -1011,9 +1085,11 @@ pub async fn claude_oauth_start(app_handle: tauri::AppHandle) -> Result<String, 
     let state = uuid::Uuid::new_v4().to_string();
 
     // 2. 로컬 콜백 서버 시작 (랜덤 포트)
-    let listener = TcpListener::bind("127.0.0.1:0").await
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
         .map_err(|e| format!("로컬 서버 시작 실패: {}", e))?;
-    let port = listener.local_addr()
+    let port = listener
+        .local_addr()
         .map_err(|e| format!("포트 확인 실패: {}", e))?
         .port();
     let redirect_uri = format!("http://localhost:{}/callback", port);
@@ -1048,8 +1124,9 @@ pub async fn claude_oauth_start(app_handle: tauri::AppHandle) -> Result<String, 
         // 5분 타임아웃
         let timeout = tokio::time::timeout(
             std::time::Duration::from_secs(300),
-            handle_oauth_callback(listener, verifier, expected_state, redirect, app)
-        ).await;
+            handle_oauth_callback(listener, verifier, expected_state, redirect, app),
+        )
+        .await;
 
         match timeout {
             Ok(result) => {
@@ -1072,17 +1149,21 @@ async fn handle_oauth_callback(
     code_verifier: String,
     expected_state: String,
     redirect_uri: String,
-    app_handle: tauri::AppHandle
+    app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
     // HTTP 요청 수신
-    let (mut socket, _) = listener.accept().await
+    let (mut socket, _) = listener
+        .accept()
+        .await
         .map_err(|e| format!("연결 수신 실패: {}", e))?;
 
     // 요청 읽기
     let mut buf = [0u8; 4096];
-    let n = socket.peek(&mut buf).await
+    let n = socket
+        .peek(&mut buf)
+        .await
         .map_err(|e| format!("요청 읽기 실패: {}", e))?;
     let request_line = String::from_utf8_lossy(&buf[..n]);
     let first_line = request_line.lines().next().unwrap_or("");
@@ -1111,7 +1192,7 @@ async fn handle_oauth_callback(
             let status = ClaudeAuthStatus {
                 is_authenticated: true,
                 auth_method: "oauth".to_string(),
-                subscription_type: None,  // 토큰에서 추출 가능하면 추가
+                subscription_type: None, // 토큰에서 추출 가능하면 추가
                 expires_at: token_response.expires_in.map(|e| {
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -1169,7 +1250,12 @@ fn parse_oauth_callback(request_line: &str) -> Result<(String, String), String> 
 
 /// 토큰 교환 (authorization code → access token)
 /// Claude CLI는 JSON 형식으로 토큰 요청을 보냄
-async fn exchange_token(code: &str, code_verifier: &str, redirect_uri: &str, state: &str) -> Result<OAuthTokenResponse, String> {
+async fn exchange_token(
+    code: &str,
+    code_verifier: &str,
+    redirect_uri: &str,
+    state: &str,
+) -> Result<OAuthTokenResponse, String> {
     let client = reqwest::Client::new();
 
     // JSON 형식으로 요청 (Claude CLI와 동일)
@@ -1195,22 +1281,31 @@ async fn exchange_token(code: &str, code_verifier: &str, redirect_uri: &str, sta
     let status = response.status();
     if !status.is_success() {
         let error_text = response.text().await.unwrap_or_default();
-        log::error!("Token exchange failed: status={}, body={}", status, error_text);
+        log::error!(
+            "Token exchange failed: status={}, body={}",
+            status,
+            error_text
+        );
         return Err(format!("토큰 교환 실패 ({}): {}", status, error_text));
     }
 
-    response.json::<OAuthTokenResponse>().await
+    response
+        .json::<OAuthTokenResponse>()
+        .await
         .map_err(|e| format!("토큰 응답 파싱 실패: {}", e))
 }
 
 /// OAuth Credentials를 Keychain에 저장
 fn save_oauth_credentials(token: &OAuthTokenResponse) -> Result<(), String> {
-    let expires_at = token.expires_in.map(|e| {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64 + e * 1000)
-            .unwrap_or(0)
-    }).unwrap_or(0);
+    let expires_at = token
+        .expires_in
+        .map(|e| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64 + e * 1000)
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
 
     let credentials = serde_json::json!({
         "claudeAiOauth": {
@@ -1223,8 +1318,8 @@ fn save_oauth_credentials(token: &OAuthTokenResponse) -> Result<(), String> {
         }
     });
 
-    let creds_json = serde_json::to_string(&credentials)
-        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+    let creds_json =
+        serde_json::to_string(&credentials).map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
 
     // Keychain에 저장
     let username = std::env::var("USER")
@@ -1234,23 +1329,28 @@ fn save_oauth_credentials(token: &OAuthTokenResponse) -> Result<(), String> {
     let entry = keyring::Entry::new(CLAUDE_CODE_KEYCHAIN_SERVICE, &username)
         .map_err(|e| format!("Keyring Entry 생성 실패: {}", e))?;
 
-    entry.set_password(&creds_json)
+    entry
+        .set_password(&creds_json)
         .map_err(|e| format!("Credentials 저장 실패: {}", e))?;
 
-    log::info!("OAuth credentials saved to keychain (account: {})", username);
+    log::info!(
+        "OAuth credentials saved to keychain (account: {})",
+        username
+    );
     Ok(())
 }
 
 /// HTTP 응답 전송 (성공/실패 통합)
-async fn send_http_response(socket: &mut tokio::net::TcpStream, success: bool, error_msg: &str) -> Result<(), String> {
+async fn send_http_response(
+    socket: &mut tokio::net::TcpStream,
+    success: bool,
+    error_msg: &str,
+) -> Result<(), String> {
     use tokio::io::AsyncWriteExt;
 
     // 먼저 요청 데이터를 읽어서 버퍼 비우기
     let mut drain_buf = [0u8; 4096];
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_millis(100),
-        socket.readable()
-    ).await;
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), socket.readable()).await;
     let _ = socket.try_read(&mut drain_buf);
 
     let (status, html) = if success {
@@ -1268,7 +1368,10 @@ p{color:#a0a0a0}
 <script>setTimeout(()=>window.close(),3000)</script>
 </div></body></html>"#.to_string())
     } else {
-        ("400 Bad Request", format!(r#"<!DOCTYPE html>
+        (
+            "400 Bad Request",
+            format!(
+                r#"<!DOCTYPE html>
 <html>
 <head><title>로그인 실패</title><style>
 body{{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}}
@@ -1279,7 +1382,10 @@ p{{color:#a0a0a0}}
 <body><div class="container">
 <h1>✗ 로그인 실패</h1>
 <p>{}</p>
-</div></body></html>"#, error_msg))
+</div></body></html>"#,
+                error_msg
+            ),
+        )
     };
 
     let response = format!(
@@ -1289,9 +1395,13 @@ p{{color:#a0a0a0}}
         html
     );
 
-    socket.write_all(response.as_bytes()).await
+    socket
+        .write_all(response.as_bytes())
+        .await
         .map_err(|e| format!("응답 전송 실패: {}", e))?;
-    socket.flush().await
+    socket
+        .flush()
+        .await
         .map_err(|e| format!("응답 플러시 실패: {}", e))?;
 
     Ok(())

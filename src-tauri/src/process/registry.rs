@@ -4,6 +4,24 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::process::Child;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = std::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    std::process::Command::new(program)
+}
+
 /// Type of process being tracked
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProcessType {
@@ -366,12 +384,12 @@ impl ProcessRegistry {
         info!("Attempting to kill process {} by PID {}", run_id, pid);
 
         let kill_result = if cfg!(target_os = "windows") {
-            std::process::Command::new("taskkill")
+            create_hidden_command("taskkill")
                 .args(["/F", "/PID", &pid.to_string()])
                 .output()
         } else {
             // First try SIGTERM
-            let term_result = std::process::Command::new("kill")
+            let term_result = create_hidden_command("kill")
                 .args(["-TERM", &pid.to_string()])
                 .output();
 
@@ -382,7 +400,7 @@ impl ProcessRegistry {
                     std::thread::sleep(std::time::Duration::from_secs(2));
 
                     // Check if still running
-                    let check_result = std::process::Command::new("kill")
+                    let check_result = create_hidden_command("kill")
                         .args(["-0", &pid.to_string()])
                         .output();
 
@@ -393,7 +411,7 @@ impl ProcessRegistry {
                                 "Process {} still running after SIGTERM, sending SIGKILL",
                                 pid
                             );
-                            std::process::Command::new("kill")
+                            create_hidden_command("kill")
                                 .args(["-KILL", &pid.to_string()])
                                 .output()
                         } else {
@@ -406,7 +424,7 @@ impl ProcessRegistry {
                 _ => {
                     // SIGTERM failed, try SIGKILL directly
                     warn!("SIGTERM failed for PID {}, trying SIGKILL", pid);
-                    std::process::Command::new("kill")
+                    create_hidden_command("kill")
                         .args(["-KILL", &pid.to_string()])
                         .output()
                 }

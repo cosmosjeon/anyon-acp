@@ -127,10 +127,7 @@ fn verify_token(token: &str, secret: &str) -> Result<Claims, jsonwebtoken::error
 }
 
 // Middleware to extract user from Authorization header
-async fn get_user_from_auth(
-    headers: &HeaderMap,
-    state: &AuthState,
-) -> Result<User, StatusCode> {
+async fn get_user_from_auth(headers: &HeaderMap, state: &AuthState) -> Result<User, StatusCode> {
     let auth_header = headers
         .get("authorization")
         .and_then(|h| h.to_str().ok())
@@ -141,8 +138,7 @@ async fn get_user_from_auth(
     }
 
     let token = &auth_header[7..];
-    let claims = verify_token(token, &state.jwt_secret)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let claims = verify_token(token, &state.jwt_secret).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let users = state.users.lock().await;
     users
@@ -171,16 +167,15 @@ async fn get_auth_url(
             },
         };
 
-        let token = generate_token(&user_id, &state.jwt_secret)
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse {
-                        error: format!("Failed to generate token: {}", e),
-                    }),
-                )
-                    .into_response()
-            })?;
+        let token = generate_token(&user_id, &state.jwt_secret).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: format!("Failed to generate token: {}", e),
+                }),
+            )
+                .into_response()
+        })?;
 
         // Store user and session
         let mut users = state.users.lock().await;
@@ -287,10 +282,7 @@ async fn get_settings(
         })?;
 
     let settings_map = state.settings.lock().await;
-    let user_settings = settings_map
-        .get(&user.id)
-        .cloned()
-        .unwrap_or_default();
+    let user_settings = settings_map.get(&user.id).cloned().unwrap_or_default();
 
     Ok(Json(Settings {
         data: user_settings,
@@ -339,7 +331,9 @@ async fn update_setting(
         })?;
 
     let mut settings_map = state.settings.lock().await;
-    let user_settings = settings_map.entry(user.id.clone()).or_insert_with(HashMap::new);
+    let user_settings = settings_map
+        .entry(user.id.clone())
+        .or_insert_with(HashMap::new);
     user_settings.insert(key.clone(), payload.clone());
 
     Ok(Json(serde_json::json!({
@@ -495,7 +489,11 @@ async fn health() -> Json<serde_json::Value> {
 }
 
 // Main server function
-pub async fn start_auth_server(port: u16, jwt_secret: String, node_env: String) -> anyhow::Result<()> {
+pub async fn start_auth_server(
+    port: u16,
+    jwt_secret: String,
+    node_env: String,
+) -> anyhow::Result<()> {
     let state = AuthState::new(jwt_secret, node_env.clone());
 
     let cors = CorsLayer::new()

@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::net::TcpStream;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PortInfo {
@@ -36,8 +36,9 @@ pub async fn scan_ports() -> Result<Vec<PortInfo>, String> {
 fn check_port(port: u16) -> bool {
     let alive = TcpStream::connect_timeout(
         &format!("127.0.0.1:{}", port).parse().unwrap(),
-        Duration::from_millis(1000)  // Increased from 300ms for reliability
-    ).is_ok();
+        Duration::from_millis(1000), // Increased from 300ms for reliability
+    )
+    .is_ok();
 
     log::debug!("scan_ports: port {} - alive: {}", port, alive);
     alive
@@ -70,14 +71,22 @@ pub async fn check_port_alive(
     let max = max_attempts.unwrap_or(10);
     let start = std::time::Instant::now();
 
-    log::info!("check_port_alive: Checking port {} (max {} attempts, {}ms interval)",
-               port, max, interval);
+    log::info!(
+        "check_port_alive: Checking port {} (max {} attempts, {}ms interval)",
+        port,
+        max,
+        interval
+    );
 
     for attempt in 1..=max {
         if check_port(port) {
             let elapsed = start.elapsed().as_millis() as u64;
-            log::info!("check_port_alive: Port {} is alive after {} attempts ({}ms)",
-                       port, attempt, elapsed);
+            log::info!(
+                "check_port_alive: Port {} is alive after {} attempts ({}ms)",
+                port,
+                attempt,
+                elapsed
+            );
             return Ok(PortCheckResult {
                 port,
                 alive: true,
@@ -92,8 +101,12 @@ pub async fn check_port_alive(
     }
 
     let elapsed = start.elapsed().as_millis() as u64;
-    log::warn!("check_port_alive: Port {} not responding after {} attempts ({}ms)",
-               port, max, elapsed);
+    log::warn!(
+        "check_port_alive: Port {} not responding after {} attempts ({}ms)",
+        port,
+        max,
+        elapsed
+    );
 
     Ok(PortCheckResult {
         port,

@@ -1,13 +1,13 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::process::Command;
 
-use super::helpers::{find_claude_binary, get_claude_dir, create_command_with_env};
-use super::shared::{ClaudeSettings, ClaudeVersionStatus, ClaudeMdFile};
+use super::helpers::{create_command_with_env, find_claude_binary, get_claude_dir};
+use super::shared::{ClaudeMdFile, ClaudeSettings, ClaudeVersionStatus};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AnyonInstallationStatus {
@@ -310,15 +310,17 @@ pub async fn save_claude_md_file(file_path: String, content: String) -> Result<S
 }
 
 #[tauri::command]
-pub async fn check_anyon_installed(project_path: String) -> Result<AnyonInstallationStatus, String> {
+pub async fn check_anyon_installed(
+    project_path: String,
+) -> Result<AnyonInstallationStatus, String> {
     let path = PathBuf::from(&project_path);
-    
+
     let anyon_dir = path.join(".anyon");
     let claude_dir = path.join(".claude");
-    
+
     let has_anyon = anyon_dir.exists() && anyon_dir.is_dir();
     let has_claude = claude_dir.exists() && claude_dir.is_dir();
-    
+
     let mut missing_dirs = Vec::new();
     if !has_anyon {
         missing_dirs.push(".anyon".to_string());
@@ -326,7 +328,7 @@ pub async fn check_anyon_installed(project_path: String) -> Result<AnyonInstalla
     if !has_claude {
         missing_dirs.push(".claude".to_string());
     }
-    
+
     Ok(AnyonInstallationStatus {
         is_installed: has_anyon,
         has_claude_dir: has_claude,
@@ -340,13 +342,13 @@ pub async fn run_npx_anyon_agents(
     app_handle: AppHandle,
 ) -> Result<NpxRunResult, String> {
     use tokio::io::AsyncWriteExt;
-    
+
     let path = PathBuf::from(&project_path);
-    
+
     if !path.exists() {
         return Err(format!("Project path does not exist: {}", project_path));
     }
-    
+
     // Emit start event
     let _ = app_handle.emit("anyon-install-start", &project_path);
 
@@ -368,34 +370,34 @@ pub async fn run_npx_anyon_agents(
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn npx command: {}", e))?;
-    
+
     // Write "y" to stdin for auto-confirmation of "Ok to proceed? (y)"
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(b"y\n").await;
         let _ = stdin.flush().await;
     }
-    
+
     // Wait for the process to complete
     let output = child
         .wait_with_output()
         .await
         .map_err(|e| format!("Failed to wait for npx command: {}", e))?;
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let success = output.status.success();
     let exit_code = output.status.code();
-    
+
     let result = NpxRunResult {
         success,
         stdout,
         stderr,
         exit_code,
     };
-    
+
     // Emit completion event
     let _ = app_handle.emit("anyon-install-complete", &result);
-    
+
     Ok(result)
 }
 
@@ -403,12 +405,12 @@ pub async fn run_npx_anyon_agents(
 pub async fn check_is_git_repo(project_path: String) -> Result<bool, String> {
     log::info!("[Rust] Checking if {} is a git repo", project_path);
     let path = PathBuf::from(&project_path);
-    
+
     if !path.exists() {
         log::error!("[Rust] Project path does not exist: {}", project_path);
         return Err(format!("Project path does not exist: {}", project_path));
     }
-    
+
     let git_dir = path.join(".git");
     let is_git = git_dir.exists() && git_dir.is_dir();
     log::info!("[Rust] Is git repo: {}", is_git);
@@ -422,15 +424,15 @@ pub async fn init_git_repo(
 ) -> Result<NpxRunResult, String> {
     log::info!("[Rust] Initializing git repo at: {}", project_path);
     let path = PathBuf::from(&project_path);
-    
+
     if !path.exists() {
         log::error!("[Rust] Project path does not exist: {}", project_path);
         return Err(format!("Project path does not exist: {}", project_path));
     }
-    
+
     // Emit start event
     let _ = app_handle.emit("git-init-start", &project_path);
-    
+
     // Run git init
     log::info!("[Rust] Running 'git init' command...");
 
@@ -439,28 +441,31 @@ pub async fn init_git_repo(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| {
-            log::error!("[Rust] Failed to run git init: {}", e);
-            format!("Failed to run git init: {}", e)
-        })?;
-    
+
+    let output = cmd.output().await.map_err(|e| {
+        log::error!("[Rust] Failed to run git init: {}", e);
+        format!("Failed to run git init: {}", e)
+    })?;
+
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let success = output.status.success();
     let exit_code = output.status.code();
-    
-    log::info!("[Rust] Git init result - success: {}, stdout: {}, stderr: {}", success, stdout, stderr);
+
+    log::info!(
+        "[Rust] Git init result - success: {}, stdout: {}, stderr: {}",
+        success,
+        stdout,
+        stderr
+    );
 
     // If git init succeeded, create an initial empty commit for rollback capability
     if success {
         log::info!("[Rust] Creating initial empty commit...");
 
         let mut commit_cmd = Command::new("git");
-        commit_cmd.args(["commit", "--allow-empty", "-m", "Initial commit (ANYON)"])
+        commit_cmd
+            .args(["commit", "--allow-empty", "-m", "Initial commit (ANYON)"])
             .current_dir(&path)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -470,8 +475,12 @@ pub async fn init_git_repo(
                 let commit_success = commit_output.status.success();
                 let commit_stdout = String::from_utf8_lossy(&commit_output.stdout).to_string();
                 let commit_stderr = String::from_utf8_lossy(&commit_output.stderr).to_string();
-                log::info!("[Rust] Initial commit result - success: {}, stdout: {}, stderr: {}",
-                    commit_success, commit_stdout, commit_stderr);
+                log::info!(
+                    "[Rust] Initial commit result - success: {}, stdout: {}, stderr: {}",
+                    commit_success,
+                    commit_stdout,
+                    commit_stderr
+                );
             }
             Err(e) => {
                 log::warn!("[Rust] Failed to create initial commit: {}", e);
@@ -494,9 +503,7 @@ pub async fn init_git_repo(
 }
 
 #[tauri::command]
-pub async fn git_add_all(
-    project_path: String,
-) -> Result<NpxRunResult, String> {
+pub async fn git_add_all(project_path: String) -> Result<NpxRunResult, String> {
     log::info!("[Rust] Running 'git add .' at: {}", project_path);
     let path = PathBuf::from(&project_path);
 
@@ -510,7 +517,10 @@ pub async fn git_add_all(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to run git add: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run git add: {}", e))?;
 
     Ok(NpxRunResult {
         success: output.status.success(),
@@ -521,10 +531,7 @@ pub async fn git_add_all(
 }
 
 #[tauri::command]
-pub async fn git_commit(
-    project_path: String,
-    message: String,
-) -> Result<NpxRunResult, String> {
+pub async fn git_commit(project_path: String, message: String) -> Result<NpxRunResult, String> {
     log::info!("[Rust] Running 'git commit' at: {}", project_path);
     let path = PathBuf::from(&project_path);
 
@@ -538,7 +545,10 @@ pub async fn git_commit(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to run git commit: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run git commit: {}", e))?;
 
     Ok(NpxRunResult {
         success: output.status.success(),
@@ -553,7 +563,11 @@ pub async fn git_set_remote(
     project_path: String,
     remote_url: String,
 ) -> Result<NpxRunResult, String> {
-    log::info!("[Rust] Setting git remote to: {} at: {}", remote_url, project_path);
+    log::info!(
+        "[Rust] Setting git remote to: {} at: {}",
+        remote_url,
+        project_path
+    );
     let path = PathBuf::from(&project_path);
 
     if !path.exists() {
@@ -562,7 +576,8 @@ pub async fn git_set_remote(
 
     // First try to remove existing origin (ignore errors)
     let mut remove_cmd = Command::new("git");
-    remove_cmd.args(["remote", "remove", "origin"])
+    remove_cmd
+        .args(["remote", "remove", "origin"])
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -575,7 +590,10 @@ pub async fn git_set_remote(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to set git remote: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to set git remote: {}", e))?;
 
     Ok(NpxRunResult {
         success: output.status.success(),
@@ -603,14 +621,18 @@ pub async fn git_push(
 
     // Convert https://github.com/user/repo.git to https://token@github.com/user/repo.git
     let auth_url = if remote_url.starts_with("https://github.com/") {
-        remote_url.replace("https://github.com/", &format!("https://{}@github.com/", token))
+        remote_url.replace(
+            "https://github.com/",
+            &format!("https://{}@github.com/", token),
+        )
     } else {
         remote_url.clone()
     };
 
     // Set remote with authenticated URL
     let mut set_remote = Command::new("git");
-    set_remote.args(["remote", "set-url", "origin", &auth_url])
+    set_remote
+        .args(["remote", "set-url", "origin", &auth_url])
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -623,11 +645,15 @@ pub async fn git_push(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to run git push: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run git push: {}", e))?;
 
     // Reset remote URL to non-authenticated version (security)
     let mut reset_remote = Command::new("git");
-    reset_remote.args(["remote", "set-url", "origin", &remote_url])
+    reset_remote
+        .args(["remote", "set-url", "origin", &remote_url])
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -642,9 +668,7 @@ pub async fn git_push(
 }
 
 #[tauri::command]
-pub async fn git_status(
-    project_path: String,
-) -> Result<NpxRunResult, String> {
+pub async fn git_status(project_path: String) -> Result<NpxRunResult, String> {
     log::info!("[Rust] Running 'git status' at: {}", project_path);
     let path = PathBuf::from(&project_path);
 
@@ -658,7 +682,10 @@ pub async fn git_status(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to run git status: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run git status: {}", e))?;
 
     Ok(NpxRunResult {
         success: output.status.success(),
@@ -669,9 +696,7 @@ pub async fn git_status(
 }
 
 #[tauri::command]
-pub async fn git_current_branch(
-    project_path: String,
-) -> Result<NpxRunResult, String> {
+pub async fn git_current_branch(project_path: String) -> Result<NpxRunResult, String> {
     log::info!("[Rust] Getting current branch at: {}", project_path);
     let path = PathBuf::from(&project_path);
 
@@ -685,7 +710,10 @@ pub async fn git_current_branch(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to get current branch: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to get current branch: {}", e))?;
 
     Ok(NpxRunResult {
         success: output.status.success(),
