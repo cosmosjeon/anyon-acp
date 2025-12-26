@@ -109,7 +109,13 @@ async fn create_and_spawn_process(
 /// Sets up stdout and stderr IO handlers
 fn setup_io_handlers(
     child: &mut tokio::process::Child,
-) -> Result<(TokioBufReader<tokio::process::ChildStdout>, TokioBufReader<tokio::process::ChildStderr>), String> {
+) -> Result<
+    (
+        TokioBufReader<tokio::process::ChildStdout>,
+        TokioBufReader<tokio::process::ChildStderr>,
+    ),
+    String,
+> {
     let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
     info!("📡 Set up stdout/stderr readers");
@@ -272,7 +278,10 @@ fn spawn_process_monitor(
         // Wait for first output with timeout
         for i in 0..300 {
             // 30 seconds (300 * 100ms)
-            if io_state.first_output.load(std::sync::atomic::Ordering::Relaxed) {
+            if io_state
+                .first_output
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
                 info!(
                     "✅ Output detected after {}ms, continuing normal execution",
                     i * 100
@@ -398,13 +407,8 @@ async fn spawn_agent_system(
     registry: State<'_, crate::process::ProcessRegistryState>,
 ) -> Result<i64, String> {
     // Create and spawn the process
-    let (mut child, pid, db_path) = create_and_spawn_process(
-        &claude_path,
-        args,
-        &project_path,
-        run_id,
-        &db,
-    ).await?;
+    let (mut child, pid, db_path) =
+        create_and_spawn_process(&claude_path, args, &project_path, run_id, &db).await?;
 
     // Set up IO handlers
     let (stdout_reader, stderr_reader) = setup_io_handlers(&mut child)?;
@@ -423,12 +427,7 @@ async fn spawn_agent_system(
     );
 
     // Spawn stderr reader task
-    let stderr_task = spawn_stderr_reader(
-        stderr_reader,
-        app.clone(),
-        run_id,
-        &io_state,
-    );
+    let stderr_task = spawn_stderr_reader(stderr_reader, app.clone(), run_id, &io_state);
 
     // Register the process in the registry for live output tracking (after stdout/stderr setup)
     registry

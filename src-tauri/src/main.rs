@@ -18,29 +18,29 @@ use commands::agents::{
     stream_session_output, update_agent, AgentDb,
 };
 use commands::claude::{
-    cancel_claude_execution, check_anyon_installed, check_claude_version,
-    continue_claude_code, create_project, execute_claude_code,
-    find_claude_md_files, get_claude_session_output, get_claude_settings, get_home_directory,
-    get_project_sessions,
-    get_system_prompt, list_directory_contents, list_projects,
-    list_running_claude_sessions, load_session_history, open_new_session, read_claude_md_file,
-    read_file_content, check_file_exists, get_file_metadata, list_anyon_docs, resume_claude_code,
-    run_npx_anyon_agents, check_is_git_repo, init_git_repo, git_add_all, git_commit, git_set_remote, git_push, git_status, git_current_branch, save_claude_md_file, save_claude_settings,
-    save_system_prompt, search_files, ClaudeProcessState,
+    cancel_claude_execution, check_anyon_installed, check_claude_version, check_file_exists,
+    check_is_git_repo, continue_claude_code, create_project, execute_claude_code,
+    find_claude_md_files, get_claude_session_output, get_claude_settings, get_file_metadata,
+    get_home_directory, get_project_sessions, get_system_prompt, git_add_all, git_commit,
+    git_current_branch, git_push, git_set_remote, git_status, init_git_repo, list_anyon_docs,
+    list_directory_contents, list_projects, list_running_claude_sessions, load_session_history,
+    open_new_session, read_claude_md_file, read_file_content, resume_claude_code,
+    run_npx_anyon_agents, save_claude_md_file, save_claude_settings, save_system_prompt,
+    search_files, ClaudeProcessState,
+};
+use commands::claude_auth::{
+    claude_auth_check, claude_auth_delete_api_key, claude_auth_disable_anyon_api,
+    claude_auth_enable_anyon_api, claude_auth_get_anyon_api_status, claude_auth_logout,
+    claude_auth_open_terminal, claude_auth_poll_for_login, claude_auth_save_api_key,
+    claude_auth_stop_polling, claude_auth_validate_api_key, claude_oauth_start,
 };
 use commands::mcp::{
     mcp_add, mcp_add_from_claude_desktop, mcp_add_json, mcp_get, mcp_get_server_status, mcp_list,
     mcp_read_project_config, mcp_remove, mcp_reset_project_choices, mcp_save_project_config,
     mcp_serve, mcp_test_connection,
 };
-use commands::claude_auth::{
-    claude_auth_check, claude_auth_open_terminal, claude_auth_save_api_key,
-    claude_auth_delete_api_key, claude_auth_validate_api_key, claude_auth_logout,
-    claude_auth_enable_anyon_api, claude_auth_disable_anyon_api, claude_auth_get_anyon_api_status,
-    claude_oauth_start, claude_auth_poll_for_login, claude_auth_stop_polling,
-};
 
-use commands::preview::{scan_ports, check_port_alive};
+use commands::preview::{check_port_alive, scan_ports};
 use commands::proxy::{apply_proxy_settings, get_proxy_settings, save_proxy_settings};
 use commands::storage::{
     storage_delete_row, storage_execute_sql, storage_insert_row, storage_list_tables,
@@ -51,7 +51,7 @@ use commands::usage::{
 };
 use process::ProcessRegistryState;
 use std::sync::Mutex;
-use tauri::{Manager, Emitter};
+use tauri::{Emitter, Manager};
 
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
@@ -106,7 +106,10 @@ fn setup_linux_ime() {
     }
 
     std::env::set_var("GDK_BACKEND", "x11");
-    log::info!("IME environment variables set for Linux with {}", ime_module);
+    log::info!(
+        "IME environment variables set for Linux with {}",
+        ime_module
+    );
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -175,9 +178,7 @@ fn setup_deep_links(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
 }
 
 /// Load proxy settings from database
-fn load_proxy_settings_from_db(
-    conn: &rusqlite::Connection,
-) -> commands::proxy::ProxySettings {
+fn load_proxy_settings_from_db(conn: &rusqlite::Connection) -> commands::proxy::ProxySettings {
     let mut settings = commands::proxy::ProxySettings::default();
 
     let keys = vec![

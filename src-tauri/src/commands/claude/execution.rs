@@ -5,8 +5,26 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
-use super::helpers::{find_claude_binary, create_system_command};
+use super::helpers::{create_system_command, find_claude_binary};
 use super::shared::ClaudeProcessState;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = std::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    std::process::Command::new(program)
+}
 
 #[tauri::command]
 pub async fn execute_claude_code(
@@ -207,11 +225,11 @@ pub async fn cancel_claude_execution(
                     if let Some(pid) = pid {
                         log::info!("Attempting system kill as last resort for PID: {}", pid);
                         let kill_result = if cfg!(target_os = "windows") {
-                            std::process::Command::new("taskkill")
+                            create_hidden_command("taskkill")
                                 .args(["/F", "/PID", &pid.to_string()])
                                 .output()
                         } else {
-                            std::process::Command::new("kill")
+                            create_hidden_command("kill")
                                 .args(["-KILL", &pid.to_string()])
                                 .output()
                         };
@@ -300,11 +318,15 @@ async fn spawn_claude_process(
 
     // Write prompt to stdin (avoids Windows batch file escaping issues with special characters)
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(prompt.as_bytes()).await
+        stdin
+            .write_all(prompt.as_bytes())
+            .await
             .map_err(|e| format!("Failed to write prompt to stdin: {}", e))?;
-        stdin.flush().await
+        stdin
+            .flush()
+            .await
             .map_err(|e| format!("Failed to flush stdin: {}", e))?;
-        drop(stdin);  // Close stdin to signal EOF
+        drop(stdin); // Close stdin to signal EOF
         log::debug!("Wrote prompt to Claude stdin and closed it");
     }
 

@@ -3,6 +3,24 @@ use tauri::{AppHandle, Manager, State};
 
 use super::types::{Agent, AgentDb, AgentRun};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = std::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> std::process::Command {
+    std::process::Command::new(program)
+}
+
 /// Initialize the agents database
 pub fn init_database(app: &AppHandle) -> SqliteResult<Connection> {
     let app_dir = app
@@ -463,7 +481,7 @@ pub async fn cleanup_finished_processes(db: State<'_, AgentDb>) -> Result<Vec<i6
         // Check if the process is still running
         let is_running = if cfg!(target_os = "windows") {
             // On Windows, use tasklist to check if process exists
-            match std::process::Command::new("tasklist")
+            match create_hidden_command("tasklist")
                 .args(["/FI", &format!("PID eq {}", pid)])
                 .args(["/FO", "CSV"])
                 .output()
@@ -476,7 +494,7 @@ pub async fn cleanup_finished_processes(db: State<'_, AgentDb>) -> Result<Vec<i6
             }
         } else {
             // On Unix-like systems, use kill -0 to check if process exists
-            match std::process::Command::new("kill")
+            match create_hidden_command("kill")
                 .args(["-0", &pid.to_string()])
                 .output()
             {
@@ -496,7 +514,8 @@ pub async fn cleanup_finished_processes(db: State<'_, AgentDb>) -> Result<Vec<i6
                 cleaned_up.push(run_id);
                 log::info!(
                     "Marked agent run {} as completed (PID {} no longer running)",
-                    run_id, pid
+                    run_id,
+                    pid
                 );
             }
         }

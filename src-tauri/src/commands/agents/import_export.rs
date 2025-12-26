@@ -58,7 +58,10 @@ pub async fn export_agent_to_file(
 
 /// Import an agent from JSON data
 #[tauri::command]
-pub async fn import_agent(db: State<'_, AgentDb>, json_data: String) -> Result<super::types::Agent, String> {
+pub async fn import_agent(
+    db: State<'_, AgentDb>,
+    json_data: String,
+) -> Result<super::types::Agent, String> {
     // Parse the JSON data
     let export_data: AgentExport =
         serde_json::from_str(&json_data).map_err(|e| format!("Invalid JSON format: {}", e))?;

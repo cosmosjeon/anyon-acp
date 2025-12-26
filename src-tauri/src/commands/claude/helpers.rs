@@ -103,7 +103,11 @@ pub(crate) fn create_command_with_env(program: &str) -> Command {
 }
 
 /// Creates a system binary command with the given arguments
-pub(crate) fn create_system_command(claude_path: &str, args: Vec<String>, project_path: &str) -> Command {
+pub(crate) fn create_system_command(
+    claude_path: &str,
+    args: Vec<String>,
+    project_path: &str,
+) -> Command {
     let mut cmd = create_command_with_env(claude_path);
 
     for arg in args {
@@ -111,7 +115,7 @@ pub(crate) fn create_system_command(claude_path: &str, args: Vec<String>, projec
     }
 
     cmd.current_dir(project_path)
-        .stdin(Stdio::piped())  // Use piped stdin to avoid Windows batch file argument escaping issues
+        .stdin(Stdio::piped()) // Use piped stdin to avoid Windows batch file argument escaping issues
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 

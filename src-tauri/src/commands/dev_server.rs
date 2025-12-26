@@ -4,11 +4,11 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
@@ -354,9 +354,9 @@ const ELEMENT_SELECTOR_SCRIPT: &str = r####"
 // Proxy Server Implementation (Rewritten for chunked/compression support)
 // ============================================================================
 
-use std::io::{BufRead, BufReader};
-use flate2::read::{GzDecoder, DeflateDecoder};
 use brotli::Decompressor;
+use flate2::read::{DeflateDecoder, GzDecoder};
+use std::io::{BufRead, BufReader};
 
 /// Parsed HTTP response with full support for chunked encoding and compression
 struct HttpResponse {
@@ -370,7 +370,8 @@ struct HttpResponse {
 impl HttpResponse {
     fn get_header(&self, name: &str) -> Option<&String> {
         let lower_name = name.to_lowercase();
-        self.headers.iter()
+        self.headers
+            .iter()
             .find(|(k, _)| k.to_lowercase() == lower_name)
             .map(|(_, v)| v)
     }
@@ -442,7 +443,8 @@ fn read_full_response(stream: &mut TcpStream) -> std::io::Result<HttpResponse> {
                 Ok(0) => break,
                 Ok(n) => {
                     body.extend_from_slice(&chunk[..n]);
-                    if body.len() > 5_000_000 { // 5MB limit
+                    if body.len() > 5_000_000 {
+                        // 5MB limit
                         break;
                     }
                 }
@@ -454,8 +456,13 @@ fn read_full_response(stream: &mut TcpStream) -> std::io::Result<HttpResponse> {
         body
     };
 
-    log::debug!("Proxy: Read response - status={}, chunked={}, encoding={:?}, body_len={}",
-        status_code, is_chunked, content_encoding, body.len());
+    log::debug!(
+        "Proxy: Read response - status={}, chunked={}, encoding={:?}, body_len={}",
+        status_code,
+        is_chunked,
+        content_encoding,
+        body.len()
+    );
 
     Ok(HttpResponse {
         status_code,
@@ -513,7 +520,11 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
             let mut decoder = GzDecoder::new(body);
             let mut decompressed = Vec::new();
             if decoder.read_to_end(&mut decompressed).is_ok() {
-                log::debug!("Proxy: Decompressed gzip {} -> {} bytes", body.len(), decompressed.len());
+                log::debug!(
+                    "Proxy: Decompressed gzip {} -> {} bytes",
+                    body.len(),
+                    decompressed.len()
+                );
                 decompressed
             } else {
                 log::warn!("Proxy: Failed to decompress gzip, using raw body");
@@ -524,7 +535,11 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
             let mut decoder = DeflateDecoder::new(body);
             let mut decompressed = Vec::new();
             if decoder.read_to_end(&mut decompressed).is_ok() {
-                log::debug!("Proxy: Decompressed deflate {} -> {} bytes", body.len(), decompressed.len());
+                log::debug!(
+                    "Proxy: Decompressed deflate {} -> {} bytes",
+                    body.len(),
+                    decompressed.len()
+                );
                 decompressed
             } else {
                 log::warn!("Proxy: Failed to decompress deflate, using raw body");
@@ -535,7 +550,11 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
             let mut decoder = Decompressor::new(body, 4096);
             let mut decompressed = Vec::new();
             if decoder.read_to_end(&mut decompressed).is_ok() {
-                log::debug!("Proxy: Decompressed brotli {} -> {} bytes", body.len(), decompressed.len());
+                log::debug!(
+                    "Proxy: Decompressed brotli {} -> {} bytes",
+                    body.len(),
+                    decompressed.len()
+                );
                 decompressed
             } else {
                 log::warn!("Proxy: Failed to decompress brotli, using raw body");
@@ -553,7 +572,10 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
 fn should_inject_script(response: &HttpResponse, path: &str) -> bool {
     // Only inject into 200 OK responses
     if response.status_code != 200 {
-        log::debug!("Proxy: Skipping injection - status code {}", response.status_code);
+        log::debug!(
+            "Proxy: Skipping injection - status code {}",
+            response.status_code
+        );
         return false;
     }
 
@@ -579,13 +601,18 @@ fn should_inject_script(response: &HttpResponse, path: &str) -> bool {
 
     // Path-based inference
     if path.ends_with('/') || path.ends_with(".html") || path.ends_with(".htm") {
-        log::debug!("Proxy: Injection likely needed - path suggests HTML: {}", path);
+        log::debug!(
+            "Proxy: Injection likely needed - path suggests HTML: {}",
+            path
+        );
         return true;
     }
 
     // Skip known non-HTML paths
-    let skip_extensions = [".js", ".css", ".json", ".map", ".png", ".jpg", ".jpeg",
-                          ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot"];
+    let skip_extensions = [
+        ".js", ".css", ".json", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff",
+        ".woff2", ".ttf", ".eot",
+    ];
     for ext in &skip_extensions {
         if path.ends_with(ext) {
             log::debug!("Proxy: Skipping injection - path extension: {}", ext);
@@ -657,7 +684,8 @@ fn build_response(status_code: u16, headers: &HashMap<String, String>, body: &[u
         let lower_key = key.to_lowercase();
         if lower_key != "content-length"
             && lower_key != "transfer-encoding"
-            && lower_key != "content-encoding" // Remove compression since we decompressed
+            && lower_key != "content-encoding"
+        // Remove compression since we decompressed
         {
             response.push_str(&format!("{}: {}\r\n", key, value));
         }
@@ -700,7 +728,12 @@ fn handle_proxy_connection(
     let mut target_stream = match TcpStream::connect(&target_addr) {
         Ok(s) => s,
         Err(e) => {
-            log::error!("Proxy: Failed to connect to target {}:{} - {}", target_host, target_port, e);
+            log::error!(
+                "Proxy: Failed to connect to target {}:{} - {}",
+                target_host,
+                target_port,
+                e
+            );
             // Send 502 Bad Gateway
             let error_response = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n";
             let _ = client_stream.write_all(error_response.as_bytes());
@@ -721,7 +754,8 @@ fn handle_proxy_connection(
     let request_with_encoding = if modified_request.to_lowercase().contains("accept-encoding:") {
         // Remove accept-encoding to avoid compressed responses
         let re = regex::Regex::new(r"(?i)accept-encoding:[^\r\n]*\r\n").unwrap();
-        re.replace(&modified_request, "Accept-Encoding: identity\r\n").to_string()
+        re.replace(&modified_request, "Accept-Encoding: identity\r\n")
+            .to_string()
     } else {
         modified_request.to_string()
     };
@@ -743,48 +777,65 @@ fn handle_proxy_connection(
     // Check if we should inject script
     if should_inject_script(&response, &path) {
         // Decompress body if needed
-        let decompressed_body = decompress_body(
-            &response.body,
-            response.content_encoding.as_deref(),
-        );
+        let decompressed_body =
+            decompress_body(&response.body, response.content_encoding.as_deref());
 
         // Convert to string for HTML manipulation
         let body_str = String::from_utf8_lossy(&decompressed_body);
 
         // Verify it's actually HTML by checking content
         let body_lower = body_str.to_lowercase();
-        if body_lower.contains("<!doctype") || body_lower.contains("<html") || body_lower.contains("<head") {
-            log::info!("Proxy: Injecting element selector script into HTML response for path: {}", path);
+        if body_lower.contains("<!doctype")
+            || body_lower.contains("<html")
+            || body_lower.contains("<head")
+        {
+            log::info!(
+                "Proxy: Injecting element selector script into HTML response for path: {}",
+                path
+            );
 
             // Inject script
             let modified_body = inject_html(&body_str);
             let modified_bytes = modified_body.as_bytes();
 
-            log::debug!("Proxy: Script injection complete, body size: {} -> {}", decompressed_body.len(), modified_bytes.len());
+            log::debug!(
+                "Proxy: Script injection complete, body size: {} -> {}",
+                decompressed_body.len(),
+                modified_bytes.len()
+            );
 
             // Build and send response
-            let final_response = build_response(response.status_code, &response.headers, modified_bytes);
+            let final_response =
+                build_response(response.status_code, &response.headers, modified_bytes);
             client_stream.write_all(&final_response)?;
         } else {
             // Not HTML content, forward decompressed body
-            log::debug!("Proxy: Path suggested HTML but content is not HTML: {}", path);
-            let final_response = build_response(response.status_code, &response.headers, &decompressed_body);
+            log::debug!(
+                "Proxy: Path suggested HTML but content is not HTML: {}",
+                path
+            );
+            let final_response =
+                build_response(response.status_code, &response.headers, &decompressed_body);
             client_stream.write_all(&final_response)?;
         }
     } else {
         // Forward response as-is (but handle potential decompression for consistency)
         if response.content_encoding.is_some() {
             // Decompress and forward without compression
-            let decompressed = decompress_body(&response.body, response.content_encoding.as_deref());
-            let final_response = build_response(response.status_code, &response.headers, &decompressed);
+            let decompressed =
+                decompress_body(&response.body, response.content_encoding.as_deref());
+            let final_response =
+                build_response(response.status_code, &response.headers, &decompressed);
             client_stream.write_all(&final_response)?;
         } else if response.is_chunked {
             // Was chunked, rebuild as content-length
-            let final_response = build_response(response.status_code, &response.headers, &response.body);
+            let final_response =
+                build_response(response.status_code, &response.headers, &response.body);
             client_stream.write_all(&final_response)?;
         } else {
             // Forward original response as-is (already have Content-Length)
-            let final_response = build_response(response.status_code, &response.headers, &response.body);
+            let final_response =
+                build_response(response.status_code, &response.headers, &response.body);
             client_stream.write_all(&final_response)?;
         }
     }
@@ -807,7 +858,12 @@ fn run_proxy_server(
     };
 
     listener.set_nonblocking(true).ok();
-    log::info!("Proxy server listening on port {}, forwarding to {}:{}", proxy_port, target_host, target_port);
+    log::info!(
+        "Proxy server listening on port {}, forwarding to {}:{}",
+        proxy_port,
+        target_host,
+        target_port
+    );
 
     loop {
         // Check stop flag
@@ -882,7 +938,11 @@ pub async fn wait_for_port_open(port: u16, timeout_secs: u64) -> Result<(), Stri
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
 
-    log::info!("wait_for_port_open: Waiting for port {} to open (timeout: {}s)", port, timeout_secs);
+    log::info!(
+        "wait_for_port_open: Waiting for port {} to open (timeout: {}s)",
+        port,
+        timeout_secs
+    );
 
     while start.elapsed() < timeout {
         match TcpStream::connect_timeout(
@@ -890,7 +950,11 @@ pub async fn wait_for_port_open(port: u16, timeout_secs: u64) -> Result<(), Stri
             Duration::from_millis(500),
         ) {
             Ok(_) => {
-                log::info!("wait_for_port_open: Port {} is now open after {:?}", port, start.elapsed());
+                log::info!(
+                    "wait_for_port_open: Port {} is now open after {:?}",
+                    port,
+                    start.elapsed()
+                );
                 return Ok(());
             }
             Err(_) => {
@@ -900,7 +964,10 @@ pub async fn wait_for_port_open(port: u16, timeout_secs: u64) -> Result<(), Stri
         }
     }
 
-    Err(format!("Port {} did not open within {} seconds", port, timeout_secs))
+    Err(format!(
+        "Port {} did not open within {} seconds",
+        port, timeout_secs
+    ))
 }
 
 /// Verify HTTP connection by making a GET request
@@ -958,7 +1025,10 @@ pub async fn verify_full_connection(
 /// Verify that a server is actually responding
 /// This command can be called from frontend to validate connection
 #[tauri::command]
-pub async fn verify_server_connection(url: String, timeout_secs: Option<u64>) -> Result<u16, String> {
+pub async fn verify_server_connection(
+    url: String,
+    timeout_secs: Option<u64>,
+) -> Result<u16, String> {
     let timeout = timeout_secs.unwrap_or(5);
     verify_http_connection(&url, timeout).await
 }
@@ -1003,9 +1073,9 @@ pub async fn start_dev_server(
 
     // Calculate fixed port if project_id is provided
     let fixed_port = project_id.as_ref().map(|id| {
-        let hash = id.chars().fold(0u32, |acc, c| {
-            acc.wrapping_mul(31).wrapping_add(c as u32)
-        });
+        let hash = id
+            .chars()
+            .fold(0u32, |acc, c| acc.wrapping_mul(31).wrapping_add(c as u32));
         32100 + (hash % 10000) as u16
     });
 
@@ -1091,13 +1161,16 @@ pub async fn start_dev_server(
         });
 
         // Notify frontend immediately
-        let _ = app.emit("dev-server-output", DevServerOutput {
-            project_path: project_path.clone(),
-            output_type: "port-detected".to_string(),
-            message: format!("Dev server configured to use port {}", port),
-            port: Some(port),
-            proxy_url: Some(format!("http://localhost:{}", proxy_port)),
-        });
+        let _ = app.emit(
+            "dev-server-output",
+            DevServerOutput {
+                project_path: project_path.clone(),
+                output_type: "port-detected".to_string(),
+                message: format!("Dev server configured to use port {}", port),
+                port: Some(port),
+                proxy_url: Some(format!("http://localhost:{}", proxy_port)),
+            },
+        );
     }
 
     // Spawn thread to read output
@@ -1123,35 +1196,53 @@ pub async fn start_dev_server(
                                 Ok(0) => break,
                                 Ok(n) => {
                                     let output = String::from_utf8_lossy(&buffer[..n]);
-                                    let _ = app.emit("dev-server-output", DevServerOutput {
-                                        project_path: project.clone(),
-                                        output_type: "stdout".to_string(),
-                                        message: output.to_string(),
-                                        port: None,
-                                        proxy_url: None,
-                                    });
+                                    let _ = app.emit(
+                                        "dev-server-output",
+                                        DevServerOutput {
+                                            project_path: project.clone(),
+                                            output_type: "stdout".to_string(),
+                                            message: output.to_string(),
+                                            port: None,
+                                            proxy_url: None,
+                                        },
+                                    );
 
                                     // Try to detect port (only if not already set with fixed port)
                                     let port_already_set = {
                                         let servers = DEV_SERVERS.lock().unwrap();
-                                        servers.servers.get(&project)
+                                        servers
+                                            .servers
+                                            .get(&project)
                                             .and_then(|e| e.info.detected_port)
                                             .is_some()
                                     };
 
                                     if !port_already_set {
                                         if let Some(port) = detect_dev_server_port(&output) {
-                                            log::info!("Detected dev server port from output: {}", port);
+                                            log::info!(
+                                                "Detected dev server port from output: {}",
+                                                port
+                                            );
 
                                             // Start proxy server
-                                            if let Some(proxy_port) = find_available_port(port + 10000) {
+                                            if let Some(proxy_port) =
+                                                find_available_port(port + 10000)
+                                            {
                                                 let stop_flag = {
                                                     let mut servers = DEV_SERVERS.lock().unwrap();
-                                                    if let Some(entry) = servers.servers.get_mut(&project) {
+                                                    if let Some(entry) =
+                                                        servers.servers.get_mut(&project)
+                                                    {
                                                         entry.info.detected_port = Some(port);
-                                                        entry.info.original_url = Some(format!("http://localhost:{}", port));
+                                                        entry.info.original_url = Some(format!(
+                                                            "http://localhost:{}",
+                                                            port
+                                                        ));
                                                         entry.info.proxy_port = Some(proxy_port);
-                                                        entry.info.proxy_url = Some(format!("http://localhost:{}", proxy_port));
+                                                        entry.info.proxy_url = Some(format!(
+                                                            "http://localhost:{}",
+                                                            proxy_port
+                                                        ));
                                                         entry.stop_flag.clone()
                                                     } else {
                                                         return;
@@ -1161,7 +1252,12 @@ pub async fn start_dev_server(
                                                 // Start proxy in background
                                                 let proxy_stop = stop_flag.clone();
                                                 thread::spawn(move || {
-                                                    run_proxy_server(proxy_port, "localhost".to_string(), port, proxy_stop);
+                                                    run_proxy_server(
+                                                        proxy_port,
+                                                        "localhost".to_string(),
+                                                        port,
+                                                        proxy_stop,
+                                                    );
                                                 });
 
                                                 let _ = app.emit("dev-server-output", DevServerOutput {
@@ -1191,13 +1287,16 @@ pub async fn start_dev_server(
                                 Ok(0) => break,
                                 Ok(n) => {
                                     let output = String::from_utf8_lossy(&buffer[..n]);
-                                    let _ = app.emit("dev-server-output", DevServerOutput {
-                                        project_path: project.clone(),
-                                        output_type: "stderr".to_string(),
-                                        message: output.to_string(),
-                                        port: None,
-                                        proxy_url: None,
-                                    });
+                                    let _ = app.emit(
+                                        "dev-server-output",
+                                        DevServerOutput {
+                                            project_path: project.clone(),
+                                            output_type: "stderr".to_string(),
+                                            message: output.to_string(),
+                                            port: None,
+                                            proxy_url: None,
+                                        },
+                                    );
                                 }
                                 Err(_) => break,
                             }
@@ -1243,7 +1342,11 @@ pub async fn connect_to_existing_server(
     project_path: String,
     port: u16,
 ) -> Result<String, String> {
-    log::info!("connect_to_existing_server: port={}, project_path={}", port, project_path);
+    log::info!(
+        "connect_to_existing_server: port={}, project_path={}",
+        port,
+        project_path
+    );
 
     // Check if port is actually in use by trying to connect to it
     // If connect succeeds, a server is running on that port
@@ -1252,10 +1355,17 @@ pub async fn connect_to_existing_server(
         Duration::from_millis(500),
     ) {
         Ok(_) => {
-            log::info!("connect_to_existing_server: Port {} is in use (connect succeeded)", port);
+            log::info!(
+                "connect_to_existing_server: Port {} is in use (connect succeeded)",
+                port
+            );
         }
         Err(e) => {
-            log::warn!("connect_to_existing_server: Port {} is NOT in use (connect failed: {})", port, e);
+            log::warn!(
+                "connect_to_existing_server: Port {} is NOT in use (connect failed: {})",
+                port,
+                e
+            );
             return Err(format!("No server running on port {}", port));
         }
     }
@@ -1297,7 +1407,11 @@ pub async fn connect_to_existing_server(
     }
 
     // Start proxy server
-    log::info!("connect_to_existing_server: Starting proxy server on port {} -> {}", proxy_port, port);
+    log::info!(
+        "connect_to_existing_server: Starting proxy server on port {} -> {}",
+        proxy_port,
+        port
+    );
     let proxy_stop = stop_flag.clone();
     thread::spawn(move || {
         run_proxy_server(proxy_port, "localhost".to_string(), port, proxy_stop);
@@ -1307,13 +1421,16 @@ pub async fn connect_to_existing_server(
     log::info!("connect_to_existing_server: Proxy URL = {}", proxy_url);
 
     // Notify frontend
-    let _ = app.emit("dev-server-output", DevServerOutput {
-        project_path: project_path.clone(),
-        output_type: "port-detected".to_string(),
-        message: format!("Connected to existing server at localhost:{}", port),
-        port: Some(port),
-        proxy_url: Some(proxy_url.clone()),
-    });
+    let _ = app.emit(
+        "dev-server-output",
+        DevServerOutput {
+            project_path: project_path.clone(),
+            output_type: "port-detected".to_string(),
+            message: format!("Connected to existing server at localhost:{}", port),
+            port: Some(port),
+            proxy_url: Some(proxy_url.clone()),
+        },
+    );
 
     // Return proxy URL for immediate use
     log::info!("connect_to_existing_server: Success, returning proxy URL");
