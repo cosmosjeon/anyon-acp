@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import React, { useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { useAuthStore } from '@/stores/authStore';
@@ -16,45 +15,8 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Deep Link 이벤트 리스너 등록 (Tauri Deep Link 플러그인 v2)
-    const setupListener = async () => {
-      const unlisten = await listen<string[]>('plugin:deep-link://urls', async (event) => {
-        console.log('Deep link received (plugin:deep-link://urls):', event.payload);
-
-        try {
-          // Tauri Deep Link 플러그인은 URL을 배열로 전달
-          const urls = event.payload;
-          if (urls && urls.length > 0) {
-            const urlString = urls[0];
-            const url = new URL(urlString);
-            const token = url.searchParams.get('token');
-
-            if (token) {
-              setIsLoading(true);
-              await login(token);
-              console.log('Login successful!');
-            } else {
-              setError('로그인에 실패했습니다. 토큰이 없습니다.');
-            }
-          }
-        } catch (error) {
-          console.error('Login failed:', error);
-          setError('로그인에 실패했습니다. 다시 시도해주세요.');
-        } finally {
-          setIsLoading(false);
-        }
-      });
-
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
-
-    return () => {
-      unlistenPromise.then((fn) => fn());
-    };
-  }, [login]);
+  // Deep link listener has been moved to App.tsx to ensure it works
+  // regardless of which page is mounted when the deep link arrives
 
   const handleGoogleLogin = async () => {
     try {

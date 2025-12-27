@@ -116,6 +116,20 @@ fn setup_linux_ime() {
     // No-op on non-Linux platforms
 }
 
+/// Extract deep link URL from command line argument, handling Windows formatting
+/// Handles: quotes, --prefix, url= prefix, and embedded anyon:// URLs
+fn extract_deep_link(arg: &str) -> Option<String> {
+    // Strip surrounding quotes
+    let trimmed = arg.trim_matches(['"', '\'']);
+    // Strip common prefixes
+    let trimmed = trimmed.strip_prefix("--").unwrap_or(trimmed);
+    let trimmed = trimmed.strip_prefix("url=").unwrap_or(trimmed);
+    // Find and extract anyon:// URL
+    trimmed
+        .find("anyon://")
+        .map(|pos| trimmed[pos..].to_string())
+}
+
 /// Initialize Tauri plugins
 fn init_tauri_plugins() -> impl Fn(tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
     |builder| {
@@ -128,27 +142,32 @@ fn init_tauri_plugins() -> impl Fn(tauri::Builder<tauri::Wry>) -> tauri::Builder
                 eprintln!("🔄 [SINGLE-INSTANCE] Triggered with args: {:?}", args);
                 log::info!("🔄 Single instance triggered with args: {:?}", args);
 
-                // Forward Deep Link URLs to existing instance
-                for arg in args {
-                    if arg.starts_with("anyon://") {
-                        eprintln!("📥 [SINGLE-INSTANCE] Received deep link: {}", arg);
-                        log::info!("📥 Received deep link via single-instance: {}", arg);
+                // Extract all deep link URLs from arguments (handles Windows formatting)
+                let urls: Vec<String> = args
+                    .iter()
+                    .filter_map(|arg| {
+                        eprintln!("🔍 [SINGLE-INSTANCE] Checking arg: {}", arg);
+                        extract_deep_link(arg)
+                    })
+                    .collect();
 
-                        // Emit the deep link event to the frontend
-                        let urls = vec![arg.clone()];
-                        if let Err(e) = app.emit("plugin:deep-link://urls", urls) {
-                            eprintln!("❌ [SINGLE-INSTANCE] Failed to emit deep link event: {}", e);
-                            log::error!("Failed to emit deep link event: {}", e);
-                        } else {
-                            eprintln!("✅ [SINGLE-INSTANCE] Emitted deep link event successfully");
-                            log::info!("✅ Emitted deep link event successfully");
-                        }
+                if !urls.is_empty() {
+                    eprintln!("📥 [SINGLE-INSTANCE] Extracted deep links: {:?}", urls);
+                    log::info!("📥 Extracted deep links: {:?}", urls);
 
-                        // Focus the main window
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.set_focus();
-                            let _ = window.unminimize();
-                        }
+                    // Emit all deep link URLs to the frontend
+                    if let Err(e) = app.emit("plugin:deep-link://urls", urls.clone()) {
+                        eprintln!("❌ [SINGLE-INSTANCE] Failed to emit deep link event: {}", e);
+                        log::error!("Failed to emit deep link event: {}", e);
+                    } else {
+                        eprintln!("✅ [SINGLE-INSTANCE] Emitted deep link event: {:?}", urls);
+                        log::info!("✅ Emitted deep link event: {:?}", urls);
+                    }
+
+                    // Focus the main window
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.set_focus();
+                        let _ = window.unminimize();
                     }
                 }
             }))
