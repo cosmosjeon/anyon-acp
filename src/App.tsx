@@ -14,6 +14,7 @@ import { NFOCredits } from "@/components/NFOCredits";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { UpdateNotification } from "@/components/UpdateNotification";
 import { AnalyticsConsentModal, hasAnalyticsConsent } from "@/components/AnalyticsConsentModal";
+import { OnboardingModal, hasCompletedOnboarding } from "@/components/help/OnboardingModal";
 import { useAppLifecycle } from "@/hooks";
 
 /**
@@ -77,6 +78,7 @@ function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
   const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -94,15 +96,26 @@ function App() {
     verifyAuth();
   }, [checkAuth]);
 
-  // Check analytics consent after authentication
+  // Check analytics consent and onboarding after authentication
   useEffect(() => {
     if (isAuthenticated && !isChecking) {
-      // Show consent modal if user hasn't consented yet
+      // Show consent modal first if user hasn't consented yet
       if (!hasAnalyticsConsent()) {
         setShowConsentModal(true);
+      } else if (!hasCompletedOnboarding()) {
+        // If already consented, check if onboarding is needed
+        setShowOnboardingModal(true);
       }
     }
   }, [isAuthenticated, isChecking]);
+
+  // Handle consent modal accept - then show onboarding if needed
+  const handleConsentAccept = () => {
+    setShowConsentModal(false);
+    if (!hasCompletedOnboarding()) {
+      setShowOnboardingModal(true);
+    }
+  };
 
   // Show loading while checking auth
   if (isChecking) {
@@ -138,7 +151,11 @@ function App() {
             <UpdateNotification />
             <AnalyticsConsentModal
               open={showConsentModal}
-              onAccept={() => setShowConsentModal(false)}
+              onAccept={handleConsentAccept}
+            />
+            <OnboardingModal
+              open={showOnboardingModal}
+              onComplete={() => setShowOnboardingModal(false)}
             />
           </TabProvider>
         </OutputCacheProvider>
