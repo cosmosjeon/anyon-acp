@@ -462,6 +462,8 @@ macro_rules! create_handlers {
             commands::git::has_git_uncommitted_changes,
             commands::git::git_reset_hard,
             commands::git::get_git_diff_summary,
+            commands::git::get_git_log,
+            commands::git::get_git_changes_count,
         ]
     };
 }

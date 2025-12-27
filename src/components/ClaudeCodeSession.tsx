@@ -101,6 +101,10 @@ interface ClaudeCodeSessionProps {
    * Callback when a new session is created
    */
   onSessionCreated?: (sessionId: string, firstMessage?: string) => void;
+  /**
+   * Callback when user stops workflow execution (e.g., pressing stop button)
+   */
+  onStopWorkflow?: () => void;
 }
 
 /**
@@ -130,6 +134,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   embedded = false,
   tabType,
   onSessionCreated,
+  onStopWorkflow,
 }, ref) => {
   const [projectPath, setProjectPath] = useState(initialProjectPath || session?.project_path || "");
 
@@ -863,6 +868,9 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       const duration = Date.now() - sessionStartTime;
       
       await api.cancelClaudeExecution(claudeSessionId);
+      
+      // Notify parent component to stop any automated workflow progression
+      onStopWorkflow?.();
       
       // Calculate metrics for enhanced analytics
       const metrics = sessionMetrics.current;

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { forwardRef, useImperativeHandle, useState, useRef, useEffect, useCallback } from 'react';
 import { PlayCircle, Square, AlertCircle, CheckCircle2, Code, Trash2, Loader2, RefreshCw, ChevronRight, File, Clock, Circle } from '@/lib/icons';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,13 @@ interface DevDocsPanelProps {
   isPlanningComplete: boolean;
   onStartWorkflow?: (workflowPrompt: string, displayText?: string) => void;
   isSessionLoading?: boolean;
+}
+
+/**
+ * Ref methods exposed by DevDocsPanel
+ */
+export interface DevDocsPanelRef {
+  stop: () => void;
 }
 
 /**
@@ -262,30 +269,30 @@ const extractBlockedTickets = (content: string): BlockedTicket[] => {
 
 /**
  * Get next workflow step based on current step
- * Orchestrator → Executor → Reviewer → Executor → Reviewer ... (cycle)
+ * Orchestrator는 수동, Executor ↔ Reviewer만 자동 반복
  */
 const getNextStep = (currentStepId: string): typeof DEV_WORKFLOW_SEQUENCE[0] | null => {
-  // Orchestrator → Executor
+  // Orchestrator → 수동 (자동 전환 안 함)
   if (currentStepId === 'pm-orchestrator') {
-    return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
+    return null; // 사용자가 Executor 버튼을 직접 눌러야 함
   }
-  // Executor → Reviewer
+  // Executor → Reviewer (자동)
   if (currentStepId === 'pm-executor') {
     return DEV_WORKFLOW_SEQUENCE[2]; // pm-reviewer
   }
-  // Reviewer → Executor (cycle back)
+  // Reviewer → Executor (자동, cycle back)
   if (currentStepId === 'pm-reviewer') {
     return DEV_WORKFLOW_SEQUENCE[1]; // pm-executor
   }
   return null;
 };
 
-export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
+export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
   projectPath,
   isPlanningComplete,
   onStartWorkflow,
   isSessionLoading = false,
-}) => {
+}, ref) => {
   const [currentRunningStep, setCurrentRunningStep] = useState<string | null>(null);
   const prevLoadingRef = useRef(isSessionLoading);
   const isStoppedRef = useRef(false);
@@ -425,27 +432,26 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
     const isNowDone = wasLoading && !isSessionLoading;
     prevLoadingRef.current = isSessionLoading;
 
-    if (isNowDone && currentRunningStep && !isStoppedRef.current) {
-      // Progress 데이터 새로고침
-      loadProgressData();
+    // 🛑 중지 상태 체크 - 중지되었으면 자동 진행 안 함
+    if (isStoppedRef.current) {
+      return;
+    }
 
-      addLogEntry(currentRunningStep, 'completed', progressData.currentWave || undefined);
-
+    if (isNowDone && currentRunningStep) {
       const checkAndContinue = async () => {
-        if (!projectPath) return;
+        // 🛑 중지 상태 체크
+        if (isStoppedRef.current || !projectPath) return;
 
         try {
-          // Check for overall development completion
+          // 1. Progress 데이터 새로고침 (await으로 완료 대기)
+          await loadProgressData();
+
+          // 2. 로그 기록 (업데이트된 progressData 사용)
+          addLogEntry(currentRunningStep, 'completed', progressData.currentWave || undefined);
+
+          // 3. 전체 개발 완료 체크
           const completeFilePath = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/${ANYON_DOCS.DEV_FILES.COMPLETE_MARKER}`;
           const isComplete = await api.checkFileExists(completeFilePath);
-
-          // Check for orchestrator completion
-          const orchestratorCompleteFile = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/ORCHESTRATOR_COMPLETE.md`;
-          const isOrchComplete = await api.checkFileExists(orchestratorCompleteFile);
-
-          if (isOrchComplete) {
-            setIsOrchestratorComplete(true);
-          }
 
           if (isComplete) {
             setIsDevComplete(true);
@@ -454,18 +460,50 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
             return;
           }
 
+          // 4. Orchestrator 완료 체크 (UI 표시용)
+          const orchestratorCompleteFile = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/ORCHESTRATOR_COMPLETE.md`;
+          const isOrchComplete = await api.checkFileExists(orchestratorCompleteFile);
+          if (isOrchComplete) {
+            setIsOrchestratorComplete(true);
+          }
+
+          // 🛑 중지 상태 재확인 (async 작업 중 중지 눌렀을 수 있음)
+          if (isStoppedRef.current) return;
+
+          // 5. 다음 단계 결정 및 자동 실행
           const nextStep = getNextStep(currentRunningStep);
+          
+          // Executor → Reviewer 전환 시 workflow_state 검증
+          if (currentRunningStep === 'pm-executor' && nextStep?.id === 'pm-reviewer') {
+            // execution-progress.md에서 workflow_state 확인
+            const progressPath = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/execution-progress.md`;
+            const progressContent = await api.readFile(progressPath);
+            const stateMatch = progressContent.match(/workflow_state:\s*["']?(\w+)["']?/i);
+            const workflowState = stateMatch ? stateMatch[1] : null;
+
+            if (workflowState !== 'awaiting_review') {
+              console.warn('[DevDocsPanel] Executor finished but workflow_state is not "awaiting_review". Skipping auto-transition to Reviewer.');
+              setCurrentRunningStep(null);
+              return;
+            }
+          }
+
           if (nextStep) {
             setTimeout(() => {
+              // 🛑 중지 상태 마지막 확인 (setTimeout 대기 중 중지 눌렀을 수 있음)
               if (!isStoppedRef.current) {
                 setCurrentRunningStep(nextStep.id);
                 addLogEntry(nextStep.id, 'running', progressData.currentWave || undefined);
                 onStartWorkflow?.(getDevWorkflowPrompt(nextStep), nextStep.displayText);
               }
             }, 500);
+          } else {
+            // 다음 단계가 없으면 (Orchestrator 완료 등) currentRunningStep 초기화
+            setCurrentRunningStep(null);
           }
         } catch (error) {
           console.error('[DevDocsPanel] Error checking workflow completion:', error);
+          setCurrentRunningStep(null);
         }
       };
 
@@ -490,6 +528,11 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
     }
     setCurrentRunningStep(null);
   };
+
+  // Expose stop method to parent via ref
+  useImperativeHandle(ref, () => ({
+    stop: handleStop,
+  }), [handleStop]);
 
   const handleClearLog = () => {
     setExecutionLog([]);
@@ -719,8 +762,28 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
           })}
         </div>
 
+        {/* Orchestrator 완료 시 Executor 버튼 클릭 유도 */}
+        {isOrchestratorComplete && !currentRunningStep && !isDevComplete && (
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  기획 문서 생성 완료!
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  개발을 시작하려면 <span className="font-semibold">PM Executor</span> 버튼을 클릭하세요
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-center text-muted-foreground mt-3">
-          각 단계를 클릭하여 시작 / 완료 후 자동으로 다음 단계 진행
+          {isOrchestratorComplete 
+            ? "Executor ↔ Reviewer는 자동 반복 / Orchestrator는 수동"
+            : "각 단계를 클릭하여 시작 / Executor ↔ Reviewer는 자동 반복"
+          }
         </p>
       </div>
 
@@ -794,17 +857,21 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
 
           {/* 로그 항목 */}
           {executionLog.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm space-y-4">
               {isDevComplete ? (
                 <div className="text-center">
                   <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-2" />
                   <p className="text-green-600 dark:text-green-400 font-medium">개발이 완료되었습니다</p>
                 </div>
-              ) : !currentRunningStep && !isStoppedRef.current ? (
-                <p>워크플로우 단계를 클릭하여 시작하세요</p>
-              ) : !currentRunningStep && isStoppedRef.current ? (
-                <p>중지됨 - 다시 시작하려면 단계를 클릭하세요</p>
-              ) : null}
+              ) : (
+                <div className="text-center space-y-2 px-4">
+                  <p className="font-medium">워크플로우 단계를 클릭하여 시작하세요</p>
+                  <p className="text-xs text-muted-foreground">
+                    중간에 멈추면 이어서 해달라고 말하거나<br />
+                    같은 버튼을 한번 더 눌러주세요
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             executionLog.map((log) => {
@@ -963,6 +1030,15 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
               );
             })
           )}
+          
+          {/* 로그가 있을 때 하단 안내 메시지 */}
+          {executionLog.length > 0 && !isDevComplete && (
+            <div className="mt-4 p-3 border border-dashed border-border rounded-lg bg-muted/20">
+              <p className="text-xs text-center text-muted-foreground">
+                💡 중간에 멈추면 이어서 해달라고 말하거나 같은 버튼을 한번 더 눌러주세요
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -977,6 +1053,6 @@ export const DevDocsPanel: React.FC<DevDocsPanelProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default DevDocsPanel;
