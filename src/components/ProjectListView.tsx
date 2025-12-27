@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderOpen, Search, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar, Trash2, X } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { FolderOpen, Search, Plus, Download, CheckCircle, AlertCircle, ArrowUpDown, Clock, SortAsc, Calendar, Trash2, X, Loader2 } from "@/lib/icons";
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,8 +14,9 @@ import {
 import { ProjectCard } from '@/components/ProjectCard';
 import { MinimalSidebar } from '@/components/MinimalSidebar';
 import { Settings } from '@/components/Settings';
-import { useProjectsNavigation } from '@/components/ProjectRoutes';
+import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { api, type Project } from '@/lib/api';
+import type { TemplateId } from '@/types/template';
 
 // Cross-platform project name extractor (handles / and \\)
 const getProjectName = (path: string): string => {
@@ -35,9 +35,7 @@ const getProjectName = (path: string): string => {
  */
 export const ProjectListView: React.FC = () => {
   const { goToProject } = useProjectsNavigation();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { projects, loading, error, refreshProjects } = useProjects();
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpeningFolder, setIsOpeningFolder] = useState(false);
   const [isInstallingAnyon, setIsInstallingAnyon] = useState(false);
@@ -46,6 +44,7 @@ export const ProjectListView: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'created'>('recent');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+  const [projectTemplates, setProjectTemplates] = useState<Record<string, TemplateId>>({});
 
   const toggleSelectMode = () => {
     if (isSelectMode) {
@@ -93,27 +92,23 @@ export const ProjectListView: React.FC = () => {
     }
   };
 
-  // Load projects from API
-  const refreshProjects = useCallback(async (): Promise<Project[]> => {
-    try {
-      setLoading(true);
-      setError(null);
-      const projectList = await api.listRegisteredProjects();
-      setProjects(projectList);
-      return projectList;
-    } catch (err) {
-      console.error("Failed to load projects:", err);
-      setError("Failed to load projects. Please ensure ~/.claude directory exists.");
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load projects on mount
+  // Load projects on mount (ensure context stays in sync)
   useEffect(() => {
     refreshProjects();
   }, [refreshProjects]);
+
+  // Load project templates
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const templates = await api.getProjectTemplates();
+        setProjectTemplates(templates as Record<string, TemplateId>);
+      } catch (err) {
+        console.error('Failed to load project templates:', err);
+      }
+    };
+    loadTemplates();
+  }, [projects]);
 
   // Filter and sort projects
   const filteredProjects = useMemo(() => {
@@ -219,25 +214,10 @@ export const ProjectListView: React.FC = () => {
           // Continue even if git check/init fails
         }
 
-        // Run npx anyon-agents@latest automatically
-        setInstallStatus({ type: 'info', text: 'Installing ANYON agents...' });
-
-        try {
-          const result = await api.runNpxAnyonAgents(selected);
-          if (result.success) {
-            setInstallStatus({ type: 'success', text: 'ANYON agents installed successfully!' });
-            setTimeout(() => setInstallStatus(null), 3000);
-          } else {
-            setInstallStatus({ type: 'error', text: result.stderr || 'Installation completed with warnings' });
-            setTimeout(() => setInstallStatus(null), 5000);
-          }
-        } catch (installErr) {
-          console.error('Failed to install anyon-agents:', installErr);
-          setInstallStatus({ type: 'error', text: 'Installation failed. You can install later from project settings.' });
-          setTimeout(() => setInstallStatus(null), 5000);
-        } finally {
-          setIsInstallingAnyon(false);
-        }
+        // Project setup complete
+        setInstallStatus({ type: 'success', text: 'Project setup complete!' });
+        setTimeout(() => setInstallStatus(null), 2000);
+        setIsInstallingAnyon(false);
       }
     } catch (err) {
       console.error('Failed to open folder picker:', err);
@@ -288,7 +268,7 @@ export const ProjectListView: React.FC = () => {
           onProjectSelect={handleSidebarProjectSelect}
         />
         <div className="flex-1 flex items-center justify-center">
-          <VideoLoader size="lg" />
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
@@ -320,7 +300,7 @@ export const ProjectListView: React.FC = () => {
                   ? 'bg-green-600/90 border-green-500/30 text-white'
                   : 'bg-background/95 border-border text-foreground'
               }`}>
-                {installStatus.type === 'info' && <VideoLoader size="sm" />}
+                {installStatus.type === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
                 {installStatus.type === 'success' && <CheckCircle className="h-4 w-4" />}
                 {installStatus.type === 'error' && <AlertCircle className="h-4 w-4" />}
                 <span className="text-sm font-medium">{installStatus.text}</span>
@@ -349,7 +329,7 @@ export const ProjectListView: React.FC = () => {
                   className="flex items-center gap-2"
                 >
                   {isOpeningFolder ? (
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : isInstallingAnyon ? (
                     <>
                       <Download className="h-4 w-4 animate-pulse" />
@@ -483,7 +463,13 @@ export const ProjectListView: React.FC = () => {
           {/* Project grid */}
           {filteredProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProjects.map((project) => (
+              {filteredProjects.map((project) => {
+                // Find template for this project (normalize path for comparison)
+                const templateId = Object.entries(projectTemplates).find(
+                  ([path]) => path.replace(/\\/g, '/').toLowerCase() === project.path.replace(/\\/g, '/').toLowerCase()
+                )?.[1] as TemplateId | undefined;
+                
+                return (
                 <ProjectCard
                   key={project.id}
                   project={project}
@@ -492,8 +478,10 @@ export const ProjectListView: React.FC = () => {
                   isSelectMode={isSelectMode}
                   isSelected={selectedProjects.has(project.id)}
                   onToggleSelect={() => toggleProjectSelection(project.id)}
+                  templateId={templateId}
                 />
-              ))}
+              );
+              })}
             </div>
           ) : projects.length > 0 && searchQuery ? (
             /* No search results */
@@ -527,7 +515,7 @@ export const ProjectListView: React.FC = () => {
                     className="flex items-center gap-2"
                   >
                     {isOpeningFolder ? (
-                      <VideoLoader size="sm" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : isInstallingAnyon ? (
                       <>
                         <Download className="h-4 w-4 animate-pulse" />

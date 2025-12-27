@@ -1,1 +1,1 @@
-export { DevDocsPanel } from './DevDocsPanel';
+export { DevDocsPanel, type DevDocsPanelRef } from './DevDocsPanel';

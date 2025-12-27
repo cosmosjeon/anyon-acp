@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { AlertCircle , Loader2 } from "@/lib/icons";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Toast, ToastContainer } from "@/components/ui/toast";
@@ -128,7 +127,7 @@ export const MCPManager: React.FC<MCPManagerProps> = ({
         {/* Content */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
-            <VideoLoader size="lg" />
+            <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-6">

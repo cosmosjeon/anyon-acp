@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, 
-  Copy, 
-  ChevronDown, 
+import {
+  ArrowLeft,
+  Copy,
+  ChevronDown,
   Clock,
   Hash,
   DollarSign,
   Bot,
   StopCircle
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Popover } from "@/components/ui/popover";
+import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type AgentRunWithMetrics } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatISOTimestamp } from "@/lib/date-utils";
 import { StreamMessage } from "./StreamMessage";
-import { AGENT_ICONS } from "./CCAgents";
+import { ICON_MAP } from "./IconPicker";
 import type { ClaudeStreamMessage } from "./AgentExecution";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -218,7 +218,7 @@ export const AgentRunView: React.FC<AgentRunViewProps> = ({
   };
 
   const renderIcon = (iconName: string) => {
-    const Icon = AGENT_ICONS[iconName as keyof typeof AGENT_ICONS] || Bot;
+    const Icon = ICON_MAP[iconName] || Bot;
     return <Icon className="h-5 w-5" />;
   };
 

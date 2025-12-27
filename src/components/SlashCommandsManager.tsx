@@ -13,12 +13,11 @@ import {
   Zap,
   Code,
   AlertCircle,
-  
   Search,
   ChevronDown,
-  ChevronRight
-} from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+  ChevronRight,
+  Loader2
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { api, type SlashCommand } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { COMMON_TOOL_MATCHERS } from "@/types/hooks";
+import { COMMON_TOOL_MATCHERS } from "@/types/toolMatchers";
 import { useTrackEvent } from "@/hooks";
 
 interface SlashCommandsManagerProps {
@@ -358,7 +357,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       {/* Commands List */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <VideoLoader size="md" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : filteredCommands.length === 0 ? (
         <Card className="p-8">
@@ -665,7 +664,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
             >
               {saving ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
@@ -712,7 +711,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
             >
               {deleting ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Deleting...
                 </>
               ) : (

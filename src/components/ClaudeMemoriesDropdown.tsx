@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Edit2, FileText } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { ChevronDown, Edit2, FileText , Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -105,7 +104,7 @@ export const ClaudeMemoriesDropdown: React.FC<ClaudeMemoriesDropdownProps> = ({
               <div className="border-t border-border">
                 {loading ? (
                   <div className="p-4 flex items-center justify-center">
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
                 ) : error ? (
                   <div className="p-3 text-xs text-destructive">{error}</div>

@@ -66,16 +66,6 @@ export class ConsentManager {
     await this.saveSettings();
   }
   
-  async revokeConsent(): Promise<void> {
-    if (!this.settings) {
-      await this.initialize();
-    }
-    
-    this.settings!.enabled = false;
-    
-    await this.saveSettings();
-  }
-  
   async deleteAllData(): Promise<void> {
     // Clear local storage
     localStorage.removeItem(ANALYTICS_STORAGE_KEY);

@@ -1,0 +1,152 @@
+{
+  "version": "2.0.0",
+  "description": "Tracks documentation freshness using git commit hashes",
+  "last_full_sync_commit": "b8108ee",
+  "documents": {
+    "auto_generated": {
+      "specs/component-inventory.md": {
+        "type": "auto",
+        "source_patterns": [
+          "src/components/**/*.tsx",
+          "src/hooks/**/*.ts",
+          "src/stores/**/*.ts"
+        ],
+        "last_synced_commit": "b8108ee",
+        "regenerate_on": [
+          "component_add",
+          "component_remove",
+          "hook_change"
+        ]
+      },
+      "specs/api-contracts.md": {
+        "type": "auto",
+        "source_patterns": [
+          "src-tauri/src/commands/**/*.rs",
+          "server/*.js"
+        ],
+        "last_synced_commit": "b8108ee",
+        "regenerate_on": [
+          "api_change",
+          "endpoint_add",
+          "endpoint_remove"
+        ]
+      },
+      "specs/data-models.md": {
+        "type": "auto",
+        "source_patterns": [
+          "src-tauri/src/main.rs",
+          "src-tauri/src/commands/storage.rs",
+          "src/types/**/*.ts",
+          "server/db/**/*.js"
+        ],
+        "last_synced_commit": "b8108ee",
+        "regenerate_on": [
+          "schema_change",
+          "type_change"
+        ]
+      },
+      "specs/source-tree-analysis.md": {
+        "type": "auto",
+        "source_patterns": [
+          "*"
+        ],
+        "last_synced_commit": "b8108ee",
+        "regenerate_on": [
+          "directory_structure_change"
+        ]
+      }
+    },
+    "manual_with_drift_detection": {
+      "specs/architecture-frontend.md": {
+        "type": "manual",
+        "watch_patterns": [
+          "src/App.tsx",
+          "src/router/**/*",
+          "src/stores/**/*"
+        ],
+        "last_reviewed_commit": "b8108ee",
+        "drift_indicators": []
+      },
+      "specs/architecture-desktop.md": {
+        "type": "manual",
+        "watch_patterns": [
+          "src-tauri/src/main.rs",
+          "src-tauri/src/lib.rs",
+          "src-tauri/Cargo.toml",
+          "src-tauri/src/commands/agents/**/*.rs"
+        ],
+        "last_reviewed_commit": "b8108ee",
+        "drift_indicators": []
+      },
+      "specs/architecture-server.md": {
+        "type": "manual",
+        "watch_patterns": [
+          "server/index.js",
+          "server/package.json",
+          "server/db/**/*.js"
+        ],
+        "last_reviewed_commit": "b8108ee",
+        "drift_indicators": []
+      },
+      "specs/integration-architecture.md": {
+        "type": "manual",
+        "watch_patterns": [
+          "src/stores/**/*.ts",
+          "src/services/**/*",
+          "src-tauri/src/commands/mod.rs"
+        ],
+        "last_reviewed_commit": "b8108ee",
+        "drift_indicators": []
+      }
+    },
+    "metadata_auto_update": {
+      "specs/project-overview.md": {
+        "type": "hybrid",
+        "auto_sections": [
+          "statistics",
+          "technology_versions"
+        ],
+        "manual_sections": [
+          "description",
+          "goals"
+        ],
+        "last_synced_commit": "b8108ee"
+      },
+      "specs/development-guide.md": {
+        "type": "hybrid",
+        "auto_sections": [
+          "prerequisites",
+          "scripts"
+        ],
+        "manual_sections": [
+          "workflow",
+          "conventions"
+        ],
+        "last_synced_commit": "b8108ee"
+      }
+    }
+  },
+  "audit_tracking": {
+    "audits/code-audit-report.md": {
+      "total_issues": 520,
+      "last_updated_commit": "b8108ee"
+    }
+  },
+  "drift_check_command": "git diff {last_commit}..HEAD -- {patterns}",
+  "triggers": {
+    "post_edit": {
+      "enabled": true,
+      "actions": [
+        "check_drift",
+        "update_sync_status"
+      ]
+    },
+    "post_commit": {
+      "enabled": true,
+      "actions": [
+        "regenerate_auto_docs",
+        "update_audit_status"
+      ]
+    }
+  }
+}

@@ -2,18 +2,20 @@ import React, { useEffect, useState, Suspense, lazy, useCallback, useRef } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
+  ArrowRight,
   Wrench,
-  Code,
-  Monitor,
   X,
   Lightbulb,
   PanelRightClose,
   PanelRightOpen,
-} from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+  Loader2,
+  FileText,
+  Code,
+  Search,
+} from "@/lib/icons";
+import type { ExecutionMode } from './FloatingPromptInput';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
-import { FileExplorer } from '@/components/FileExplorer';
 import { EnhancedPreviewPanel } from '@/components/preview';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { Settings } from '@/components/Settings';
@@ -29,7 +31,10 @@ const ClaudeCodeSession = lazy(() =>
 );
 const FileTree = lazy(() => import('@/components/FileTree'));
 
-type MaintenanceTabType = 'code' | 'preview';
+
+
+// Maintenance tab types
+type MaintenanceTabType = 'planning' | 'development';
 
 interface MaintenanceWorkspaceProps {
   projectId: string;
@@ -40,18 +45,26 @@ interface MaintenanceWorkspaceProps {
  *
  * Layout:
  * ┌────────┬─────────────────┬──────────────────────┐
- * │Sidebar │     Chat        │   Code/Preview       │
- * │ (56px) │  (flexible)     │   Tabs               │
+ * │Sidebar │     Chat        │   Preview (default)  │
+ * │ (56px) │  (flexible)     │   or Code (toggle)   │
  * └────────┴─────────────────┴──────────────────────┘
+ *
+ * - Preview is shown by default
+ * - Code view is toggled via </> button in header
  */
 export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ projectId }) => {
   const { goToProject, goToProjectList, goToMvp } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<MaintenanceTabType>('preview');
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [sessionKey, setSessionKey] = useState(0);
+  const [sessionKey, _setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Tab state - default to planning mode
+  const [activeTab, setActiveTab] = useState<MaintenanceTabType>('planning');
+
+  // Session loading state - to prevent tab switching during AI work
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
 
   // Sidebar state - collapsed by default
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -74,10 +87,16 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   // Load last session
   useEffect(() => {
     if (project?.path) {
-      const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'maintenance');
-      if (lastSessionData) {
-        const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
-        setCurrentSession(session);
+      try {
+        const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'maintenance');
+        if (lastSessionData) {
+          const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+          if (session) {
+            setCurrentSession(session);
+          }
+        }
+      } catch (err) {
+        console.error('[MaintenanceWorkspace] Failed to load last session:', err);
       }
     }
   }, [project?.path]);
@@ -85,18 +104,19 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   // Git repo check
   useEffect(() => {
     const checkGitRepo = async () => {
-      if (project?.path) {
-        try {
-          const isGitRepo = await api.checkIsGitRepo(project.path);
-          if (!isGitRepo) {
-            const gitResult = await api.initGitRepo(project.path);
-            if (gitResult.success) {
-              console.log('Git repository initialized successfully');
-            }
+      if (!project?.path) return;
+      
+      try {
+        const isGitRepo = await api.checkIsGitRepo(project.path);
+        if (!isGitRepo) {
+          const gitResult = await api.initGitRepo(project.path);
+          if (gitResult?.success) {
+            console.log('[MaintenanceWorkspace] Git repository initialized successfully');
           }
-        } catch (gitErr) {
-          console.error('Failed to check/init git repo:', gitErr);
         }
+      } catch (gitErr) {
+        // Git init failure is not critical, just log it
+        console.warn('[MaintenanceWorkspace] Failed to check/init git repo:', gitErr);
       }
     };
     checkGitRepo();
@@ -177,31 +197,36 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
     }
   };
 
-  const handleSessionSelect = useCallback((session: Session | null) => {
-    setCurrentSession(session);
-    setSessionKey(prev => prev + 1);
-    if (session && project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', session.id);
-    }
-  }, [project?.path]);
-
   const handleSessionCreated = useCallback((sessionId: string) => {
-    if (project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId);
+    if (!sessionId) {
+      console.warn('[MaintenanceWorkspace] handleSessionCreated called with empty sessionId');
+      return;
     }
-  }, [project?.path]);
-
-  const handleNewSession = useCallback(() => {
-    setCurrentSession(null);
-    setSessionKey(prev => prev + 1);
-  }, []);
+    if (project?.path && project?.id) {
+      try {
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'maintenance', sessionId, project.id);
+      } catch (err) {
+        console.error('[MaintenanceWorkspace] Failed to save session:', err);
+      }
+    }
+  }, [project?.path, project?.id]);
 
   const projectName = project?.path.split('/').pop() || 'Project';
+
+  // Handle execution mode change from FloatingPromptInput button
+  const handleExecutionModeChange = useCallback((mode: ExecutionMode) => {
+    setActiveTab(mode === 'plan' ? 'planning' : 'development');
+  }, []);
+
+  // Handle streaming state change to prevent tab switching during AI work
+  const handleStreamingChange = useCallback((isStreaming: boolean) => {
+    setIsSessionLoading(isStreaming);
+  }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <VideoLoader size="lg" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -225,9 +250,6 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
         <WorkspaceSidebar
           projectPath={project?.path || ''}
           tabType="maintenance"
-          currentSessionId={currentSession?.id}
-          onNewSession={handleNewSession}
-          onSessionSelect={handleSessionSelect}
           onLogoClick={() => setShowSettings(false)}
           onSettingsClick={() => setShowSettings(false)}
           collapsed={sidebarCollapsed}
@@ -242,13 +264,10 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
 
   return (
     <div ref={containerRef} className="h-full flex overflow-hidden bg-background">
-      {/* Sidebar with Sessions */}
+      {/* Sidebar */}
       <WorkspaceSidebar
         projectPath={project?.path || ''}
         tabType="maintenance"
-        currentSessionId={currentSession?.id}
-        onNewSession={handleNewSession}
-        onSessionSelect={handleSessionSelect}
         onLogoClick={goToProjectList}
         onSettingsClick={() => setShowSettings(true)}
         collapsed={sidebarCollapsed}
@@ -272,7 +291,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
+              <Suspense fallback={<div className="p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -348,22 +367,25 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               session={currentSession || undefined}
               initialProjectPath={project?.path}
               onBack={handleBack}
               onProjectPathChange={() => {}}
+              onStreamingChange={handleStreamingChange}
               embedded={true}
               tabType="maintenance"
               onSessionCreated={handleSessionCreated}
+              defaultExecutionMode={activeTab === 'planning' ? 'plan' : 'execute'}
+              onExecutionModeChange={handleExecutionModeChange}
             />
           </Suspense>
         </div>
       </div>
 
-      {/* Right Panel (Code/Preview) */}
+      {/* Right Panel (Planning/Development) */}
       <AnimatePresence>
         {rightPanelVisible && (
           <>
@@ -383,40 +405,84 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               transition={{ duration: 0.2 }}
               className="h-full bg-background border-l border-border overflow-hidden flex flex-col shadow-[-2px_0_8px_rgba(0,0,0,0.08)]"
             >
-              {/* Header - Preview focused with code toggle */}
+              {/* Tabs Header */}
               <div className="flex-shrink-0 border-b border-border bg-card/50">
-                <div className="flex items-center justify-between px-3 py-2">
-                  {/* Left: Title */}
-                  <div className="flex items-center gap-2">
-                    <Monitor className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">
-                      {activeTab === 'preview' ? '프리뷰' : '코드'}
-                    </span>
-                  </div>
-
-                  {/* Right: Code toggle button */}
+                <div className="flex">
+                  {/* 계획 세우기 탭 */}
                   <button
-                    onClick={() => setActiveTab(activeTab === 'preview' ? 'code' : 'preview')}
+                    onClick={() => !isSessionLoading && setActiveTab('planning')}
+                    disabled={isSessionLoading}
                     className={cn(
-                      "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors",
-                      activeTab === 'code'
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'planning'
+                        ? "border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      isSessionLoading && "opacity-50 cursor-not-allowed pointer-events-none"
                     )}
-                    title={activeTab === 'preview' ? '코드 보기' : '프리뷰 보기'}
                   >
-                    <Code className="w-3.5 h-3.5" />
-                    <span>{activeTab === 'preview' ? '코드' : '프리뷰'}</span>
+                    <FileText className="w-4 h-4" />
+                    <span>계획 세우기</span>
+                    {isSessionLoading && activeTab === 'planning' && (
+                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                    )}
+                  </button>
+
+                  {/* 개발 탭 */}
+                  <button
+                    onClick={() => !isSessionLoading && setActiveTab('development')}
+                    disabled={isSessionLoading}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'development'
+                        ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      isSessionLoading && "opacity-50 cursor-not-allowed pointer-events-none"
+                    )}
+                  >
+                    <Code className="w-4 h-4" />
+                    <span>개발</span>
+                    {isSessionLoading && activeTab === 'development' && (
+                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                    )}
                   </button>
                 </div>
               </div>
 
               {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
-                {activeTab === 'code' && (
-                  <FileExplorer rootPath={project?.path} />
+                {activeTab === 'planning' ? (
+                  // 계획 세우기: 심플한 안내 화면
+                  <div className="h-full flex flex-col items-center justify-center p-8">
+                    <div className="text-center max-w-sm">
+                      <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
+                        <Search className="w-8 h-8 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <p className="text-lg font-medium mb-2">문제 분석 & 계획 수립</p>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        채팅으로 버그를 분석하고 수정 계획을 세우세요.
+                      </p>
+
+                      {/* 계획 완료 안내 */}
+                      <div className="pt-6 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-3">
+                          계획이 완료되었나요?
+                        </p>
+                        <Button
+                          onClick={() => setActiveTab('development')}
+                          variant="outline"
+                          className="gap-2"
+                          disabled={isSessionLoading}
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                          개발 탭으로 이동
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // 개발: EnhancedPreviewPanel
+                  <EnhancedPreviewPanel projectPath={project?.path} projectId={project?.id} />
                 )}
-                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
               </div>
             </motion.div>
           </>

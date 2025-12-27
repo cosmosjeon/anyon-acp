@@ -1,61 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import React, { useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
-import { Terminal } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { Terminal, Loader2 } from "@/lib/icons";
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import anyonTextLogo from '@/assets/ANYON.png';
 
-const API_URL = 'https://claude-anyon-web-production.up.railway.app';
+const API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
 
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Deep Link 이벤트 리스너 등록 (Tauri Deep Link 플러그인 v2)
-    const setupListener = async () => {
-      const unlisten = await listen<string[]>('plugin:deep-link://urls', async (event) => {
-        console.log('Deep link received (plugin:deep-link://urls):', event.payload);
-
-        try {
-          // Tauri Deep Link 플러그인은 URL을 배열로 전달
-          const urls = event.payload;
-          if (urls && urls.length > 0) {
-            const urlString = urls[0];
-            const url = new URL(urlString);
-            const token = url.searchParams.get('token');
-
-            if (token) {
-              setIsLoading(true);
-              await login(token);
-              console.log('Login successful!');
-            } else {
-              setError('로그인에 실패했습니다. 토큰이 없습니다.');
-            }
-          }
-        } catch (error) {
-          console.error('Login failed:', error);
-          setError('로그인에 실패했습니다. 다시 시도해주세요.');
-        } finally {
-          setIsLoading(false);
-        }
-      });
-
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
-
-    return () => {
-      unlistenPromise.then((fn) => fn());
-    };
-  }, [login]);
+  // Deep link listener has been moved to App.tsx to ensure it works
+  // regardless of which page is mounted when the deep link arrives
 
   const handleGoogleLogin = async () => {
     try {
@@ -169,7 +130,7 @@ export const LoginPage: React.FC = () => {
         <div className="w-full max-w-sm space-y-8">
           {/* 로고 */}
           <div className="text-center">
-            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto" />
+            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto invert dark:invert-0" />
           </div>
 
           {/* 환영 메시지 */}
@@ -200,7 +161,7 @@ export const LoginPage: React.FC = () => {
             >
               {isLoading ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                   <span className="text-muted-foreground">로그인 중...</span>
                 </>
               ) : (
@@ -238,7 +199,7 @@ export const LoginPage: React.FC = () => {
                 size="lg"
               >
                 {isLoading ? (
-                  <VideoLoader size="sm" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Terminal className="w-4 h-4" />
                 )}

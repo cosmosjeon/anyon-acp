@@ -8,7 +8,7 @@ import {
   X,
   CheckSquare,
   Square
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Project } from "@/lib/api";

@@ -32,12 +32,12 @@ src-tauri/binaries/
 *.sw?
 temp_lib/
 
-.cursor/
-AGENTS.md
-CLAUDE.md
-*_TASK.md
+
 
 # Claude project-specific files
-.claude/
+
+# BMad Method artifacts
+.anyon/
+_bmad-output/
 
 .env

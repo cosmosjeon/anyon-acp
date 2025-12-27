@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Card component - A container with consistent styling and sections
- * 
+ * Updated with Maia design system tokens
+ *
  * @example
  * <Card>
  *   <CardHeader>
@@ -25,14 +26,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border shadow-xs",
+      "rounded-lg border border-border bg-card text-card-foreground shadow-sm",
       className
     )}
-    style={{
-      borderColor: "var(--color-border)",
-      backgroundColor: "var(--color-card)",
-      color: "var(--color-card-foreground)"
-    }}
     {...props}
   />
 ));
@@ -47,7 +43,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn("flex flex-col gap-y-1.5 p-6", className)}
     {...props}
   />
 ));
@@ -57,10 +53,10 @@ CardHeader.displayName = "CardHeader";
  * CardTitle component - Main title within CardHeader
  */
 const CardTitle = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <h3
+  <div
     ref={ref}
     className={cn("font-semibold leading-none tracking-tight", className)}
     {...props}

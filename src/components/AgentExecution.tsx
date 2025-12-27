@@ -10,30 +10,24 @@ import {
   ChevronDown,
   Maximize2,
   X,
-  Settings2
-} from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+  Loader2
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { LegacyPopover as Popover } from "@/components/ui/popover";
 import { api, type Agent } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { StreamMessage } from "./StreamMessage";
 import { ExecutionControlBar } from "./ExecutionControlBar";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { HooksEditor } from "./HooksEditor";
 import { useTrackEvent, useComponentMetrics, useFeatureAdoptionTracking } from "@/hooks";
 import { useTabState } from "@/hooks/useTabState";
+import { useManualEventListeners } from "@/hooks/useEventListeners";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger('AgentExecution');
 
 interface AgentExecutionProps {
   /**
@@ -61,6 +55,8 @@ interface AgentExecutionProps {
 export interface ClaudeStreamMessage {
   type: "system" | "assistant" | "user" | "result";
   subtype?: string;
+  /** 워크플로우 짧은 표시 텍스트 (예: "PRD 문서 작성 시작") */
+  displayText?: string;
   message?: {
     content?: any[];
     usage?: {
@@ -105,16 +101,11 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   useComponentMetrics('AgentExecution');
   const agentFeatureTracking = useFeatureAdoptionTracking(`agent_${agent.name || 'custom'}`);
   
-  // Hooks configuration state
-  const [isHooksDialogOpen, setIsHooksDialogOpen] = useState(false);
-
   // IME composition state
   const isIMEComposingRef = useRef(false);
-  const [activeHooksTab, setActiveHooksTab] = useState("project");
 
   // Execution stats
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
-  const [totalTokens, setTotalTokens] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
   const [isFullscreenModalOpen, setIsFullscreenModalOpen] = useState(false);
@@ -124,9 +115,11 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fullscreenScrollRef = useRef<HTMLDivElement>(null);
   const fullscreenMessagesEndRef = useRef<HTMLDivElement>(null);
-  const unlistenRefs = useRef<UnlistenFn[]>([]);
   const elapsedTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
+
+  // Event listeners management
+  const { setupListeners, cleanupListeners } = useManualEventListeners();
 
   // Filter out messages that shouldn't be displayed
   const displayableMessages = React.useMemo(() => {
@@ -213,12 +206,12 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   useEffect(() => {
     // Clean up listeners on unmount
     return () => {
-      unlistenRefs.current.forEach(unlisten => unlisten());
+      cleanupListeners();
       if (elapsedTimeIntervalRef.current) {
         clearInterval(elapsedTimeIntervalRef.current);
       }
     };
-  }, []);
+  }, [cleanupListeners]);
 
   // Check if user is at the very bottom of the scrollable container
   const isAtBottom = () => {
@@ -265,32 +258,13 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
     };
   }, [isRunning, executionStartTime]);
 
-  // Calculate total tokens from messages
-  useEffect(() => {
-    const tokens = messages.reduce((total, msg) => {
-      if (msg.message?.usage) {
-        return total + msg.message.usage.input_tokens + msg.message.usage.output_tokens;
-      }
-      if (msg.usage) {
-        return total + msg.usage.input_tokens + msg.usage.output_tokens;
-      }
-      return total;
-    }, 0);
-    setTotalTokens(tokens);
-  }, [messages]);
-
-
   // Project path selection is handled upstream when opening an execution tab
-
-  const handleOpenHooksDialog = async () => {
-    setIsHooksDialogOpen(true);
-  };
 
   const handleExecute = async () => {
     try {
       setIsRunning(true);
       // Update tab status to running
-      console.log('Setting tab status to running for tab:', tabId);
+      logger.log('Setting tab status to running for tab:', tabId);
       if (tabId) {
         updateTabStatus(tabId, 'running');
       }
@@ -298,93 +272,101 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       setMessages([]);
       setRawJsonlOutput([]);
       setRunId(null);
-      
+
       // Clear any existing listeners
-      unlistenRefs.current.forEach(unlisten => unlisten());
-      unlistenRefs.current = [];
-      
+      cleanupListeners();
+
       // Execute the agent and get the run ID
       const executionRunId = await api.executeAgent(agent.id!, projectPath, task, model);
-      console.log("Agent execution started with run ID:", executionRunId);
+      logger.log("Agent execution started with run ID:", executionRunId);
       setRunId(executionRunId);
-      
+
       // Track agent execution start
       trackEvent.agentStarted({
         agent_type: agent.name || 'custom',
         agent_name: agent.name,
         has_custom_prompt: task !== agent.default_task
       });
-      
+
       // Track feature adoption
       agentFeatureTracking.trackUsage();
-      
+
       // Set up event listeners with run ID isolation
-      const outputUnlisten = await listen<string>(`agent-output:${executionRunId}`, (event) => {
-        try {
-          // Store raw JSONL
-          setRawJsonlOutput(prev => [...prev, event.payload]);
-          
-          // Parse and display
-          const message = JSON.parse(event.payload) as ClaudeStreamMessage;
-          setMessages(prev => [...prev, message]);
-        } catch (err) {
-          console.error("Failed to parse message:", err, event.payload);
-        }
-      });
+      await setupListeners([
+        {
+          eventName: `agent-output:${executionRunId}`,
+          handler: (payload: string) => {
+            try {
+              // Store raw JSONL
+              setRawJsonlOutput(prev => [...prev, payload]);
 
-      const errorUnlisten = await listen<string>(`agent-error:${executionRunId}`, (event) => {
-        console.error("Agent error:", event.payload);
-        setError(event.payload);
-        
-        // Track agent error
-        trackEvent.agentError({
-          error_type: 'runtime_error',
-          error_stage: 'execution',
-          retry_count: 0,
-          agent_type: agent.name || 'custom'
-        });
-      });
-
-      const completeUnlisten = await listen<boolean>(`agent-complete:${executionRunId}`, (event) => {
-        setIsRunning(false);
-        const duration = executionStartTime ? Date.now() - executionStartTime : undefined;
-        setExecutionStartTime(null);
-        if (!event.payload) {
-          setError("Agent execution failed");
-          // Update tab status to error
-          if (tabId) {
-            updateTabStatus(tabId, 'error');
+              // Parse and display
+              const message = JSON.parse(payload) as ClaudeStreamMessage;
+              setMessages(prev => [...prev, message]);
+            } catch (err) {
+              logger.error("Failed to parse message:", err, payload);
+            }
           }
-          // Track both the old event for compatibility and the new error event
-          trackEvent.agentExecuted(agent.name || 'custom', false, agent.name, duration);
-          trackEvent.agentError({
-            error_type: 'execution_failed',
-            error_stage: 'completion',
-            retry_count: 0,
-            agent_type: agent.name || 'custom'
-          });
-        } else {
-          // Update tab status to complete on success
-          if (tabId) {
-            updateTabStatus(tabId, 'complete');
+        },
+        {
+          eventName: `agent-error:${executionRunId}`,
+          handler: (payload: string) => {
+            logger.error("Agent error:", payload);
+            setError(payload);
+
+            // Track agent error
+            trackEvent.agentError({
+              error_type: 'runtime_error',
+              error_stage: 'execution',
+              retry_count: 0,
+              agent_type: agent.name || 'custom'
+            });
           }
-          trackEvent.agentExecuted(agent.name || 'custom', true, agent.name, duration);
+        },
+        {
+          eventName: `agent-complete:${executionRunId}`,
+          handler: (payload: boolean) => {
+            setIsRunning(false);
+            const duration = executionStartTime ? Date.now() - executionStartTime : undefined;
+            setExecutionStartTime(null);
+            if (!payload) {
+              setError("Agent execution failed");
+              // Update tab status to error
+              if (tabId) {
+                updateTabStatus(tabId, 'error');
+              }
+              // Track both the old event for compatibility and the new error event
+              trackEvent.agentExecuted(agent.name || 'custom', false, agent.name, duration);
+              trackEvent.agentError({
+                error_type: 'execution_failed',
+                error_stage: 'completion',
+                retry_count: 0,
+                agent_type: agent.name || 'custom'
+              });
+            } else {
+              // Update tab status to complete on success
+              if (tabId) {
+                updateTabStatus(tabId, 'complete');
+              }
+              trackEvent.agentExecuted(agent.name || 'custom', true, agent.name, duration);
+            }
+          }
+        },
+        {
+          eventName: `agent-cancelled:${executionRunId}`,
+          handler: () => {
+            setIsRunning(false);
+            setExecutionStartTime(null);
+            setError("Agent execution was cancelled");
+            // Update tab status to idle when cancelled
+            if (tabId) {
+              updateTabStatus(tabId, 'idle');
+            }
+          }
         }
-      });
-
-      const cancelUnlisten = await listen<boolean>(`agent-cancelled:${executionRunId}`, () => {
-        setIsRunning(false);
-        setExecutionStartTime(null);
-        setError("Agent execution was cancelled");
-        // Update tab status to idle when cancelled
-        if (tabId) {
-          updateTabStatus(tabId, 'idle');
-        }
-      });
-
-      unlistenRefs.current = [outputUnlisten, errorUnlisten, completeUnlisten, cancelUnlisten];
+      ]);
     } catch (err) {
-      console.error("Failed to execute agent:", err);
+      logger.error("Failed to execute agent:", err);
       setIsRunning(false);
       setExecutionStartTime(null);
       setRunId(null);
@@ -410,7 +392,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   const handleStop = async () => {
     try {
       if (!runId) {
-        console.error("No run ID available to stop");
+        logger.error("No run ID available to stop");
         return;
       }
 
@@ -418,16 +400,16 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       const success = await api.killAgentSession(runId);
 
       if (success) {
-        console.log(`Successfully stopped agent session ${runId}`);
+        logger.log(`Successfully stopped agent session ${runId}`);
       } else {
-        console.warn(`Failed to stop agent session ${runId} - it may have already finished`);
+        logger.warn(`Failed to stop agent session ${runId} - it may have already finished`);
       }
 
       // Update UI state
       setIsRunning(false);
       setExecutionStartTime(null);
     } catch (err) {
-      console.error("Failed to stop agent:", err);
+      logger.error("Failed to stop agent:", err);
     }
   };
 
@@ -453,8 +435,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
     }
     
     // Clean up listeners but don't stop the actual agent process
-    unlistenRefs.current.forEach(unlisten => unlisten());
-    unlistenRefs.current = [];
+    cleanupListeners();
     
     // Navigate back
     onBack();
@@ -659,18 +640,6 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-caption text-muted-foreground">Task Description</Label>
-                {projectPath && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleOpenHooksDialog}
-                    disabled={isRunning}
-                    className="h-8 -mr-2"
-                  >
-                    <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                    <span className="text-caption">Configure Hooks</span>
-                  </Button>
-                )}
               </div>
               <div className="flex gap-2">
                 <Input
@@ -755,7 +724,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {isRunning && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <VideoLoader size="md" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                     <span className="text-sm text-muted-foreground">Initializing agent...</span>
                   </div>
                 </div>
@@ -799,7 +768,6 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       <ExecutionControlBar
         isExecuting={isRunning}
         onStop={handleStop}
-        totalTokens={totalTokens}
         elapsedTime={elapsedTime}
       />
 
@@ -896,7 +864,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {isRunning && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
-                    <VideoLoader size="md" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                     <span className="text-sm text-muted-foreground">Initializing agent...</span>
                   </div>
                 </div>
@@ -935,65 +903,6 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
         </div>
       )}
 
-      {/* Hooks Configuration Dialog */}
-      <Dialog 
-        open={isHooksDialogOpen} 
-        onOpenChange={setIsHooksDialogOpen}
-      >
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col gap-0 p-0">
-          <div className="px-6 py-4 border-b border-border">
-            <DialogTitle className="text-heading-2">Configure Hooks</DialogTitle>
-            <DialogDescription className="mt-1 text-body-small text-muted-foreground">
-              Configure hooks that run before, during, and after tool executions
-            </DialogDescription>
-          </div>
-          
-          <Tabs value={activeHooksTab} onValueChange={setActiveHooksTab} className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-6 pt-4">
-              <TabsList className="grid w-full grid-cols-2 h-auto p-1">
-                <TabsTrigger value="project" className="py-2.5 px-3 text-body-small">
-                  Project Settings
-                </TabsTrigger>
-                <TabsTrigger value="local" className="py-2.5 px-3 text-body-small">
-                  Local Settings
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <TabsContent value="project" className="flex-1 overflow-auto px-6 pb-6 mt-0">
-              <div className="space-y-4 pt-4">
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-caption text-muted-foreground">
-                    Project hooks are stored in <code className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">.claude/settings.json</code> and 
-                    are committed to version control, allowing team members to share configurations.
-                  </p>
-                </div>
-                <HooksEditor
-                  projectPath={projectPath}
-                  scope="project"
-                  className="border-0"
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="local" className="flex-1 overflow-auto px-6 pb-6 mt-0">
-              <div className="space-y-4 pt-4">
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-caption text-muted-foreground">
-                    Local hooks are stored in <code className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">.claude/settings.local.json</code> and 
-                    are not committed to version control, perfect for personal preferences.
-                  </p>
-                </div>
-                <HooksEditor
-                  projectPath={projectPath}
-                  scope="local"
-                  className="border-0"
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

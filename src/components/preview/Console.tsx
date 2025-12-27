@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Trash2, ChevronDown } from 'lucide-react';
+import { Trash2, ChevronDown } from "@/lib/icons";
 import { usePreviewStore } from '@/stores/previewStore';
 import { cn } from '@/lib/utils';
 import type { AppOutput } from '@/types/preview';

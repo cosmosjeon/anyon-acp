@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { LucideIcon } from 'lucide-react';
+import { IconComponent } from '@/lib/icons';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface SelectionCardProps {
-  icon?: LucideIcon;
+  icon?: IconComponent;
   iconImage?: string;
   title: string;
   description: string;

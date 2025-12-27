@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { CheckCircle2, ArrowRight, PlayCircle, ChevronLeft, ChevronRight, FileText , Loader2 } from '@/lib/icons';
 import prdIcon from '@/assets/prd-icon.png';
 import uiuxIcon from '@/assets/uiux-icon.png';
 import trdIcon from '@/assets/trd-icon.png';
@@ -7,17 +7,18 @@ import architectureIcon from '@/assets/architecture-icon.png';
 import erdIcon from '@/assets/erd-icon.png';
 import designIcon from '@/assets/design-icon.png';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
-import { WORKFLOW_SEQUENCE, type WorkflowStep } from '@/constants/planning';
+import { WORKFLOW_SEQUENCE, type WorkflowStep, getWorkflowPrompt } from '@/constants/planning';
 import { PlanningDocViewer } from './PlanningDocViewer';
+import { UXPreviewPanel } from './UXPreviewPanel';
 
 interface PlanningDocsPanelProps {
   projectPath: string | undefined;
-  onStartNewWorkflow: (workflowPrompt: string) => void;
+  onStartWorkflow: (workflowPrompt: string, displayText?: string) => void;
   isSessionLoading?: boolean;
+  onPlanningComplete?: () => void;
 }
 
 /**
@@ -26,12 +27,30 @@ interface PlanningDocsPanelProps {
  */
 export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   projectPath,
-  onStartNewWorkflow,
+  onStartWorkflow,
   isSessionLoading = false,
+  onPlanningComplete,
 }) => {
   const { documents, isLoading, progress } = usePlanningDocs(projectPath);
   const [activeDocId, setActiveDocId] = useState<string>('prd');
   const [activeWorkflows, setActiveWorkflows] = useState<Set<string>>(new Set());
+  const hasTriggeredComplete = useRef(false);
+
+  // Trigger completion modal once when all planning is complete
+  useEffect(() => {
+    if (progress.isAllComplete && onPlanningComplete && !hasTriggeredComplete.current) {
+      hasTriggeredComplete.current = true;
+      onPlanningComplete();
+    }
+  }, [progress.isAllComplete, onPlanningComplete]);
+
+  // Reset trigger when project changes
+  useEffect(() => {
+    hasTriggeredComplete.current = false;
+  }, [projectPath]);
+
+  // 이전 문서 상태 추적용 ref (자동 탭 전환용)
+  const prevDocsRef = React.useRef<typeof documents>([]);
 
   // Clear active workflows when documents are created
   React.useEffect(() => {
@@ -44,6 +63,28 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       });
       return updated;
     });
+  }, [documents]);
+
+  // 새 문서 생성 시 자동 탭 전환
+  React.useEffect(() => {
+    // 초기 로드 시 스킵
+    if (prevDocsRef.current.length === 0) {
+      prevDocsRef.current = documents;
+      return;
+    }
+
+    // 이전에 없었는데 새로 생긴 문서 찾기
+    const newlyCreatedDoc = documents.find(doc => {
+      const prevDoc = prevDocsRef.current.find(p => p.id === doc.id);
+      return doc.exists && (!prevDoc || !prevDoc.exists);
+    });
+
+    if (newlyCreatedDoc) {
+      console.log('[PlanningDocsPanel] Auto-switching to newly created doc:', newlyCreatedDoc.id);
+      setActiveDocId(newlyCreatedDoc.id);
+    }
+
+    prevDocsRef.current = documents;
   }, [documents]);
 
   const activeDoc = documents.find(d => d.id === activeDocId);
@@ -71,10 +112,23 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
 
   // Start workflow for a step
   const handleStartWorkflow = useCallback((step: WorkflowStep) => {
+    if (!step?.id) {
+      console.warn('[PlanningDocsPanel] handleStartWorkflow called with invalid step');
+      return;
+    }
+
+    // 프롬프트 체크를 먼저 수행 - 없으면 조기 종료
+    const workflowPrompt = getWorkflowPrompt(step);
+    if (!workflowPrompt) {
+      console.warn('[PlanningDocsPanel] No workflow prompt for step:', step.id);
+      return;
+    }
+
+    // 프롬프트가 있을 때만 상태 업데이트
     setActiveWorkflows(prev => new Set(prev).add(step.id));
-    onStartNewWorkflow(step.workflowId);
+    onStartWorkflow(workflowPrompt, step.displayText);
     setActiveDocId(step.id);
-  }, [onStartNewWorkflow]);
+  }, [onStartWorkflow]);
 
   // Navigate to next/prev document
   const handleNavigate = useCallback((direction: 'prev' | 'next') => {
@@ -103,7 +157,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   if (isLoading && documents.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <VideoLoader size="md" />
+        <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -116,7 +170,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       {/* 상단 통일 헤더 */}
       <PanelHeader
         icon={<FileText className="w-4 h-4" />}
-        title={activeStep?.title || 'PRD'}
+        title={activeStep?.title || 'Document'}
         subtitle={`${activeStepIndex + 1}/${WORKFLOW_SEQUENCE.length}`}
         badge={
           activeDoc?.exists ? (
@@ -156,59 +210,89 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       {/* 프로그레스 바 영역 */}
       <div className="flex-shrink-0 border-b px-4 py-3 bg-background">
 
-        {/* 프로그레스 바 */}
-        <div className="relative">
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${(progress.completed / progress.total) * 100}%` }}
-            />
-          </div>
+        {/* 단계 인디케이터 + 레이블 통합 */}
+        <div className="flex justify-between">
+          {WORKFLOW_SEQUENCE.map((step, index) => {
+            const doc = documents.find(d => d.id === step.id);
+            const isCompleted = doc?.exists;
+            const isActive = activeDocId === step.id;
+            const isEnabled = isTabEnabled(index);
 
-          {/* 단계 인디케이터 */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between px-0">
-            {WORKFLOW_SEQUENCE.map((step, index) => {
-              const doc = documents.find(d => d.id === step.id);
-              const isCompleted = doc?.exists;
-              const isActive = activeDocId === step.id;
-              const isEnabled = isTabEnabled(index);
+            // 짧은 약어 매핑
+            const shortLabel: Record<string, string> = {
+              'prd': 'PRD',
+              'ux-design': 'UX',
+              'design-guide': 'UI',
+              'trd': 'TRD',
+              'architecture': 'Arch',
+              'erd': 'ERD',
+            };
 
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => handleTabClick(step.id)}
-                  disabled={!isEnabled}
+            return (
+              <button
+                key={step.id}
+                onClick={() => handleTabClick(step.id)}
+                disabled={!isEnabled}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 group",
+                  isEnabled && "cursor-pointer",
+                  !isEnabled && "cursor-not-allowed"
+                )}
+                title={step.title}
+              >
+                {/* 인디케이터 점 */}
+                <div
                   className={cn(
                     "w-3 h-3 rounded-full border-2 transition-all",
                     isCompleted && "bg-primary border-primary",
                     !isCompleted && isEnabled && "bg-background border-muted-foreground/40",
                     !isCompleted && !isEnabled && "bg-muted border-muted-foreground/20",
                     isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                    isEnabled && "cursor-pointer hover:scale-110",
-                    !isEnabled && "cursor-not-allowed"
+                    isEnabled && "group-hover:scale-110"
                   )}
-                  title={step.title}
                 />
-              );
-            })}
-          </div>
+                {/* 레이블 */}
+                <span
+                  className={cn(
+                    "text-[10px] transition-colors",
+                    isActive && "text-foreground font-medium",
+                    !isActive && isEnabled && "text-muted-foreground group-hover:text-foreground",
+                    !isEnabled && "text-muted-foreground/50"
+                  )}
+                >
+                  {shortLabel[step.id] || step.title}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* 단계 레이블 (간소화) */}
-        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-          {WORKFLOW_SEQUENCE.map((step) => (
-            <span key={step.id} className="w-8 text-center truncate">
-              {step.title.split(' ')[0]}
-            </span>
-          ))}
+        {/* 프로그레스 바 */}
+        <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-300"
+            style={{
+              width: progress.completed === 0
+                ? '0%'
+                : `${((progress.completed - 1) / (progress.total - 1)) * 100}%`
+            }}
+          />
         </div>
       </div>
 
       {/* 문서 콘텐츠 영역 */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {activeDoc?.exists && activeDoc.content ? (
-          // 문서 내용 표시
-          <PlanningDocViewer content={activeDoc.content} />
+          // UX Design step uses UXPreviewPanel with element selection
+          activeDocId === 'ux-design' && activeDoc.filename.endsWith('.html') ? (
+            <UXPreviewPanel
+              content={activeDoc.content}
+              projectPath={projectPath}
+            />
+          ) : (
+            // Other documents use simple PlanningDocViewer
+            <PlanningDocViewer content={activeDoc.content} filename={activeDoc.filename} />
+          )
         ) : (
           // 작성 시작 프롬프트
           <div className="flex-1 flex items-center justify-center p-8">
@@ -252,10 +336,11 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
                       size="lg"
                       className="gap-2 w-full max-w-xs"
                     >
-                      {activeWorkflows.has(activeStep.id) ? (
+                      {/* 워크플로우 실행 중이거나, 문서가 아직 없는 상태에서 세션 로딩 중일 때 "작성중..." 표시 */}
+                      {activeWorkflows.has(activeStep.id) || (isSessionLoading && !documents.find(d => d.id === activeStep.id)?.content) ? (
                         <>
-                          <VideoLoader size="sm" />
-                          작성 중...
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {activeStep.title} 작성중...
                         </>
                       ) : (
                         <>
@@ -282,26 +367,31 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
       </div>
 
       {/* 하단 CTA 영역 */}
-      {activeDoc?.exists && progress.nextStep && (
+      {activeDoc?.exists && progress?.nextStep?.id && (
         <div className="flex-shrink-0 border-t p-4 bg-gradient-to-r from-primary/5 to-primary/10">
           <Button
             className="w-full gap-2"
             size="lg"
             onClick={() => {
-              setActiveDocId(progress.nextStep!.id);
-              handleStartWorkflow(progress.nextStep!);
+              const nextStep = progress.nextStep;
+              if (nextStep?.id) {
+                setActiveDocId(nextStep.id);
+                handleStartWorkflow(nextStep);
+              }
             }}
-            disabled={isSessionLoading || activeWorkflows.has(progress.nextStep.id)}
+            disabled={isSessionLoading || !progress.nextStep || activeWorkflows.has(progress.nextStep.id)}
           >
-            {activeWorkflows.has(progress.nextStep.id) ? (
+            {/* 워크플로우 실행 중이거나, 문서가 아직 없는 상태에서 세션 로딩 중일 때 "작성중..." 표시 */}
+            {(progress.nextStep && activeWorkflows.has(progress.nextStep.id)) ||
+             (isSessionLoading && progress.nextStep && !documents.find(d => d.id === progress.nextStep?.id)?.content) ? (
               <>
-                <VideoLoader size="sm" />
-                작성 중...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {progress.nextStep?.title} 작성중...
               </>
             ) : (
               <>
                 <ArrowRight className="h-4 w-4" />
-                다음: {progress.nextStep.title} 작성하기
+                다음: {progress.nextStep?.title || '다음 단계'} 작성하기
               </>
             )}
           </Button>

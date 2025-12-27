@@ -8,7 +8,7 @@ import {
   MoreVertical,
   Cog,
   Trash2,
-} from 'lucide-react';
+} from "@/lib/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,

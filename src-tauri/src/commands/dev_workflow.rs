@@ -195,8 +195,7 @@ pub async fn start_dev_workflow(
     let conn = db.0.lock().map_err(|e| e.to_string())?;
 
     // Get or create session
-    let session =
-        get_or_create_dev_session(&conn, &project_path).map_err(|e| e.to_string())?;
+    let session = get_or_create_dev_session(&conn, &project_path).map_err(|e| e.to_string())?;
 
     // Reset if needed
     if session.status == "completed" || session.status == "error" {
@@ -220,7 +219,7 @@ pub async fn start_dev_workflow(
                 project_clone,
                 PM_ORCHESTRATOR_PROMPT.to_string(),
                 model_clone,
-                None, // system_prompt
+                None, // execution_mode: default to execute
             )
             .await
             {
@@ -275,7 +274,11 @@ pub async fn on_claude_complete(
     success: bool,
     model: &str,
 ) -> Result<bool, String> {
-    log::info!("🔥 on_claude_complete CALLED - prompt: {}, success: {}", prompt, success);
+    log::info!(
+        "🔥 on_claude_complete CALLED - prompt: {}, success: {}",
+        prompt,
+        success
+    );
 
     // Only handle dev workflow prompts
     if !is_dev_workflow_prompt(prompt) {
@@ -354,9 +357,10 @@ pub async fn on_claude_complete(
             project_path.to_string(),
             next.clone(),
             model.to_string(),
-            None, // system_prompt
+            None, // execution_mode: default to execute
         )
-        .await {
+        .await
+        {
             Ok(_) => {
                 log::info!("✅ Successfully started next workflow: {}", next);
                 Ok(true)

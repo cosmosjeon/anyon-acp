@@ -10,23 +10,27 @@ import {
   Wrench,
   PanelRightClose,
   PanelRightOpen,
-} from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+  Loader2,
+  History,
+} from "@/lib/icons";
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
-import { DevDocsPanel } from '@/components/development';
+import { DevDocsPanel, DevDocsPanelRef } from '@/components/development';
 import { EnhancedPreviewPanel } from '@/components/preview';
+import { VersionControlPanel } from '@/components/version-control';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
+import { FloatingHelpButton, AIChatModal, PlanningCompleteModal, PreviewWelcomeModal } from '@/components/help';
+import { SUPPORT_CONFIG } from '@/constants/support';
 import { Settings } from '@/components/Settings';
 import { usePlanningDocs } from '@/hooks/usePlanningDocs';
+import { useWorkflowPreview } from '@/hooks/useWorkflowPreview';
 import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import type { ClaudeCodeSessionRef } from '@/components/ClaudeCodeSession';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
 import { cn } from '@/lib/utils';
-import { shouldUseSdkForWorkflow } from '@/config/featureFlags';
 import { usePreviewStore } from '@/stores/previewStore';
 
 // Lazy load components
@@ -109,13 +113,21 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const [activeTab, setActiveTab] = useState<MvpTabType>('planning');
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [sessionKey, setSessionKey] = useState(0);
+  const [sessionKey, _setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [showPlanningCompleteModal, setShowPlanningCompleteModal] = useState(false);
+  const [showPreviewWelcomeModal, setShowPreviewWelcomeModal] = useState(false);
+  const [hasShownPreviewWelcome, setHasShownPreviewWelcome] = useState(false);
 
   // Sidebar state - collapsed by default
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [filePanelOpen, setFilePanelOpen] = useState(false);
   const filePanelWidth = 280;
+
+  // Version control panel state
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const versionPanelWidth = 320;
 
   // Right panel state
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
@@ -125,10 +137,40 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
   // Ref for ClaudeCodeSession
   const claudeSessionRef = useRef<ClaudeCodeSessionRef>(null);
+  
+  // Ref for DevDocsPanel
+  const devDocsPanelRef = useRef<DevDocsPanelRef>(null);
 
   // Check planning docs completion
   const { progress } = usePlanningDocs(project?.path);
   const isPlanningComplete = progress.isAllComplete;
+
+  // Workflow preview file detection (e.g., ui-ux.html from startup-ux workflow)
+  const [workflowPreviewPath, setWorkflowPreviewPath] = useState<string | null>(null);
+
+  const handlePreviewFileDetected = useCallback((filePath: string) => {
+    console.log('[MvpWorkspace] Preview file detected:', filePath);
+    setWorkflowPreviewPath(filePath);
+    // 자동으로 프리뷰 탭으로 전환
+    setActiveTab('preview');
+    // 패널이 닫혀있으면 열기
+    if (!rightPanelVisible) {
+      setRightPanelVisible(true);
+    }
+  }, [rightPanelVisible]);
+
+  const { hasNewPreview, markPreviewSeen } = useWorkflowPreview({
+    projectPath: project?.path,
+    onPreviewFileDetected: handlePreviewFileDetected,
+    pollingInterval: 1000,
+  });
+
+  // 프리뷰 탭으로 전환하면 새 프리뷰 표시 제거
+  useEffect(() => {
+    if (activeTab === 'preview' && hasNewPreview) {
+      markPreviewSeen();
+    }
+  }, [activeTab, hasNewPreview, markPreviewSeen]);
 
   useEffect(() => {
     if (projectId && projects.length > 0) {
@@ -140,10 +182,20 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   // Load last session
   useEffect(() => {
     if (project?.path) {
-      const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
-      if (lastSessionData) {
-        const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
-        setCurrentSession(session);
+      try {
+        const lastSessionData = SessionPersistenceService.getLastSessionDataForTab(project.path, 'mvp');
+        console.log('[MvpWorkspace] Last session data:', lastSessionData);
+        if (lastSessionData) {
+          const session = SessionPersistenceService.createSessionFromRestoreData(lastSessionData);
+          console.log('[MvpWorkspace] Created session:', session);
+          if (session) {
+            setCurrentSession(session);
+          }
+        } else {
+          console.log('[MvpWorkspace] No last session data found for path:', project.path);
+        }
+      } catch (err) {
+        console.error('[MvpWorkspace] Failed to load last session:', err);
       }
     }
   }, [project?.path]);
@@ -151,18 +203,19 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   // Git repo check
   useEffect(() => {
     const checkGitRepo = async () => {
-      if (project?.path) {
-        try {
-          const isGitRepo = await api.checkIsGitRepo(project.path);
-          if (!isGitRepo) {
-            const gitResult = await api.initGitRepo(project.path);
-            if (gitResult.success) {
-              console.log('Git repository initialized successfully');
-            }
+      if (!project?.path) return;
+      
+      try {
+        const isGitRepo = await api.checkIsGitRepo(project.path);
+        if (!isGitRepo) {
+          const gitResult = await api.initGitRepo(project.path);
+          if (gitResult?.success) {
+            console.log('[MvpWorkspace] Git repository initialized successfully');
           }
-        } catch (gitErr) {
-          console.error('Failed to check/init git repo:', gitErr);
         }
+      } catch (gitErr) {
+        // Git init failure is not critical, just log it
+        console.warn('[MvpWorkspace] Failed to check/init git repo:', gitErr);
       }
     };
     checkGitRepo();
@@ -184,6 +237,11 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
           case '\\':
             e.preventDefault();
             setRightPanelVisible(prev => !prev);
+            break;
+          case 'h':
+          case 'H':
+            e.preventDefault();
+            setVersionPanelOpen(prev => !prev);
             break;
         }
       }
@@ -248,57 +306,80 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   }, []);
 
   // Start a new workflow (new conversation) from PlanningDocsPanel
-  const handleStartNewWorkflow = useCallback(async (workflowId: string) => {
-    // Check if SDK mode should be used for this workflow
-    if (shouldUseSdkForWorkflow(workflowId) && project?.path) {
-      // SDK mode: inject system prompt via ClaudeCodeSession
-      console.log(`[Workflow] Executing via SDK mode: ${workflowId}`);
-
-      // Dynamically import to get the system prompt
-      const { getWorkflowPromptConfig } = await import('@/constants/workflowPrompts');
-      const config = getWorkflowPromptConfig(workflowId);
-
-      if (config && claudeSessionRef.current) {
-        // Use ClaudeCodeSession with system prompt injection
-        claudeSessionRef.current.startNewSession(config.defaultUserPrompt, config.systemPrompt);
-      } else {
-        console.error(`[Workflow] Config not found for ${workflowId}`);
-      }
-    } else {
-      console.error(`[Workflow] SDK mode disabled or project path not set for ${workflowId}`);
+  const handleStartNewWorkflow = useCallback((workflowPrompt: string, userMessage?: string) => {
+    if (claudeSessionRef.current) {
+      // Start a new session with the workflow prompt and optional user message
+      claudeSessionRef.current.startNewSession(workflowPrompt, userMessage);
     }
-  }, [project?.path]);
-
-  const handleSessionSelect = useCallback((session: Session | null) => {
-    setCurrentSession(session);
-    setSessionKey(prev => prev + 1);
-    if (session && project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', session.id);
-    }
-  }, [project?.path]);
+  }, []);
 
   const handleSessionCreated = useCallback((sessionId: string) => {
-    if (project?.path) {
-      SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId);
+    if (!sessionId) {
+      console.warn('[MvpWorkspace] handleSessionCreated called with empty sessionId');
+      return;
     }
-  }, [project?.path]);
+    if (project?.path && project?.id) {
+      try {
+        SessionPersistenceService.saveLastSessionForTab(project.path, 'mvp', sessionId, project.id);
+      } catch (err) {
+        console.error('[MvpWorkspace] Failed to save session:', err);
+      }
+    }
+  }, [project?.path, project?.id]);
 
-  const handleNewSession = useCallback(() => {
-    setCurrentSession(null);
-    setSessionKey(prev => prev + 1);
+  // Callback when all planning docs are complete
+  const handlePlanningComplete = useCallback(() => {
+    setShowPlanningCompleteModal(true);
+  }, []);
+
+  // Proceed to development after planning complete
+  const handleProceedWithAI = useCallback(() => {
+    setActiveTab('development');
+  }, []);
+
+  // Open KakaoTalk channel for support
+  const handleContactSupport = useCallback(() => {
+    window.open(SUPPORT_CONFIG.KAKAO_CHANNEL_URL, '_blank');
+  }, []);
+
+  // Handle preview tab click - show welcome modal on first visit
+  const handlePreviewTabClick = useCallback(() => {
+    if (!hasShownPreviewWelcome) {
+      setShowPreviewWelcomeModal(true);
+      setHasShownPreviewWelcome(true);
+    }
+    setActiveTab('preview');
+  }, [hasShownPreviewWelcome]);
+
+  // View preview action from modal
+  const handleViewPreview = useCallback(() => {
+    setActiveTab('preview');
+  }, []);
+
+  // Handle stop workflow signal from chat input stop button
+  const handleStopWorkflow = useCallback(() => {
+    // Propagate stop signal to DevDocsPanel to stop automated workflow progression
+    devDocsPanelRef.current?.stop();
   }, []);
 
   const projectName = project?.path.split('/').pop() || 'Project';
 
-  if (loading) {
+  // Show loading if:
+  // 1. projects are being fetched (loading)
+  // 2. OR projects are loaded but project state hasn't been set yet (race condition fix)
+  //    This prevents ClaudeCodeSession from receiving undefined projectPath on first render
+  const isProjectLoading = loading || (projectId && projects.length > 0 && !project);
+
+  if (isProjectLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <VideoLoader size="lg" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  if (!project && !loading) {
+  // At this point: loading = false, projects loaded, and project state has been set
+  if (!project) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-muted-foreground">Project not found</p>
@@ -317,9 +398,6 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
         <WorkspaceSidebar
           projectPath={project?.path || ''}
           tabType="mvp"
-          currentSessionId={currentSession?.id}
-          onNewSession={handleNewSession}
-          onSessionSelect={handleSessionSelect}
           onLogoClick={() => setShowSettings(false)}
           onSettingsClick={() => setShowSettings(false)}
           collapsed={sidebarCollapsed}
@@ -334,13 +412,10 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
   return (
     <div ref={containerRef} className="h-full flex overflow-hidden bg-background">
-      {/* Sidebar with Sessions */}
+      {/* Sidebar */}
       <WorkspaceSidebar
         projectPath={project?.path || ''}
         tabType="mvp"
-        currentSessionId={currentSession?.id}
-        onNewSession={handleNewSession}
-        onSessionSelect={handleSessionSelect}
         onLogoClick={goToProjectList}
         onSettingsClick={() => setShowSettings(true)}
         collapsed={sidebarCollapsed}
@@ -364,7 +439,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               </Button>
             </div>
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<div className="p-4"><VideoLoader size="sm" /></div>}>
+              <Suspense fallback={<div className="p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
                 {project?.path && (
                   <FileTree
                     rootPath={project.path}
@@ -423,24 +498,41 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               },
             ]}
           />
-          {/* Panel Toggle Button */}
-          <button
-            onClick={() => setRightPanelVisible(prev => !prev)}
-            className={cn(
-              'p-2 rounded-md transition-colors',
-              rightPanelVisible
-                ? 'text-primary hover:bg-primary/10'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            )}
-            title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
-          >
-            {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
-          </button>
+          {/* Header Buttons */}
+          <div className="flex items-center gap-1">
+            {/* Version Control Toggle Button */}
+            <button
+              onClick={() => setVersionPanelOpen(prev => !prev)}
+              className={cn(
+                'p-2 rounded-md transition-colors',
+                versionPanelOpen
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+              title={versionPanelOpen ? '버전 관리 닫기 (Cmd+H)' : '버전 관리 열기 (Cmd+H)'}
+            >
+              <History className="w-5 h-5" />
+            </button>
+
+            {/* Panel Toggle Button */}
+            <button
+              onClick={() => setRightPanelVisible(prev => !prev)}
+              className={cn(
+                'p-2 rounded-md transition-colors',
+                rightPanelVisible
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+              title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
+            >
+              {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Chat Content */}
         <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center h-full"><VideoLoader size="lg" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             <ClaudeCodeSession
               key={sessionKey}
               ref={claudeSessionRef}
@@ -452,10 +544,29 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               embedded={true}
               tabType="mvp"
               onSessionCreated={handleSessionCreated}
+              onStopWorkflow={handleStopWorkflow}
             />
           </Suspense>
         </div>
       </div>
+
+      {/* Version Control Panel */}
+      <AnimatePresence>
+        {versionPanelOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: versionPanelWidth, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="h-full border-l border-border bg-background flex flex-col overflow-hidden flex-shrink-0"
+          >
+            <VersionControlPanel
+              projectPath={project?.path}
+              onClose={() => setVersionPanelOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Right Panel (Planning/Dev/Preview) */}
       <AnimatePresence>
@@ -533,9 +644,9 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                   </button>
 
                   {/* 프리뷰 탭 */}
-                  <PreviewTabButton 
+                  <PreviewTabButton
                     isActive={activeTab === 'preview'}
-                    onClick={() => setActiveTab('preview')}
+                    onClick={handlePreviewTabClick}
                   />
                 </div>
               </div>
@@ -545,19 +656,27 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                 {activeTab === 'planning' && (
                   <PlanningDocsPanel
                     projectPath={project?.path}
-                    onStartNewWorkflow={handleStartNewWorkflow}
+                    onStartWorkflow={handleStartNewWorkflow}
                     isSessionLoading={isSessionLoading}
+                    onPlanningComplete={handlePlanningComplete}
                   />
                 )}
                 {activeTab === 'development' && (
                   <DevDocsPanel
+                    ref={devDocsPanelRef}
                     projectPath={project?.path}
                     isPlanningComplete={isPlanningComplete}
-                    onStartNewSession={handleStartNewWorkflow}
+                    onStartWorkflow={handleStartNewWorkflow}
                     isSessionLoading={isSessionLoading}
                   />
                 )}
-                {activeTab === 'preview' && <EnhancedPreviewPanel projectPath={project?.path} />}
+                {activeTab === 'preview' && (
+                  <EnhancedPreviewPanel
+                    projectPath={project?.path}
+                    projectId={project?.id}
+                    htmlFilePath={workflowPreviewPath || undefined}
+                  />
+                )}
               </div>
             </motion.div>
           </>
@@ -566,6 +685,31 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
       {/* Drag overlay */}
       {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
+
+      {/* Floating Help Button */}
+      <FloatingHelpButton />
+
+      {/* AI Chat Modal */}
+      <AIChatModal
+        isOpen={showAIChat}
+        onClose={() => setShowAIChat(false)}
+      />
+
+      {/* Planning Complete Modal */}
+      <PlanningCompleteModal
+        isOpen={showPlanningCompleteModal}
+        onClose={() => setShowPlanningCompleteModal(false)}
+        onProceedWithAI={handleProceedWithAI}
+        onContactSupport={handleContactSupport}
+      />
+
+      {/* Preview Welcome Modal */}
+      <PreviewWelcomeModal
+        isOpen={showPreviewWelcomeModal}
+        onClose={() => setShowPreviewWelcomeModal(false)}
+        onViewPreview={handleViewPreview}
+        onContactSupport={handleContactSupport}
+      />
     </div>
   );
 };

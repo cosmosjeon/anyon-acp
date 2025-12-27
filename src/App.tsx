@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { HashRouter } from "react-router-dom";
+import { listen } from "@tauri-apps/api/event";
 import logoAnyon from "@/assets/logo-anyon.png";
 import { useAuthStore } from "@/stores/authStore";
 import { LoginPage } from "@/components/LoginPage";
-import { api } from "@/lib/api";
+import { api as _api } from "@/lib/api";
 import { initializeWebMode } from "@/lib/apiAdapter";
 import { OutputCacheProvider } from "@/lib/outputCache";
 import { TabProvider } from "@/contexts/TabContext";
@@ -11,10 +12,10 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CustomTitlebar } from "@/components/CustomTitlebar";
 import { AppLayout } from "@/components/AppLayout";
 import { NFOCredits } from "@/components/NFOCredits";
-import { ClaudeBinaryDialog } from "@/components/ClaudeBinaryDialog";
 import { Toast, ToastContainer } from "@/components/ui/toast";
-import { StartupIntro } from "@/components/StartupIntro";
 import { UpdateNotification } from "@/components/UpdateNotification";
+import { AnalyticsConsentModal, hasAnalyticsConsent } from "@/components/AnalyticsConsentModal";
+import { OnboardingModal, hasCompletedOnboarding } from "@/components/help/OnboardingModal";
 import { useAppLifecycle } from "@/hooks";
 
 /**
@@ -22,7 +23,6 @@ import { useAppLifecycle } from "@/hooks";
  */
 function AppContent() {
   const [showNFO, setShowNFO] = useState(false);
-  const [showClaudeBinaryDialog, setShowClaudeBinaryDialog] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
   // Initialize analytics lifecycle tracking
@@ -31,18 +31,6 @@ function AppContent() {
   // Initialize web mode compatibility on mount
   useEffect(() => {
     initializeWebMode();
-  }, []);
-
-  // Listen for Claude not found events
-  useEffect(() => {
-    const handleClaudeNotFound = () => {
-      setShowClaudeBinaryDialog(true);
-    };
-
-    window.addEventListener('claude-not-found', handleClaudeNotFound as EventListener);
-    return () => {
-      window.removeEventListener('claude-not-found', handleClaudeNotFound as EventListener);
-    };
   }, []);
 
   // Listen for info/about click from sidebar
@@ -70,17 +58,6 @@ function AppContent() {
       {/* NFO Credits Modal */}
       {showNFO && <NFOCredits onClose={() => setShowNFO(false)} />}
 
-      {/* Claude Binary Dialog */}
-      <ClaudeBinaryDialog
-        open={showClaudeBinaryDialog}
-        onOpenChange={setShowClaudeBinaryDialog}
-        onSuccess={() => {
-          setToast({ message: "Claude binary path saved successfully", type: "success" });
-          window.location.reload();
-        }}
-        onError={(message) => setToast({ message, type: "error" })}
-      />
-
       {/* Toast Container */}
       <ToastContainer>
         {toast && (
@@ -101,16 +78,8 @@ function AppContent() {
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
-  const [showIntro, setShowIntro] = useState(() => {
-    try {
-      const cached = typeof window !== 'undefined'
-        ? window.localStorage.getItem('app_setting:startup_intro_enabled')
-        : null;
-      if (cached === 'true') return true;
-      if (cached === 'false') return false;
-    } catch (_ignore) { }
-    return true;
-  });
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -128,25 +97,71 @@ function App() {
     verifyAuth();
   }, [checkAuth]);
 
+  // Deep link listener - handles OAuth callback from any app state
+  // Must be at app root level so it works regardless of which page is mounted
   useEffect(() => {
-    let timer: number | undefined;
-    (async () => {
-      try {
-        const pref = await api.getSetting('startup_intro_enabled');
-        const enabled = pref === null ? true : pref === 'true';
-        if (enabled) {
-          timer = window.setTimeout(() => setShowIntro(false), 2000);
-        } else {
-          setShowIntro(false);
+    console.log('🎧 [App] Setting up deep link listener...');
+
+    const setupDeepLinkListener = async () => {
+      const unlisten = await listen<string[]>('plugin:deep-link://urls', async (event) => {
+        console.log('📥 [App] Deep link received:', event.payload);
+
+        try {
+          const urls = event.payload;
+          if (urls && urls.length > 0) {
+            // Process all URLs (in case multiple are passed)
+            for (const urlString of urls) {
+              try {
+                const url = new URL(urlString);
+                const token = url.searchParams.get('token');
+
+                if (token) {
+                  console.log('🔑 [App] Token found, logging in...');
+                  await useAuthStore.getState().login(token);
+                  console.log('✅ [App] Login successful via deep link');
+                  break; // Only process first valid token
+                }
+              } catch (parseError) {
+                console.error('❌ [App] Failed to parse deep link URL:', urlString, parseError);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ [App] Deep link handling failed:', error);
         }
-      } catch (err) {
-        timer = window.setTimeout(() => setShowIntro(false), 2000);
-      }
-    })();
+      });
+
+      console.log('✅ [App] Deep link listener registered');
+      return unlisten;
+    };
+
+    const unlistenPromise = setupDeepLinkListener();
+
     return () => {
-      if (timer) window.clearTimeout(timer);
+      unlistenPromise.then((unlisten) => unlisten());
     };
   }, []);
+
+  // Check analytics consent and onboarding after authentication
+  useEffect(() => {
+    if (isAuthenticated && !isChecking) {
+      // Show consent modal first if user hasn't consented yet
+      if (!hasAnalyticsConsent()) {
+        setShowConsentModal(true);
+      } else if (!hasCompletedOnboarding()) {
+        // If already consented, check if onboarding is needed
+        setShowOnboardingModal(true);
+      }
+    }
+  }, [isAuthenticated, isChecking]);
+
+  // Handle consent modal accept - then show onboarding if needed
+  const handleConsentAccept = () => {
+    setShowConsentModal(false);
+    if (!hasCompletedOnboarding()) {
+      setShowOnboardingModal(true);
+    }
+  };
 
   // Show loading while checking auth
   if (isChecking) {
@@ -179,8 +194,15 @@ function App() {
         <OutputCacheProvider>
           <TabProvider>
             <AppContent />
-            <StartupIntro visible={showIntro} />
             <UpdateNotification />
+            <AnalyticsConsentModal
+              open={showConsentModal}
+              onAccept={handleConsentAccept}
+            />
+            <OnboardingModal
+              open={showOnboardingModal}
+              onComplete={() => setShowOnboardingModal(false)}
+            />
           </TabProvider>
         </OutputCacheProvider>
       </ThemeProvider>

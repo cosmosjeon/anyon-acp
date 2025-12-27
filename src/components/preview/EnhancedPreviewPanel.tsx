@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
+import { api } from '@/lib/api';
 import {
   RefreshCw,
   Maximize,
@@ -22,10 +23,11 @@ import {
   Square,
   MoreVertical,
   Eye,
-} from 'lucide-react';
+  Loader2,
+} from '@/lib/icons';
 import { PanelHeader, StatusBadge } from '@/components/ui/panel-header';
-import { VideoLoader } from '@/components/VideoLoader';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +43,8 @@ import { ActionHeader } from './ActionHeader';
 import { ErrorBanner } from './ErrorBanner';
 import { Problems } from './Problems';
 import { Console } from './Console';
+import { CodePanel } from '@/components/CodePanel';
+import { injectSelectorScript } from '@/lib/previewSelector';
 import type { PortInfo, DeviceSize, SelectedElement, ElementAction } from '@/types/preview';
 
 // Tauri 환경 체크 - 여러 방법으로 확인
@@ -73,6 +77,8 @@ interface EnhancedPreviewPanelProps {
   htmlFilePath?: string;
   /** Project root path for resolving relative paths in HTML */
   projectPath?: string;
+  /** Project ID for fixed port allocation */
+  projectId?: string;
   /** Callback when element is selected in selector mode */
   onElementSelected?: (element: SelectedElement | null) => void;
   /** Callback when element action is triggered */
@@ -88,6 +94,7 @@ interface EnhancedPreviewPanelProps {
 export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   htmlFilePath,
   projectPath,
+  projectId,
   onElementSelected,
   onElementAction: _onElementAction,
   onAIFix,
@@ -109,12 +116,15 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     packageManager,
     isLoading,
     setSelectorActive,
+    connectionState,
+    setConnectionState,
+    connectionError,
   } = usePreviewStore();
 
   // 메시지 훅
   usePreviewMessages();
   const { isSelectorActive, isComponentSelectorInitialized } = useComponentSelectorShortcut();
-  const { startDevServer, stopDevServer } = useDevServer(projectPath);
+  const { startDevServer, stopDevServer, connectToExistingServer } = useDevServer(projectPath, projectId);
 
   // 로컬 상태
   const [sourceMode, setSourceMode] = useState<'port' | 'file'>(htmlFilePath ? 'file' : 'port');
@@ -123,8 +133,18 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   const [urlPath] = useState('/');
   const [currentFilePath, setCurrentFilePath] = useState<string>(htmlFilePath || '');
   const [currentUrl, setCurrentUrl] = useState('');
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [manualPort, setManualPort] = useState<string>('');
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Ref callback - iframe 마운트/언마운트 시 항상 호출됨 (서버 모드 호환)
+  const handleIframeRef = useCallback((iframe: HTMLIFrameElement | null) => {
+    iframeRef.current = iframe;
+    setIframeRef(iframe);
+    if (iframe) {
+      console.log('[Preview] iframe ref set to store');
+    }
+  }, [setIframeRef]);
 
   // 디바이스 모드 상태
   const [isDeviceMode, setIsDeviceMode] = useState(false);
@@ -135,52 +155,20 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
   // 요소 선택 상태
   const [_selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
 
-
-
-  // 소스 모드 변경 핸들러
-  const handleSourceModeChange = (mode: 'port' | 'file') => {
-    if (mode === sourceMode) return;
-    setSourceMode(mode);
-    // 모드 변경 시 적절한 URL 설정
-    if (mode === 'port') {
-      // 서버 모드: 서버 URL 사용
-      if (devServerProxyUrl) {
-        setCurrentUrl(devServerProxyUrl + urlPath);
-      }
-    } else {
-      // 파일 모드: 현재 파일이 있으면 유지, 없으면 초기화
-      setSelectedPort(null);
-      if (!currentFilePath) {
-        setCurrentUrl('');
-      }
-    }
-  };
-
-  // iframe ref 등록
-  useEffect(() => {
-    if (iframeRef.current) {
-      setIframeRef(iframeRef.current);
-    }
-    return () => setIframeRef(null);
-  }, [setIframeRef]);
-
-  // HTML 파일 로드
-  useEffect(() => {
-    if (htmlFilePath && htmlFilePath !== currentFilePath) {
-      setCurrentFilePath(htmlFilePath);
-      setSourceMode('file');
-      loadHtmlFile(htmlFilePath);
-    }
-  }, [htmlFilePath]);
-
-  const loadHtmlFile = async (filePath: string) => {
+  // HTML 파일 로드 함수 (useCallback으로 정의)
+  const loadHtmlFile = useCallback(async (filePath: string) => {
     console.log('[Preview] loadHtmlFile called:', { filePath, isTauri, projectPath });
+
+    if (!filePath?.trim()) {
+      console.warn('[Preview] loadHtmlFile called with empty filePath');
+      return;
+    }
 
     if (!isTauri) {
       console.warn('[Preview] Not in Tauri environment, cannot load HTML file directly');
       addAppOutput({
         type: 'info',
-        message: `[preview] Tauri 앱에서만 HTML 파일 미리보기가 가능합니다: ${filePath.split(/[/\\]/).pop()}`,
+        message: `[preview] Tauri 앱에서만 HTML 파일 미리보기가 가능합니다: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
         timestamp: Date.now(),
         projectPath: projectPath || '',
       });
@@ -188,32 +176,84 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
 
     try {
-      const resolvedProjectPath = projectPath || filePath.substring(0, filePath.lastIndexOf('/')) || filePath.substring(0, filePath.lastIndexOf('\\'));
-      console.log('[Preview] Starting preview server for:', resolvedProjectPath);
+      const content = await invoke<string>('read_file_content', { filePath });
 
-      const serverInfo = await invoke('start_file_preview_server', { projectPath: resolvedProjectPath });
-      console.log('[Preview] Server started:', serverInfo);
+      if (!content) {
+        console.warn('[Preview] Empty content received from file:', filePath);
+        addAppOutput({
+          type: 'stderr',
+          message: `[preview] File is empty: ${filePath.split(/[/\\]/).pop() || 'unknown'}`,
+          timestamp: Date.now(),
+          projectPath: projectPath || '',
+        });
+        return;
+      }
 
-      const previewUrl = await invoke<string>('get_file_preview_url', { filePath, projectPath: resolvedProjectPath });
-      console.log('[Preview] Got preview URL:', previewUrl);
+      console.log('[Preview] File content loaded, length:', content.length);
 
-      setCurrentUrl(previewUrl);
+      const injectedContent = injectSelectorScript(content);
+      console.log('[Preview] Selector script injected, new length:', injectedContent.length);
+
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(injectedContent)}`;
+      setCurrentUrl(dataUrl);
+      setConnectionState('connected');
+
       addAppOutput({
         type: 'info',
-        message: `[preview] Loading ${filePath.split(/[/\\]/).pop()} at ${previewUrl}`,
+        message: `[preview] Loaded ${filePath.split(/[/\\]/).pop() || 'file'}`,
         timestamp: Date.now(),
-        projectPath: resolvedProjectPath,
+        projectPath: projectPath || '',
       });
     } catch (err) {
       console.error('[Preview] Failed to load HTML file:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setConnectionState('error');
       addAppOutput({
         type: 'stderr',
-        message: `[preview] Failed to load HTML file: ${err}`,
+        message: `[preview] Failed to load HTML file: ${errorMessage}`,
         timestamp: Date.now(),
         projectPath: projectPath || '',
       });
     }
+  }, [isTauri, projectPath, addAppOutput]);
+
+  // 파일 연결 해제
+  const disconnectFile = useCallback(() => {
+    setCurrentUrl('');
+    setCurrentFilePath('');
+    setConnectionState('disconnected');
+  }, []);
+
+  // 소스 모드 변경 핸들러
+  const handleSourceModeChange = (mode: 'port' | 'file') => {
+    if (mode === sourceMode) return;
+    setSourceMode(mode);
+
+    // 모드 전환 시 각 모드는 독립적으로 동작
+    // - 서버 모드: devServerProxyUrl 사용 (previewStore에서 관리)
+    // - 파일 모드: currentUrl (로컬 상태) 사용
+    if (mode === 'file') {
+      // 파일 모드로 전환: 이전에 로드한 파일이 있으면 다시 로드
+      setSelectedPort(null);
+      if (currentFilePath) {
+        loadHtmlFile(currentFilePath);
+      } else {
+        setCurrentUrl('');
+      }
+    }
+    // 서버 모드로 전환 시 devServerProxyUrl이 있으면 effectiveUrl에서 자동으로 사용됨
   };
+
+
+  // HTML 파일 자동 로드 (htmlFilePath prop 변경 시)
+  useEffect(() => {
+    if (htmlFilePath) {
+      console.log('[Preview] Auto-loading HTML file:', htmlFilePath);
+      setCurrentFilePath(htmlFilePath);
+      setSourceMode('file');
+      loadHtmlFile(htmlFilePath);
+    }
+  }, [htmlFilePath, loadHtmlFile]);
 
   // Dev server 프록시 URL 사용
   useEffect(() => {
@@ -247,9 +287,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
     const autoDetectAndStart = async () => {
       try {
-        const hasPackageJson = await invoke<boolean>('check_file_exists', {
-          filePath: `${projectPath}/package.json`
-        });
+        const hasPackageJson = await api.checkFileExists(`${projectPath}/package.json`);
 
         if (hasPackageJson) {
           if (!devServerRunning) {
@@ -262,7 +300,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         const htmlFiles = ['index.html', 'main.html', 'home.html'];
         for (const htmlFile of htmlFiles) {
           const htmlPath = `${projectPath}/${htmlFile}`;
-          const exists = await invoke<boolean>('check_file_exists', { filePath: htmlPath });
+          const exists = await api.checkFileExists(htmlPath);
           if (exists) {
             console.log('[Preview] Auto-detected HTML file:', htmlPath);
             setSourceMode('file');
@@ -274,7 +312,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
         for (const htmlFile of htmlFiles) {
           const htmlPath = `${projectPath}/src/${htmlFile}`;
-          const exists = await invoke<boolean>('check_file_exists', { filePath: htmlPath });
+          const exists = await api.checkFileExists(htmlPath);
           if (exists) {
             console.log('[Preview] Auto-detected HTML file in src/:', htmlPath);
             setSourceMode('file');
@@ -304,20 +342,60 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     }
   }, [sourceMode, devServerProxyUrl]);
 
+  // AI가 코드 생성 후 package.json 생성 감지
+  useEffect(() => {
+    if (!projectPath || !isTauri) return;
+    if (devServerRunning || sourceMode === 'port') return; // 이미 실행 중이면 체크 안 함
+
+    let checkCount = 0;
+    const maxChecks = 30; // 최대 1분 (2초 * 30)
+
+    const checkInterval = setInterval(async () => {
+      checkCount++;
+
+      try {
+        const hasPackageJson = await api.checkFileExists(`${projectPath}/package.json`);
+
+        if (hasPackageJson) {
+          console.log('[Preview] package.json detected, starting dev server automatically');
+          clearInterval(checkInterval);
+          setSourceMode('port');
+          startDevServer();
+        }
+
+        // 1분 후 체크 중단
+        if (checkCount >= maxChecks) {
+          clearInterval(checkInterval);
+        }
+      } catch (err) {
+        console.error('[Preview] Failed to check package.json:', err);
+      }
+    }, 2000); // 2초마다 체크
+
+    return () => clearInterval(checkInterval);
+  }, [projectPath, devServerRunning, sourceMode, startDevServer]);
+
   const scanPorts = async () => {
     try {
       const result = await invoke<PortInfo[]>('scan_ports');
+      
+      if (!result || !Array.isArray(result)) {
+        console.warn('[Preview] Invalid port scan result:', result);
+        return;
+      }
+      
       setPorts(result);
 
       if (!selectedPort && result.length > 0) {
-        const alive = result.find((p) => p.alive);
-        if (alive) {
+        const alive = result.find((p) => p?.alive);
+        if (alive?.port && alive?.url) {
           setSelectedPort(alive.port);
           setCurrentUrl(alive.url);
         }
       }
     } catch (err) {
-      console.error('Port scan failed:', err);
+      // Port scan failure is not critical, suppress error in console
+      console.debug('[Preview] Port scan failed:', err);
     }
   };
 
@@ -363,7 +441,17 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
       currentUrl
     });
 
-    if (iframeRef.current?.contentWindow) {
+    if (!iframeRef.current) {
+      console.warn('[Preview] No iframe ref available');
+      return;
+    }
+    
+    if (!iframeRef.current.contentWindow) {
+      console.warn('[Preview] No iframe contentWindow available');
+      return;
+    }
+
+    try {
       if (isSelectorActive) {
         iframeRef.current.contentWindow.postMessage(
           { type: 'deactivate-anyon-component-selector' },
@@ -379,8 +467,8 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         );
         setSelectorActive(true);
       }
-    } else {
-      console.warn('[Preview] No iframe contentWindow available');
+    } catch (err) {
+      console.error('[Preview] Failed to toggle selector:', err);
     }
   };
 
@@ -400,16 +488,85 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
     clearPreviewError();
   }, [onAIFix, clearPreviewError]);
 
+  // 수동 포트 연결 핸들러
+  const handleConnectManualPort = useCallback(async (port: number) => {
+    if (!port || port < 1 || port > 65535) {
+      addAppOutput({
+        type: 'stderr',
+        message: '[anyon] 유효한 포트 번호를 입력해주세요 (1-65535)',
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+      return;
+    }
+
+    const success = await connectToExistingServer(port);
+    if (!success) {
+      addAppOutput({
+        type: 'stderr',
+        message: `[anyon] 포트 ${port}에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.`,
+        timestamp: Date.now(),
+        projectPath: projectPath || '',
+      });
+    }
+  }, [connectToExistingServer, addAppOutput, projectPath]);
+
   const { width, height } = getDeviceDimensions();
   const hasContent = currentUrl || (sourceMode === 'port' && ports.some((p) => p.alive));
   const problemCount = problemReport?.problems?.length || 0;
 
-  // 서버 상태 텍스트
+  // 서버 상태 텍스트 (connectionState 기반)
   const getServerStatusText = () => {
-    if (isLoading) return '시작 중...';
-    if (devServerRunning && devServerPort) return `localhost:${devServerPort}`;
-    if (sourceMode === 'file' && currentFilePath) return currentFilePath.split(/[/\\]/).pop() || '';
-    return '연결 안됨';
+    if (sourceMode === 'file' && currentFilePath) {
+      return currentFilePath.split(/[/\\]/).pop() || '';
+    }
+
+    switch (connectionState) {
+      case 'starting':
+        return '서버 시작 중...';
+      case 'port-detected':
+        return devServerPort ? `포트 ${devServerPort} 감지됨` : '포트 감지 중...';
+      case 'connecting':
+        return '프록시 연결 중...';
+      case 'verifying':
+        return '연결 확인 중...';
+      case 'connected':
+        return devServerPort ? `localhost:${devServerPort}` : '연결됨';
+      case 'error':
+        return connectionError ? connectionError.substring(0, 30) : '연결 실패';
+      case 'disconnected':
+      default:
+        return '연결 안됨';
+    }
+  };
+
+  // 연결 상태에 따른 배지 표시
+  const getConnectionBadge = () => {
+    if (sourceMode === 'file') {
+      return currentFilePath ? (
+        <StatusBadge variant="success">파일</StatusBadge>
+      ) : (
+        <StatusBadge variant="muted">파일 없음</StatusBadge>
+      );
+    }
+
+    switch (connectionState) {
+      case 'starting':
+        return <StatusBadge variant="warning" pulse>시작중</StatusBadge>;
+      case 'port-detected':
+        return <StatusBadge variant="warning" pulse>포트 감지</StatusBadge>;
+      case 'connecting':
+        return <StatusBadge variant="warning" pulse>연결중</StatusBadge>;
+      case 'verifying':
+        return <StatusBadge variant="warning" pulse>검증중</StatusBadge>;
+      case 'connected':
+        return <StatusBadge variant="success">연결됨</StatusBadge>;
+      case 'error':
+        return <StatusBadge variant="error">에러</StatusBadge>;
+      case 'disconnected':
+      default:
+        return <StatusBadge variant="muted">오프라인</StatusBadge>;
+    }
   };
 
   // 현재 활성 컨텐츠 렌더링
@@ -426,9 +583,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         return <Console />;
       case 'code':
         return (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            Code view coming soon...
-          </div>
+          <CodePanel projectPath={projectPath} />
         );
       case 'preview':
       default:
@@ -438,7 +593,12 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
 
   // 프리뷰 iframe 렌더링
   const renderPreview = () => {
-    if (!currentUrl) {
+    // 모드별 URL 분리: 서버 모드와 파일 모드가 서로 영향을 주지 않도록 함
+    const effectiveUrl = sourceMode === 'port'
+      ? (devServerProxyUrl ? devServerProxyUrl + urlPath : '')  // 서버 모드: 프록시 URL만 사용
+      : currentUrl;  // 파일 모드: data URL 사용
+
+    if (!effectiveUrl) {
       return (
         <div className="relative flex items-center justify-center h-full">
           <ErrorBanner
@@ -448,66 +608,110 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
           />
 
           <div className="text-center max-w-sm px-6">
-            {/* 아이콘 컨테이너 */}
+            {/* 아이콘 컨테이너 - connectionState 기반 */}
             <div className={cn(
               "w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center",
-              isLoading 
-                ? "bg-amber-100 dark:bg-amber-900/30" 
-                : previewError
-                  ? "bg-red-100 dark:bg-red-900/30"
-                  : "bg-muted"
+              connectionState === 'error'
+                ? "bg-red-100 dark:bg-red-900/30"
+                : connectionState === 'disconnected'
+                  ? "bg-muted"
+                  : "bg-amber-100 dark:bg-amber-900/30"
             )}>
-              {isLoading ? (
-                <VideoLoader size="md" />
-              ) : previewError ? (
+              {connectionState !== 'disconnected' && connectionState !== 'error' ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : connectionState === 'error' ? (
                 <Monitor className="w-8 h-8 text-red-500" />
               ) : (
                 <Monitor className="w-8 h-8 text-muted-foreground" />
               )}
             </div>
 
-            {/* 제목 */}
+            {/* 제목 - connectionState 기반 */}
             <h3 className="text-base font-medium mb-2">
               {sourceMode === 'port'
-                ? isLoading
-                  ? '개발 서버 시작 중...'
-                  : devServerRunning
-                    ? '연결 중...'
-                    : previewError
-                      ? '연결 실패'
-                      : '프리뷰 준비'
+                ? (() => {
+                    switch (connectionState) {
+                      case 'starting': return '개발 서버 시작 중...';
+                      case 'port-detected': return '포트 감지됨';
+                      case 'connecting': return '프록시 연결 중...';
+                      case 'verifying': return '연결 확인 중...';
+                      case 'error': return '연결 실패';
+                      case 'disconnected':
+                      default: return '프리뷰 준비';
+                    }
+                  })()
                 : 'HTML 파일 선택'}
             </h3>
 
-            {/* 설명 */}
+            {/* 설명 - connectionState 기반 */}
             <p className="text-sm text-muted-foreground mb-5">
               {sourceMode === 'port'
-                ? isLoading
-                  ? packageManager 
-                    ? `${packageManager}로 서버를 시작하고 있습니다...`
-                    : '패키지 매니저를 감지하고 있습니다...'
-                  : devServerRunning
-                    ? '개발 서버에 연결하고 있습니다...'
-                    : previewError
-                      ? '개발 서버 시작에 실패했습니다. 다시 시도해주세요.'
-                      : '개발 서버를 시작하면 앱을 미리 볼 수 있습니다.'
+                ? (() => {
+                    switch (connectionState) {
+                      case 'starting':
+                        return packageManager
+                          ? `${packageManager}로 서버를 시작하고 있습니다...`
+                          : '패키지 매니저를 감지하고 있습니다...';
+                      case 'port-detected':
+                        return `포트 ${devServerPort || ''}에서 서버를 감지했습니다.`;
+                      case 'connecting':
+                        return '프록시 서버에 연결하고 있습니다...';
+                      case 'verifying':
+                        return '연결 가능 여부를 확인하고 있습니다...';
+                      case 'error':
+                        return connectionError || '개발 서버 시작에 실패했습니다. 다시 시도해주세요.';
+                      case 'disconnected':
+                      default:
+                        return '개발 서버를 시작하면 앱을 미리 볼 수 있습니다.';
+                    }
+                  })()
                 : '프로젝트의 HTML 파일을 선택하여 미리보기를 시작하세요.'}
             </p>
 
-            {/* CTA 버튼 */}
-            {sourceMode === 'port' && !devServerRunning && !isLoading && (
-              <Button
-                onClick={startDevServer}
-                disabled={!projectPath}
-                size="lg"
-                className="gap-2"
-              >
-                <Play className="w-4 h-4" />
-                {previewError ? '다시 시도' : '서버 시작'}
-              </Button>
+            {/* CTA 버튼 - connectionState 기반 */}
+            {sourceMode === 'port' && (connectionState === 'disconnected' || connectionState === 'error') && (
+              <div className="flex flex-col gap-3">
+                {/* 자동 서버 시작 버튼 */}
+                <Button
+                  onClick={startDevServer}
+                  disabled={!projectPath}
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  {connectionState === 'error' ? '다시 시도' : '서버 시작'}
+                </Button>
+
+                {/* 구분선 */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-px flex-1 bg-border" />
+                  <span>또는</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                {/* 수동 포트 연결 */}
+                <div className="flex gap-2 justify-center">
+                  <Input
+                    type="number"
+                    placeholder="포트 (예: 3000)"
+                    value={manualPort}
+                    onChange={(e) => setManualPort(e.target.value)}
+                    className="w-28 text-center"
+                    min={1}
+                    max={65535}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => handleConnectManualPort(parseInt(manualPort))}
+                    disabled={!manualPort || !projectPath}
+                  >
+                    연결
+                  </Button>
+                </div>
+              </div>
             )}
 
-            {sourceMode === 'file' && !isLoading && (
+            {sourceMode === 'file' && connectionState === 'disconnected' && (
               <Button
                 onClick={async () => {
                   if (!isTauri) return;
@@ -562,8 +766,8 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
               }}
             >
               <iframe
-                ref={iframeRef}
-                src={currentUrl}
+                ref={handleIframeRef}
+                src={effectiveUrl}
                 className="border-0 bg-white rounded-lg"
                 style={{ width: `${width}px`, height: `${height}px`, display: 'block' }}
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -583,8 +787,8 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         />
 
         <iframe
-          ref={iframeRef}
-          src={currentUrl}
+          ref={handleIframeRef}
+          src={effectiveUrl}
           className="w-full h-full border-0"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         />
@@ -599,17 +803,7 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
         icon={<Eye className="w-4 h-4" />}
         title="프리뷰"
         subtitle={getServerStatusText()}
-        badge={
-          isLoading ? (
-            <StatusBadge variant="warning" pulse>시작중</StatusBadge>
-          ) : devServerRunning ? (
-            <StatusBadge variant="success">연결됨</StatusBadge>
-          ) : previewError ? (
-            <StatusBadge variant="error">에러</StatusBadge>
-          ) : (
-            <StatusBadge variant="muted">오프라인</StatusBadge>
-          )
-        }
+        badge={getConnectionBadge()}
         actions={
           <div className="flex items-center gap-1">
             {/* 소스 모드 토글 */}
@@ -665,6 +859,19 @@ export const EnhancedPreviewPanel: React.FC<EnhancedPreviewPanelProps> = ({
                   시작
                 </Button>
               )
+            )}
+
+            {/* 파일 연결 해제 버튼 */}
+            {sourceMode === 'file' && connectionState === 'connected' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={disconnectFile}
+                className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <Square className="w-3 h-3 mr-1" />
+                연결 해제
+              </Button>
             )}
           </div>
         }

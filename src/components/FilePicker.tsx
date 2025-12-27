@@ -12,7 +12,7 @@ import {
   FileImage,
   Search,
   ChevronRight
-} from "lucide-react";
+} from "@/lib/icons";
 import type { FileEntry } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

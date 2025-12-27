@@ -1,16 +1,147 @@
 @import "tailwindcss";
 
-/* Tauri Transparent Window with Rounded Corners - Official Approach */
+/* ============================================================
+   FONT DECLARATIONS
+   ============================================================ */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/src/assets/fonts/inter/Inter.ttf') format('truetype-variations');
+}
+
+/* ============================================================
+   TAILWIND @theme DIRECTIVE - MAIA DESIGN SYSTEM
+   ============================================================ */
+
+@theme {
+  /* ===== MAIA NEUTRAL COLORS (Dark Mode Default) ===== */
+  --color-background: oklch(14.5% 0 0);
+  --color-foreground: oklch(98.5% 0 0);
+  --color-card: oklch(20.5% 0 0);
+  --color-card-foreground: oklch(98.5% 0 0);
+  --color-popover: oklch(14.5% 0 0);
+  --color-popover-foreground: oklch(98.5% 0 0);
+  --color-primary: oklch(98.5% 0 0);
+  --color-primary-foreground: oklch(14.5% 0 0);
+  --color-secondary: oklch(26.9% 0 0);
+  --color-secondary-foreground: oklch(98.5% 0 0);
+  --color-muted: oklch(26.9% 0 0);
+  --color-muted-foreground: oklch(70.8% 0 0);
+  --color-accent: oklch(26.9% 0 0);
+  --color-accent-foreground: oklch(98.5% 0 0);
+  --color-destructive: oklch(63.7% 0.237 25.331);
+  --color-destructive-foreground: oklch(98.5% 0 0);
+  --color-border: oklch(26.9% 0 0);
+  --color-input: oklch(26.9% 0 0);
+  --color-ring: oklch(70.8% 0 0);
+
+  /* ===== BRAND COLOR ADDITIONS ===== */
+  --color-brand-primary: #d97757;
+  --color-brand-secondary: #ff9a7a;
+
+  /* ===== ADDITIONAL STATUS COLORS ===== */
+  --color-green-500: oklch(72.3% 0.219 149.579);
+  --color-green-600: oklch(62.7% 0.194 149.214);
+
+  /* ===== DESIGN TOKENS - BORDER RADIUS ===== */
+  --radius-sm: 0.25rem;
+  --radius-base: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ===== DESIGN TOKENS - FONTS ===== */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* ===== DESIGN TOKENS - FONT WEIGHTS ===== */
+  --font-weight-thin: 100;
+  --font-weight-extralight: 200;
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 900;
+
+  /* ===== DESIGN TOKENS - FONT SIZES ===== */
+  --text-xs: 0.75rem;      /* 12px */
+  --text-sm: 0.875rem;     /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-lg: 1.125rem;     /* 18px */
+  --text-xl: 1.25rem;      /* 20px */
+  --text-2xl: 1.5rem;      /* 24px */
+  --text-3xl: 1.875rem;    /* 30px */
+  --text-4xl: 2.25rem;     /* 36px */
+  --text-5xl: 3rem;        /* 48px */
+
+  /* ===== DESIGN TOKENS - LINE HEIGHTS ===== */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 1.75;
+
+  /* ===== DESIGN TOKENS - LETTER SPACING ===== */
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* ===== DESIGN TOKENS - TRANSITIONS ===== */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* ============================================================
+   LIGHT THEME - MAIA NEUTRAL
+   ============================================================ */
+
+.light {
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(14.5% 0 0);
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(14.5% 0 0);
+  --color-popover: oklch(100% 0 0);
+  --color-popover-foreground: oklch(14.5% 0 0);
+  --color-primary: oklch(14.5% 0 0);
+  --color-primary-foreground: oklch(98.5% 0 0);
+  --color-secondary: oklch(97% 0 0);
+  --color-secondary-foreground: oklch(14.5% 0 0);
+  --color-muted: oklch(97% 0 0);
+  --color-muted-foreground: oklch(55.6% 0 0);
+  --color-accent: oklch(97% 0 0);
+  --color-accent-foreground: oklch(14.5% 0 0);
+  --color-destructive: oklch(63.7% 0.237 25.331);
+  --color-destructive-foreground: oklch(98.5% 0 0);
+  --color-border: oklch(92.2% 0 0);
+  --color-input: oklch(92.2% 0 0);
+  --color-ring: oklch(55.6% 0 0);
+
+  /* Additional status colors for light mode */
+  --color-green-500: oklch(62.3% 0.214 149.579);
+  --color-green-600: oklch(54.6% 0.194 149.214);
+}
+
+/* ============================================================
+   TAURI TRANSPARENT WINDOW STYLES
+   ============================================================ */
+
 html, body {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
-  /* Transparent background for window transparency */
   background-color: rgba(0, 0, 0, 0);
 }
 
-/* Tauri drag region helpers */
 .tauri-drag {
   -webkit-app-region: drag;
 }
@@ -19,7 +150,6 @@ html, body {
   -webkit-app-region: no-drag;
 }
 
-/* Apply rounded corners and background to body */
 body {
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -29,27 +159,47 @@ body {
 #root {
   height: 100%;
   width: 100%;
-  /* Ensure root also clips fixed-position descendants */
   border-radius: inherit;
   overflow: hidden;
 }
 
-/* Ensure the viewport itself clips fixed-position elements */
 html {
   border-radius: var(--radius-lg);
   overflow: hidden;
-  /* Robust clipping for fixed descendants and backdrop filters */
   clip-path: inset(0 round var(--radius-lg));
 }
 
-/* Inter Font - Local */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url('/src/assets/fonts/inter/Inter.ttf') format('truetype-variations');
+/* ============================================================
+   PLATFORM-SPECIFIC STYLES
+   ============================================================ */
+
+html.is-macos body {
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }
+
+html.is-windows body {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 0 0 1px var(--color-border);
+}
+
+html.is-windows html {
+  border-radius: 8px;
+  clip-path: inset(0 round 8px);
+}
+
+html.is-linux body {
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 0 0 1px var(--color-border);
+}
+
+html.is-linux html {
+  border-radius: 10px;
+  clip-path: inset(0 round 10px);
+}
+
+/* ============================================================
+   SCROLLBAR STYLES
+   ============================================================ */
 
 /* Custom scrollbar hiding */
 .scrollbar-hide {
@@ -85,259 +235,60 @@ html {
   background-color: var(--color-muted-foreground);
 }
 
-/* Dark theme configuration */
-@theme {
-  /* Colors */
-  --color-background: oklch(0.10 0.01 240);
-  --color-foreground: oklch(0.95 0.01 240);
-  --color-card: oklch(0.14 0.01 240);
-  --color-card-foreground: oklch(0.95 0.01 240);
-  --color-popover: oklch(0.13 0.01 240);
-  --color-popover-foreground: oklch(0.95 0.01 240);
-  --color-primary: oklch(0.95 0.01 240);
-  --color-primary-foreground: oklch(0.14 0.01 240);
-  --color-secondary: oklch(0.18 0.01 240);
-  --color-secondary-foreground: oklch(0.95 0.01 240);
-  --color-muted: oklch(0.16 0.01 240);
-  --color-muted-foreground: oklch(0.65 0.01 240);
-  --color-accent: oklch(0.18 0.01 240);
-  --color-accent-foreground: oklch(0.95 0.01 240);
-  --color-destructive: oklch(0.6 0.2 25);
-  --color-destructive-foreground: oklch(0.98 0.01 240);
-  --color-border: oklch(0.20 0.01 240);
-  --color-input: oklch(0.20 0.01 240);
-  --color-ring: oklch(0.50 0.015 240);
-  
-  /* Additional colors for status messages */
-  --color-green-500: oklch(0.72 0.20 142);
-  --color-green-600: oklch(0.64 0.22 142);
-
-  /* Border radius */
-  --radius-sm: 0.25rem;
-  --radius-base: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-
-  /* Fonts */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
-  
-  /* Font Weights */
-  --font-weight-thin: 100;
-  --font-weight-extralight: 200;
-  --font-weight-light: 300;
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --font-weight-extrabold: 800;
-  --font-weight-black: 900;
-  
-  /* Font Sizes */
-  --text-xs: 0.75rem;      /* 12px */
-  --text-sm: 0.875rem;     /* 14px */
-  --text-base: 1rem;       /* 16px */
-  --text-lg: 1.125rem;     /* 18px */
-  --text-xl: 1.25rem;      /* 20px */
-  --text-2xl: 1.5rem;      /* 24px */
-  --text-3xl: 1.875rem;    /* 30px */
-  --text-4xl: 2.25rem;     /* 36px */
-  --text-5xl: 3rem;        /* 48px */
-  
-  /* Line Heights */
-  --leading-none: 1;
-  --leading-tight: 1.25;
-  --leading-snug: 1.375;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.625;
-  --leading-loose: 1.75;
-  
-  /* Letter Spacing */
-  --tracking-tighter: -0.05em;
-  --tracking-tight: -0.025em;
-  --tracking-normal: 0;
-  --tracking-wide: 0.025em;
-  --tracking-wider: 0.05em;
-  --tracking-widest: 0.1em;
-
-  /* Transitions */
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-/* Theme Variations */
-/* Default is dark theme - already defined above */
-
-/* Light Theme */
-.theme-light {
-  --color-background: oklch(0.98 0.01 240);
-  --color-foreground: oklch(0.12 0.01 240);
-  --color-card: oklch(0.96 0.01 240);
-  --color-card-foreground: oklch(0.12 0.01 240);
-  --color-popover: oklch(0.98 0.01 240);
-  --color-popover-foreground: oklch(0.12 0.01 240);
-  --color-primary: oklch(0.12 0.01 240);
-  --color-primary-foreground: oklch(0.98 0.01 240);
-  --color-secondary: oklch(0.94 0.01 240);
-  --color-secondary-foreground: oklch(0.12 0.01 240);
-  --color-muted: oklch(0.94 0.01 240);
-  --color-muted-foreground: oklch(0.45 0.01 240);
-  --color-accent: oklch(0.94 0.01 240);
-  --color-accent-foreground: oklch(0.12 0.01 240);
-  --color-destructive: oklch(0.6 0.2 25);
-  --color-destructive-foreground: oklch(0.98 0.01 240);
-  --color-border: oklch(0.90 0.01 240);
-  --color-input: oklch(0.90 0.01 240);
-  --color-ring: oklch(0.52 0.015 240);
-  
-  /* Additional colors for status messages */
-  --color-green-500: oklch(0.62 0.20 142);
-  --color-green-600: oklch(0.54 0.22 142);
-}
-
-/* Dark Theme - Improved visibility with lighter colors */
-.theme-dark {
-  --color-background: oklch(0.18 0.01 240);
-  --color-foreground: oklch(0.98 0.01 240);
-  --color-card: oklch(0.22 0.01 240);
-  --color-card-foreground: oklch(0.98 0.01 240);
-  --color-popover: oklch(0.20 0.01 240);
-  --color-popover-foreground: oklch(0.98 0.01 240);
-  --color-primary: oklch(0.98 0.01 240);
-  --color-primary-foreground: oklch(0.18 0.01 240);
-  --color-secondary: oklch(0.26 0.01 240);
-  --color-secondary-foreground: oklch(0.98 0.01 240);
-  --color-muted: oklch(0.26 0.01 240);
-  --color-muted-foreground: oklch(0.72 0.01 240);
-  --color-accent: oklch(0.26 0.01 240);
-  --color-accent-foreground: oklch(0.98 0.01 240);
-  --color-destructive: oklch(0.6 0.2 25);
-  --color-destructive-foreground: oklch(0.98 0.01 240);
-  --color-border: oklch(0.30 0.01 240);
-  --color-input: oklch(0.26 0.01 240);
-  --color-ring: oklch(0.98 0.01 240);
-
-  /* Additional colors for status messages */
-  --color-green-500: oklch(0.72 0.20 142);
-  --color-green-600: oklch(0.64 0.22 142);
-}
-
-/* Reset and base styles */
+/* Global scrollbars - ultra thin and elegant */
 * {
-  border-color: var(--color-border);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
 
-html {
-  color-scheme: dark;
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
 }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans);
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Placeholder text styling */
-input::placeholder,
-textarea::placeholder {
-  color: var(--color-muted-foreground);
-  opacity: 0.6;
+::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
 }
 
-/* Cursor pointer for all interactive elements */
-button,
-a,
-[role="button"],
-[role="link"],
-[role="menuitem"],
-[role="tab"],
-[tabindex]:not([tabindex="-1"]),
-.cursor-pointer {
-  cursor: pointer;
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.6);
 }
 
-/* Ensure disabled elements don't have pointer cursor */
-button:disabled,
-[disabled],
-.disabled {
-  cursor: not-allowed !important;
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
-/* Remove all focus styles globally */
-* {
-  outline: none !important;
-  outline-offset: 0 !important;
+/* Code blocks - slightly larger for better usability */
+pre::-webkit-scrollbar,
+.w-md-editor-content::-webkit-scrollbar,
+code::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-*:focus,
-*:focus-visible,
-*:focus-within {
-  outline: none !important;
-  box-shadow: none !important;
+pre::-webkit-scrollbar-thumb,
+.w-md-editor-content::-webkit-scrollbar-thumb,
+code::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.4);
+  border-radius: 4px;
 }
 
-/* Specifically remove focus styles from form elements */
-input:focus,
-input:focus-visible,
-textarea:focus,
-textarea:focus-visible,
-select:focus,
-select:focus-visible,
-button:focus,
-button:focus-visible,
-[role="button"]:focus,
-[role="button"]:focus-visible,
-[role="combobox"]:focus,
-[role="combobox"]:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: var(--color-input) !important;
+pre::-webkit-scrollbar-thumb:hover,
+.w-md-editor-content::-webkit-scrollbar-thumb:hover,
+code::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.6);
 }
 
-/* Remove ring styles */
-.ring-0,
-.ring-1,
-.ring-2,
-.ring,
-.ring-offset-0,
-.ring-offset-1,
-.ring-offset-2,
-.ring-offset {
-  box-shadow: none !important;
-}
+/* ============================================================
+   TYPOGRAPHY UTILITY CLASSES
+   ============================================================ */
 
-/* Platform-specific window styling for transparent, custom-decorated window */
-
-/* macOS: subtle window outline with rounded corners */
-html.is-macos body {
-  /* Maintain rounded-corner shape and add a gentle 1px inner outline */
-  box-shadow: inset 0 0 0 1px var(--color-border);
-}
-
-/* Windows: sharper corners, standard shadow */
-html.is-windows body {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 0 0 1px var(--color-border);
-}
-
-html.is-windows html {
-  border-radius: 8px;
-  clip-path: inset(0 round 8px);
-}
-
-/* Linux: similar to Windows but with slightly softer corners */
-html.is-linux body {
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 0 0 1px var(--color-border);
-}
-
-html.is-linux html {
-  border-radius: 10px;
-  clip-path: inset(0 round 10px);
-}
-
-/* Typography Utility Classes */
 .text-display-1 {
   font-size: var(--text-5xl);
   font-weight: var(--font-weight-bold);
@@ -423,7 +374,96 @@ html.is-linux html {
   text-transform: uppercase;
 }
 
-/* Custom utilities */
+/* ============================================================
+   BASE STYLES & RESET
+   ============================================================ */
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  color-scheme: dark;
+}
+
+.light {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-muted-foreground);
+  opacity: 0.6;
+}
+
+button,
+a,
+[role="button"],
+[role="link"],
+[role="menuitem"],
+[role="tab"],
+[tabindex]:not([tabindex="-1"]),
+.cursor-pointer {
+  cursor: pointer;
+}
+
+button:disabled,
+[disabled],
+.disabled {
+  cursor: not-allowed !important;
+}
+
+/* Remove all focus styles globally */
+* {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+*:focus,
+*:focus-visible,
+*:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+button:focus,
+button:focus-visible,
+[role="button"]:focus,
+[role="button"]:focus-visible,
+[role="combobox"]:focus,
+[role="combobox"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: var(--color-input) !important;
+}
+
+.ring-0,
+.ring-1,
+.ring-2,
+.ring,
+.ring-offset-0,
+.ring-offset-1,
+.ring-offset-2,
+.ring-offset {
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   CUSTOM UTILITIES
+   ============================================================ */
+
 @utility animate-in {
   animation-name: enter;
   animation-duration: 150ms;
@@ -443,45 +483,32 @@ html.is-linux html {
   -webkit-line-clamp: 2;
 }
 
-@keyframes enter {
-  from {
-    opacity: var(--tw-enter-opacity, 1);
-    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1)) rotate(var(--tw-enter-rotate, 0));
-  }
-}
+/* ============================================================
+   MARKDOWN EDITOR THEME-AWARE STYLES
+   ============================================================ */
 
-@keyframes exit {
-  to {
-    opacity: var(--tw-exit-opacity, 1);
-    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
-  }
-}
-
-/* Markdown Editor Theme-aware Styles */
 [data-color-mode="dark"],
-.theme-dark [data-color-mode="dark"],
-.theme-gray [data-color-mode="dark"] {
-  --color-border-default: rgb(48, 54, 61);
-  --color-canvas-default: rgb(13, 17, 23);
-  --color-canvas-subtle: rgb(22, 27, 34);
-  --color-fg-default: rgb(201, 209, 217);
-  --color-fg-muted: rgb(139, 148, 158);
-  --color-fg-subtle: rgb(110, 118, 129);
-  --color-accent-fg: rgb(88, 166, 255);
-  --color-danger-fg: rgb(248, 81, 73);
+:not(.light) [data-color-mode="dark"] {
+  --color-border-default: var(--color-border);
+  --color-canvas-default: var(--color-background);
+  --color-canvas-subtle: var(--color-card);
+  --color-fg-default: var(--color-foreground);
+  --color-fg-muted: var(--color-muted-foreground);
+  --color-fg-subtle: var(--color-muted-foreground);
+  --color-accent-fg: oklch(74.6% 0.16 232.661);
+  --color-danger-fg: oklch(63.7% 0.237 25.331);
 }
 
 [data-color-mode="light"],
-.theme-light [data-color-mode="light"],
-.theme-white [data-color-mode="light"] {
-  --color-border-default: rgb(216, 222, 228);
-  --color-canvas-default: rgb(255, 255, 255);
-  --color-canvas-subtle: rgb(246, 248, 250);
-  --color-fg-default: rgb(31, 35, 40);
-  --color-fg-muted: rgb(101, 109, 118);
-  --color-fg-subtle: rgb(149, 157, 165);
-  --color-accent-fg: rgb(9, 105, 218);
-  --color-danger-fg: rgb(207, 34, 46);
+.light [data-color-mode="light"] {
+  --color-border-default: var(--color-border);
+  --color-canvas-default: var(--color-background);
+  --color-canvas-subtle: var(--color-card);
+  --color-fg-default: var(--color-foreground);
+  --color-fg-muted: var(--color-muted-foreground);
+  --color-fg-subtle: var(--color-muted-foreground);
+  --color-accent-fg: oklch(58.8% 0.158 241.966);
+  --color-danger-fg: oklch(63.7% 0.237 25.331);
 }
 
 .w-md-editor {
@@ -533,7 +560,10 @@ html.is-linux html {
   color: var(--color-foreground) !important;
 }
 
-/* Prose styles for markdown rendering */
+/* ============================================================
+   PROSE STYLES FOR MARKDOWN
+   ============================================================ */
+
 .prose {
   color: var(--color-foreground);
   max-width: 65ch;
@@ -709,7 +739,6 @@ html.is-linux html {
   padding: 0.571em;
 }
 
-/* Dark mode adjustments */
 .prose.dark\:prose-invert {
   color: var(--color-foreground);
 }
@@ -728,7 +757,6 @@ html.is-linux html {
 }
 
 .prose.dark\:prose-invert pre {
-  /*background-color: rgb(13, 17, 23);*/
   border: 1px solid var(--color-border);
 }
 
@@ -740,9 +768,125 @@ html.is-linux html {
   border-bottom-color: var(--color-border);
 }
 
-/* Remove maximum width constraint */
 .prose.max-w-none {
   max-width: none;
+}
+
+/* ============================================================
+   BRAND ANIMATIONS
+   ============================================================ */
+
+/* Shimmer hover effect */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.shimmer-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(217, 119, 87, 0.4) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  animation: shimmer 1s ease-in-out;
+}
+
+/* Trailing border effect with brand colors */
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes trail-rotate {
+  to {
+    --angle: 360deg;
+  }
+}
+
+.trailing-border {
+  position: relative;
+  background: var(--color-card);
+  z-index: 0;
+  overflow: visible;
+}
+
+.trailing-border::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  padding: 2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 0%,
+    transparent 85%,
+    #d97757 90%,
+    #ff9a7a 92.5%,
+    #d97757 95%,
+    transparent 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.trailing-border:hover::after {
+  opacity: 1;
+  animation: trail-rotate 2s linear infinite;
+}
+
+.trailing-border > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================================
+   CUSTOM ANIMATIONS
+   ============================================================ */
+
+/* Utility animations */
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1)) rotate(var(--tw-enter-rotate, 0));
+  }
+}
+
+@keyframes exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
+  }
 }
 
 /* Rotating symbol animation */
@@ -779,154 +923,6 @@ html.is-linux html {
   animation: rotate-symbol 1s linear infinite;
 }
 
-/* Removed special font-weight for larger sizes to maintain consistency */
-
-/* Shimmer hover effect */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.shimmer-hover {
-  position: relative;
-  overflow: hidden;
-}
-
-.shimmer-hover::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.05),
-    transparent
-  );
-  transition: left 0.5s;
-}
-
-.shimmer-hover:hover::before {
-  left: 100%;
-  animation: shimmer 0.5s;
-}
-
-/* Trailing border effect */
-@property --angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes trail-rotate {
-  to {
-    --angle: 360deg;
-  }
-}
-
-.trailing-border {
-  position: relative;
-  background: var(--color-card);
-  z-index: 0;
-  overflow: visible;
-}
-
-/* The correctly traveling border line */
-.trailing-border::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  padding: 2px;
-  border-radius: inherit;
-  background: conic-gradient(
-    from var(--angle),
-    transparent 0%,
-    transparent 85%,
-    #d97757 90%,
-    #ff9a7a 92.5%,
-    #d97757 95%,
-    transparent 100%
-  );
-  -webkit-mask: 
-    linear-gradient(#fff 0 0) content-box, 
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: -1;
-}
-
-.trailing-border:hover::after {
-  opacity: 1;
-  animation: trail-rotate 2s linear infinite;
-}
-
-/* Ensure the card content stays above the border effect */
-.trailing-border > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* --- ELEGANT SCROLLBARS --- */
-
-/* Firefox - thin and minimal */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
-}
-
-/* Global webkit scrollbar - ultra thin and elegant */
-::-webkit-scrollbar {
-  width: 3px;
-  height: 3px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 2px;
-  transition: background-color 0.2s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.6);
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* Code blocks - slightly larger for better usability */
-pre::-webkit-scrollbar,
-.w-md-editor-content::-webkit-scrollbar,
-code::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-pre::-webkit-scrollbar-thumb,
-.w-md-editor-content::-webkit-scrollbar-thumb,
-code::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.4);
-  border-radius: 4px;
-}
-
-pre::-webkit-scrollbar-thumb:hover,
-.w-md-editor-content::-webkit-scrollbar-thumb:hover,
-code::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.6);
-}
-
 /* NFO Credits Scanlines Animation */
 @keyframes scanlines {
   0% {
@@ -943,14 +939,11 @@ code::-webkit-scrollbar-thumb:hover {
 
 /* Screenshot Shutter Animation */
 @keyframes shutterFlash {
-  0% {
+  0%, 100% {
     opacity: 0;
   }
   50% {
     opacity: 1;
-  }
-  100% {
-    opacity: 0;
   }
 }
 
@@ -961,16 +954,12 @@ code::-webkit-scrollbar-thumb:hover {
 /* Image Move to Input Animation */
 @keyframes moveToInput {
   0% {
-    transform: scale(1) translateY(0);
     opacity: 1;
-  }
-  50% {
-    transform: scale(0.3) translateY(50%);
-    opacity: 0.8;
+    transform: translate(0, 0);
   }
   100% {
-    transform: scale(0.1) translateY(100vh);
     opacity: 0;
+    transform: translate(var(--dx), var(--dy));
   }
 }
 
@@ -978,8 +967,15 @@ code::-webkit-scrollbar-thumb:hover {
   animation: moveToInput 0.8s ease-in-out forwards;
 }
 
-/* Logo and video inversion for dark mode */
-.theme-dark .logo-invert,
-.theme-dark .video-invert {
+/* Logo and video inversion for light/dark mode */
+/* Invert in light mode (light background) - make white logos black */
+.light .logo-invert,
+.light .video-invert {
   filter: invert(1);
+}
+
+/* Keep normal in dark mode (dark background) - logos are white */
+:not(.light) .logo-invert,
+:not(.light) .video-invert {
+  filter: invert(0);
 }

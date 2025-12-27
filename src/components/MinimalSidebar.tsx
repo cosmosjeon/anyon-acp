@@ -8,7 +8,7 @@ import {
   ChevronDown,
   Sun,
   Moon,
-} from 'lucide-react';
+} from "@/lib/icons";
 import { cn } from '@/lib/utils';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 import { UserProfileDropdown } from '@/components/UserProfileDropdown';
@@ -83,7 +83,7 @@ export const MinimalSidebar: React.FC<MinimalSidebarProps> = ({
               className="flex items-center gap-1.5 rounded-lg cursor-pointer"
             >
               <img src={logoAnyon} alt="ANYON" className="w-9 h-9 object-contain logo-invert" />
-              <img src={logoText} alt="ANYON" className="h-6 object-contain" />
+              <img src={logoText} alt="ANYON" className="h-6 object-contain logo-invert" />
             </button>
           ) : (
             <TooltipSimple content="Home" side="right">

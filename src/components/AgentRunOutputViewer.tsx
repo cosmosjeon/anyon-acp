@@ -1,30 +1,30 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Maximize2, 
-  Minimize2, 
-  Copy, 
-  RefreshCw, 
-  RotateCcw, 
+import {
+  Maximize2,
+  Minimize2,
+  Copy,
+  RefreshCw,
+  RotateCcw,
   ChevronDown,
   Bot,
   Clock,
   Hash,
   DollarSign,
   StopCircle
-} from 'lucide-react';
+} from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Toast, ToastContainer } from '@/components/ui/toast';
-import { Popover } from '@/components/ui/popover';
+import { LegacyPopover as Popover } from '@/components/ui/popover';
 import { api, type AgentRunWithMetrics } from '@/lib/api';
 import { useOutputCache } from '@/lib/outputCache';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { StreamMessage } from './StreamMessage';
 import { ErrorBoundary } from './ErrorBoundary';
 import { formatISOTimestamp } from '@/lib/date-utils';
-import { AGENT_ICONS } from './CCAgents';
+import { ICON_MAP } from './IconPicker';
 import type { ClaudeStreamMessage } from './AgentExecution';
 import { useTabState } from '@/hooks/useTabState';
 
@@ -509,7 +509,7 @@ export function AgentRunOutputViewer({
   }, [messages]);
 
   const renderIcon = (iconName: string) => {
-    const Icon = AGENT_ICONS[iconName as keyof typeof AGENT_ICONS] || Bot;
+    const Icon = ICON_MAP[iconName] || Bot;
     return <Icon className="h-5 w-5" />;
   };
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Play, Terminal, AlertCircle } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { Play, Terminal, AlertCircle , Loader2 } from "@/lib/icons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api, type ProcessInfo, type Session } from "@/lib/api";
@@ -77,7 +76,7 @@ export const RunningClaudeSessions: React.FC<RunningClaudeSessionsProps> = ({
   if (loading && runningSessions.length === 0) {
     return (
       <div className={cn("flex items-center justify-center py-4", className)}>
-        <VideoLoader size="sm" />
+        <Loader2 className="h-4 w-4 animate-spin" />
       </div>
     );
   }

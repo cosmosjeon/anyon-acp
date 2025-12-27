@@ -1,0 +1,137 @@
+{
+  "projectName": "ANYON",
+  "projectType": "multi-part",
+  "parts": [
+    {
+      "id": "frontend",
+      "name": "Frontend",
+      "type": "web",
+      "path": "src/",
+      "description": "React-based user interface",
+      "technologies": [
+        "React 18.3.1",
+        "TypeScript 5.6.2",
+        "Vite 6.0.3",
+        "Tailwind CSS 4.1.8",
+        "Zustand 5.0.6",
+        "React Router 7.10.1",
+        "Radix UI"
+      ],
+      "entryPoints": [
+        "src/main.tsx",
+        "src/App.tsx"
+      ],
+      "statistics": {
+        "components": 81,
+        "stores": 5,
+        "hooks": 17,
+        "contexts": 3
+      },
+      "documentation": [
+        "architecture-frontend.md",
+        "component-inventory.md"
+      ]
+    },
+    {
+      "id": "desktop",
+      "name": "Desktop Backend",
+      "type": "desktop",
+      "path": "src-tauri/",
+      "description": "Tauri/Rust backend for desktop application",
+      "technologies": [
+        "Tauri 2.x",
+        "Rust 2021 Edition",
+        "Tokio",
+        "Axum 0.8",
+        "rusqlite 0.32",
+        "jsonwebtoken 9"
+      ],
+      "entryPoints": [
+        "src-tauri/src/main.rs",
+        "src-tauri/src/lib.rs"
+      ],
+      "statistics": {
+        "commands": 120,
+        "modules": 15,
+        "databaseTables": 4
+      },
+      "documentation": [
+        "architecture-desktop.md"
+      ]
+    },
+    {
+      "id": "server",
+      "name": "Auth Server",
+      "type": "backend",
+      "path": "server/",
+      "description": "Node.js authentication and settings server",
+      "technologies": [
+        "Node.js 18+",
+        "Express 4.18.2",
+        "google-auth-library 10.5.0",
+        "jsonwebtoken 9.0.2"
+      ],
+      "entryPoints": [
+        "server/index.js"
+      ],
+      "statistics": {
+        "endpoints": 15,
+        "middlewares": 2
+      },
+      "documentation": [
+        "architecture-server.md"
+      ]
+    }
+  ],
+  "integrations": [
+    {
+      "from": "frontend",
+      "to": "desktop",
+      "protocol": "Tauri IPC",
+      "description": "120+ commands via invoke()"
+    },
+    {
+      "from": "frontend",
+      "to": "server",
+      "protocol": "HTTP REST",
+      "description": "15 auth/settings endpoints"
+    },
+    {
+      "from": "desktop",
+      "to": "server",
+      "protocol": "HTTP (embedded)",
+      "description": "Internal auth server"
+    }
+  ],
+  "sharedResources": {
+    "database": {
+      "type": "SQLite",
+      "location": "App data directory",
+      "tables": [
+        "agents",
+        "agent_runs",
+        "app_settings",
+        "checkpoints",
+        "checkpoint_files"
+      ]
+    },
+    "fileSystem": {
+      "claudeProjects": "~/.claude/projects/",
+      "sessionLogs": "~/.claude/projects/*/*.jsonl",
+      "documentation": "anyon-docs/"
+    }
+  },
+  "buildOutputs": {
+    "frontend": "dist/",
+    "desktop": {
+      "macos": "src-tauri/target/release/bundle/dmg/",
+      "windows": "src-tauri/target/release/bundle/msi/",
+      "linux": "src-tauri/target/release/bundle/deb/"
+    }
+  },
+  "metadata": {
+    "generatedAt": "2024-01-12T00:00:00.000Z",
+    "generator": "bmad-document-project",
+    "scanLevel": "exhaustive"
+  }
+}

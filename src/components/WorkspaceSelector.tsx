@@ -1,24 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Download, AlertTriangle, FolderOpen, CheckCircle } from 'lucide-react';
-import { VideoLoader } from '@/components/VideoLoader';
+import { motion } from 'framer-motion';
+import { FolderOpen, Loader2 } from "@/lib/icons";
 import maintainTabIcon from '@/assets/maintain-tab-icon.png';
 import mvpTabIcon from '@/assets/mvp-tab-icon.png';
-import { Button } from '@/components/ui/button';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { api } from '@/lib/api';
 import type { Project } from '@/lib/api';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 
 // Cross-platform project name extractor (handles / and \\)
 const getProjectName = (path: string): string => {
@@ -43,9 +33,6 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
   const { goToProjectList, goToMvp, goToMaintenance } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
   const [project, setProject] = useState<Project | undefined>(undefined);
-  const [showInstallDialog, setShowInstallDialog] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
-  const [installMessage, setInstallMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
     console.log('[WorkspaceSelector] useEffect triggered', {
@@ -62,67 +49,28 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
     }
   }, [projectId, projects, loading, getProjectById]);
 
-  // Check git repo and anyon installation when project is loaded
+  // Check git repo when project is loaded
   useEffect(() => {
     const checkProjectSetup = async () => {
       if (project?.path) {
-        // First, check if it's a git repository and initialize if not
+        // Check if it's a git repository and initialize if not
         try {
           const isGitRepo = await api.checkIsGitRepo(project.path);
 
           if (!isGitRepo) {
-            setInstallMessage({ type: 'info', text: 'Initializing git repository...' });
+            console.log('[WorkspaceSelector] Initializing git repository...');
             const gitResult = await api.initGitRepo(project.path);
-
-            if (gitResult.success) {
-              setInstallMessage({ type: 'success', text: 'Git repository initialized!' });
-              setTimeout(() => setInstallMessage(null), 2000);
-            } else {
+            if (!gitResult.success) {
               console.warn('Git init failed:', gitResult.stderr);
-              setInstallMessage({ type: 'info', text: 'Git initialization failed, but continuing...' });
-              setTimeout(() => setInstallMessage(null), 2000);
             }
-            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         } catch (gitErr) {
           console.error('Failed to check/init git repo:', gitErr);
-          // Continue even if git check/init fails
-        }
-
-        // Then check anyon installation
-        const status = await api.checkAnyonInstalled(project.path);
-        if (!status.is_installed) {
-          setShowInstallDialog(true);
         }
       }
     };
     checkProjectSetup();
   }, [project?.path]);
-
-  const handleInstallAnyon = async () => {
-    if (!project?.path) return;
-
-    setIsInstalling(true);
-    setShowInstallDialog(false);
-    setInstallMessage({ type: 'info', text: 'Installing ANYON agents...' });
-
-    try {
-      const result = await api.runNpxAnyonAgents(project.path);
-      if (result.success) {
-        setInstallMessage({ type: 'success', text: 'ANYON agents installed successfully!' });
-        setTimeout(() => setInstallMessage(null), 3000);
-      } else {
-        setInstallMessage({ type: 'error', text: result.stderr || 'Installation completed with warnings' });
-        setTimeout(() => setInstallMessage(null), 5000);
-      }
-    } catch (err) {
-      console.error('Failed to install anyon-agents:', err);
-      setInstallMessage({ type: 'error', text: 'Installation failed. Please try again or install manually.' });
-      setTimeout(() => setInstallMessage(null), 5000);
-    } finally {
-      setIsInstalling(false);
-    }
-  };
 
   const handleBack = () => {
     goToProjectList();
@@ -155,41 +103,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
           onLogoClick={goToProjectList}
         />
         <div className="flex-1 flex items-center justify-center">
-          <VideoLoader size="lg" />
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      {/* ANYON Installation Dialog */}
-      <Dialog open={showInstallDialog} onOpenChange={setShowInstallDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              ANYON Agents Not Installed
-            </DialogTitle>
-            <DialogDescription>
-              This project doesn't have ANYON agents installed. ANYON agents provide enhanced AI-assisted development workflows.
-              <br /><br />
-              Would you like to install them now?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInstallDialog(false)}>
-              Later
-            </Button>
-            <Button onClick={handleInstallAnyon}>
-              <Download className="mr-2 h-4 w-4" />
-              Install Now
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <div className="h-full flex overflow-hidden bg-background">
+    <div className="h-full flex overflow-hidden bg-background">
         {/* Sidebar */}
         <AppSidebar
           navDisabled
@@ -201,39 +122,6 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
 
         {/* Main Content */}
         <div className="flex-1 h-full overflow-y-auto flex flex-col">
-          {/* Installing indicator / Status message - Bottom Center */}
-          <AnimatePresence>
-            {(isInstalling || installMessage) && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
-              >
-                <div className={`flex items-center gap-3 px-5 py-3 rounded-full shadow-lg border backdrop-blur-sm ${
-                  installMessage?.type === 'error'
-                    ? 'bg-destructive/90 border-destructive/30 text-white'
-                    : installMessage?.type === 'success'
-                    ? 'bg-green-600/90 border-green-500/30 text-white'
-                    : 'bg-background/95 border-border text-foreground'
-                }`}>
-                  {isInstalling ? (
-                    <>
-                      <VideoLoader size="sm" />
-                      <span className="text-sm font-medium">Installing ANYON agents...</span>
-                    </>
-                  ) : installMessage && (
-                    <>
-                      {installMessage.type === 'success' && <CheckCircle className="h-4 w-4" />}
-                      {installMessage.type === 'error' && <AlertTriangle className="h-4 w-4" />}
-                      <span className="text-sm font-medium">{installMessage.text}</span>
-                    </>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Breadcrumb - Top Left */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -300,7 +188,6 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
           </div>
         </div>
       </div>
-    </>
   );
 };
 

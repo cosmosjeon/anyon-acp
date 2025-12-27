@@ -1,9 +1,11 @@
 pub mod agents;
 pub mod claude;
+pub mod claude_auth;
+pub mod dev_server;
 pub mod dev_workflow;
+pub mod git;
 pub mod mcp;
 pub mod preview;
-pub mod proxy;
 pub mod slash_commands;
 pub mod storage;
 pub mod usage;

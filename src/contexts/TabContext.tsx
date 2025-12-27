@@ -1,20 +1,18 @@
 import React, { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react';
-import { TabPersistenceService } from '@/services/tabPersistence';
-import { SessionPersistenceService } from '@/services/sessionPersistence';
 
 export interface Tab {
   id: string;
   type: 'chat' | 'agent' | 'agents' | 'projects' | 'usage' | 'mcp' | 'settings' | 'claude-md' | 'claude-file' | 'agent-execution' | 'create-agent' | 'import-agent';
   title: string;
-  sessionId?: string;  // for chat tabs
-  sessionData?: any; // for chat tabs - stores full session object
-  agentRunId?: string; // for agent tabs
-  agentData?: any; // for agent-execution tabs
-  claudeFileId?: string; // for claude-file tabs
-  initialProjectPath?: string; // for chat tabs
-  projectPath?: string; // for agent-execution tabs
-  projectsRoute?: string; // for projects tabs - internal route state (e.g., '/projects', '/project/123/maintenance')
-  projectsRouteParams?: Record<string, string>; // for projects tabs - route params
+  sessionId?: string;
+  sessionData?: any;
+  agentRunId?: string;
+  agentData?: any;
+  claudeFileId?: string;
+  initialProjectPath?: string;
+  projectPath?: string;
+  projectsRoute?: string;
+  projectsRouteParams?: Record<string, string>;
   status: 'active' | 'idle' | 'running' | 'complete' | 'error';
   hasUnsavedChanges: boolean;
   order: number;
@@ -38,112 +36,39 @@ interface TabContextType {
 
 const TabContext = createContext<TabContextType | undefined>(undefined);
 
-// const STORAGE_KEY = 'opcode_tabs'; // No longer needed - persistence disabled
 const MAX_TABS = 20;
 
-export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const isInitialized = useRef(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+const generateTabId = () => {
+  return `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
 
-  // Load tabs from storage on mount
+export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isInitialized = useRef(false);
+
+  // Create default tab
+  const createDefaultTab = (): Tab => ({
+    id: generateTabId(),
+    type: 'projects',
+    title: 'Projects',
+    status: 'idle',
+    hasUnsavedChanges: false,
+    order: 0,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  const [tabs, setTabs] = useState<Tab[]>(() => [createDefaultTab()]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id || null);
+
+  // Initialize on mount
   useEffect(() => {
-    const loadTabs = async () => {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    // Migrate from old format if needed
-    TabPersistenceService.migrateFromOldFormat();
-
-    // Try to load saved tabs
-    const { tabs: savedTabs, activeTabId: savedActiveTabId } = TabPersistenceService.loadTabs();
-    
-    if (savedTabs.length > 0) {
-      // For chat tabs, restore session data
-      const restoredTabs = await Promise.all(savedTabs.map(async (tab) => {
-        if (tab.type === 'chat' && tab.sessionId) {
-          // Check if session can be restored
-          const sessionData = SessionPersistenceService.loadSession(tab.sessionId);
-          if (sessionData) {
-            // Create a Session object for the tab
-            const session = SessionPersistenceService.createSessionFromRestoreData(sessionData);
-            return {
-              ...tab,
-              sessionData: session,
-              initialProjectPath: sessionData.projectPath
-            };
-          }
-        }
-        return tab;
-      }));
-      
-      setTabs(restoredTabs);
-      setActiveTabId(savedActiveTabId);
-    } else {
-      // Create default projects tab if no saved tabs
-      const defaultTab: Tab = {
-        id: generateTabId(),
-        type: 'projects',
-        title: 'Projects',
-        status: 'idle',
-        hasUnsavedChanges: false,
-        order: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      setTabs([defaultTab]);
-      setActiveTabId(defaultTab.id);
+    if (tabs.length > 0 && !activeTabId) {
+      setActiveTabId(tabs[0].id);
     }
-    };
-    
-    loadTabs();
   }, []);
-
-  // Save tabs to localStorage with debounce
-  useEffect(() => {
-    // Don't save if not initialized
-    if (!isInitialized.current) return;
-    
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Debounce saving to avoid excessive writes
-    saveTimeoutRef.current = setTimeout(() => {
-      TabPersistenceService.saveTabs(tabs, activeTabId);
-    }, 500); // Wait 500ms after last change before saving
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [tabs, activeTabId]);
-
-  // Save tabs immediately when window is about to close
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (isInitialized.current && tabs.length > 0) {
-        TabPersistenceService.saveTabs(tabs, activeTabId);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Save one final time when component unmounts
-      if (isInitialized.current && tabs.length > 0) {
-        TabPersistenceService.saveTabs(tabs, activeTabId);
-      }
-    };
-  }, [tabs, activeTabId]);
-
-  const generateTabId = () => {
-    return `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  };
 
   const addTab = useCallback((tabData: Omit<Tab, 'id' | 'order' | 'createdAt' | 'updatedAt'>): string => {
     if (tabs.length >= MAX_TABS) {
@@ -166,14 +91,11 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const removeTab = useCallback((id: string) => {
     setTabs(prevTabs => {
       const filteredTabs = prevTabs.filter(tab => tab.id !== id);
-      
-      // Reorder remaining tabs
       const reorderedTabs = filteredTabs.map((tab, index) => ({
         ...tab,
         order: index
       }));
 
-      // Update active tab if necessary
       if (activeTabId === id && reorderedTabs.length > 0) {
         const removedTabIndex = prevTabs.findIndex(tab => tab.id === id);
         const newActiveIndex = Math.min(removedTabIndex, reorderedTabs.length - 1);
@@ -187,9 +109,9 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeTabId]);
 
   const updateTab = useCallback((id: string, updates: Partial<Tab>) => {
-    setTabs(prevTabs => 
-      prevTabs.map(tab => 
-        tab.id === id 
+    setTabs(prevTabs =>
+      prevTabs.map(tab =>
+        tab.id === id
           ? { ...tab, ...updates, updatedAt: new Date() }
           : tab
       )
@@ -207,8 +129,7 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newTabs = [...prevTabs];
       const [removed] = newTabs.splice(startIndex, 1);
       newTabs.splice(endIndex, 0, removed);
-      
-      // Update order property
+
       return newTabs.map((tab, index) => ({
         ...tab,
         order: index
@@ -223,7 +144,6 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const closeAllTabs = useCallback(() => {
     setTabs([]);
     setActiveTabId(null);
-    TabPersistenceService.clearTabs();
   }, []);
 
   const getTabsByType = useCallback((type: 'chat' | 'agent'): Tab[] => {

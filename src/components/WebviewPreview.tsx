@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   ArrowRight,
@@ -7,16 +8,16 @@ import {
   X,
   Minimize2,
   Maximize2,
-  
   AlertCircle,
   Globe,
   Home,
-} from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+  Loader2,
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { isLocalhostUrl, extractPortFromUrl } from "@/hooks/usePortVerification";
 
 interface WebviewPreviewProps {
   /**
@@ -107,12 +108,35 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
   // In the full implementation, this would create a Tauri webview window
   useEffect(() => {
     if (currentUrl) {
-      // This is where we'd create the actual webview
-      // For now, using iframe for demonstration
       setIsLoading(true);
       setHasError(false);
-      
-      // Simulate loading
+
+      // For localhost URLs, verify the port is reachable
+      if (isLocalhostUrl(currentUrl)) {
+        const port = extractPortFromUrl(currentUrl);
+        if (port) {
+          // Quick check if port is alive (single attempt, no polling)
+          invoke<{ port: number; alive: boolean }>('check_port_alive', {
+            port,
+            maxAttempts: 1,
+          })
+            .then((result) => {
+              if (!result.alive) {
+                setHasError(true);
+                setErrorMessage(`Server not responding on port ${port}`);
+              }
+              setIsLoading(false);
+            })
+            .catch((err) => {
+              console.warn('[WebviewPreview] Port check failed:', err);
+              // Don't block loading if port check fails
+              setIsLoading(false);
+            });
+          return;
+        }
+      }
+
+      // For non-localhost or if port check not needed, just simulate loading
       const timer = setTimeout(() => {
         setIsLoading(false);
       }, 1000);
@@ -173,10 +197,38 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
     console.log("Go forward");
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsLoading(true);
-    // In real implementation, this would call webview.reload()
-    setTimeout(() => setIsLoading(false), 1000);
+    setHasError(false);
+
+    // For localhost URLs, verify the port is reachable before refreshing
+    if (isLocalhostUrl(currentUrl)) {
+      const port = extractPortFromUrl(currentUrl);
+      if (port) {
+        try {
+          const result = await invoke<{ port: number; alive: boolean }>('check_port_alive', {
+            port,
+            maxAttempts: 3, // Try a few times on refresh
+            pollIntervalMs: 300,
+          });
+
+          if (!result.alive) {
+            setHasError(true);
+            setErrorMessage(`Server not responding on port ${port}`);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[WebviewPreview] Port check on refresh failed:', err);
+        }
+      }
+    }
+
+    // Reload the iframe
+    if (iframeRef.current) {
+      iframeRef.current.src = currentUrl;
+    }
+    setIsLoading(false);
   };
 
   const handleGoHome = () => {
@@ -199,7 +251,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
             <Globe className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Preview</span>
             {isLoading && (
-              <VideoLoader size="sm" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             )}
           </div>
           
@@ -316,7 +368,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
               className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center"
             >
               <div className="flex flex-col items-center gap-3">
-                <VideoLoader size="lg" />
+                <Loader2 className="h-8 w-8 animate-spin" />
                 <p className="text-sm text-muted-foreground">Loading preview...</p>
               </div>
             </motion.div>

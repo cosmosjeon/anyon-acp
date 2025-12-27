@@ -1,0 +1,508 @@
+{
+  "audit_summary": {
+    "audit_date": "2025-12-19",
+    "total_files_analyzed": 120,
+    "total_issues": 87,
+    "critical_issues": 12,
+    "high_severity_issues": 23,
+    "medium_severity_issues": 34,
+    "low_severity_issues": 18
+  },
+  "findings": {
+    "architecture_issues": {
+      "critical": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ToolWidgets.tsx",
+          "lines": "1-3386",
+          "severity": "Critical",
+          "category": "Large File / God Component",
+          "description": "ToolWidgets.tsx is 3,386 lines - a massive god component containing 20+ widget implementations",
+          "impact": "Extremely difficult to maintain, slow to load, impossible to tree-shake, high bundle impact",
+          "suggested_fix": "Split into individual widget files under components/widgets/ directory. Each widget should be its own file:\n- components/widgets/TaskWidget.tsx\n- components/widgets/EditWidget.tsx\n- components/widgets/TodoWidget.tsx\n- etc.\nCreate an index.ts for clean imports."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/lib/api.ts",
+          "lines": "1-2496",
+          "severity": "Critical",
+          "category": "Large File / Monolithic API",
+          "description": "api.ts is 2,496 lines - all API methods in one file with 100+ function definitions",
+          "impact": "Difficult to maintain, high cognitive load, no separation of concerns",
+          "suggested_fix": "Split by domain:\n- lib/api/projects.ts\n- lib/api/sessions.ts\n- lib/api/agents.ts\n- lib/api/checkpoints.ts\n- lib/api/mcp.ts\n- lib/api/storage.ts\nCreate lib/api/index.ts to re-export with proper types."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "1-2074",
+          "severity": "Critical",
+          "category": "Large File / Complex Component",
+          "description": "ClaudeCodeSession.tsx is 2,074 lines with massive complexity - multiple concerns mixed together",
+          "impact": "Extremely difficult to test, high bug risk, poor performance, hard to refactor",
+          "suggested_fix": "Already has a .refactored.tsx version - use it! Split into:\n- useClaudeSession hook (session management)\n- useStreamingMessages hook (message handling)\n- SessionMessageList component\n- SessionControls component\n- SessionTimeline component\nReduce to < 500 lines."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/FloatingPromptInput.tsx",
+          "lines": "1-1543",
+          "severity": "Critical",
+          "category": "Large File / Over-featured Component",
+          "description": "FloatingPromptInput.tsx is 1,543 lines - too many features in one component",
+          "impact": "Hard to maintain, difficult to test individual features, performance issues",
+          "suggested_fix": "Extract sub-components:\n- ModelPicker.tsx\n- ThinkingModePicker.tsx\n- ExecutionModePicker.tsx\n- FileAttachmentManager.tsx\n- SlashCommandIntegration.tsx\nUse composition instead of monolithic component."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/Settings.tsx",
+          "lines": "1-1279",
+          "severity": "Critical",
+          "category": "Large File / Settings Monolith",
+          "description": "Settings.tsx is 1,279 lines - all settings sections in one component",
+          "impact": "Slow to render, difficult to navigate code, hard to test individual sections",
+          "suggested_fix": "Split by section:\n- AppearanceSettings.tsx\n- PrivacySettings.tsx\n- AIAuthSettings.tsx\n- PermissionSettings.tsx\n- etc.\nUse a settings router pattern."
+        }
+      ],
+      "high": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "233-236",
+          "severity": "High",
+          "category": "State Management Anti-pattern",
+          "description": "Redundant state synchronization - queuedPromptsRef kept in sync with queuedPrompts state",
+          "impact": "Unnecessary complexity, potential for stale data, confusing data flow",
+          "suggested_fix": "Remove ref and use state directly, or use ref-only pattern if immediate access needed without re-renders."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "203-218",
+          "severity": "High",
+          "category": "Over-engineered Session Metrics",
+          "description": "Complex session metrics object with 13+ properties tracked in a ref",
+          "impact": "Hard to maintain, no TypeScript safety, easy to miss updates",
+          "suggested_fix": "Create a useSessionMetrics hook with proper state management and TypeScript types."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "253-368",
+          "severity": "High",
+          "category": "Complex Message Filtering Logic",
+          "description": "displayableMessages useMemo has 100+ lines of filtering and merging logic",
+          "impact": "Hard to test, difficult to debug, potential performance issues",
+          "suggested_fix": "Extract to separate utility functions:\n- filterDisplayableMessages()\n- mergeConsecutiveToolMessages()\n- isToolOnlyMessage()\nMove to lib/messageProcessing.ts"
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "666-1170",
+          "severity": "High",
+          "category": "Massive handleSendPrompt Function",
+          "description": "handleSendPrompt is 500+ lines with deeply nested logic and multiple responsibilities",
+          "impact": "Impossible to test properly, high bug risk, hard to understand",
+          "suggested_fix": "Split into:\n- validatePrompt()\n- setupEventListeners()\n- handleStreamMessage()\n- processComplete()\n- sendPromptToBackend()\nUse state machine pattern for execution flow."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/stores/sessionStore.ts",
+          "lines": "126-127",
+          "severity": "High",
+          "category": "Incomplete Store Implementation",
+          "description": "deleteSession method has placeholder implementation with console.warn",
+          "impact": "Feature not working, potential data inconsistency",
+          "suggested_fix": "Implement proper backend API call or remove the method if not supported."
+        },
+        {
+          "file": "Multiple files",
+          "lines": "N/A",
+          "severity": "High",
+          "category": "No Error Boundaries",
+          "description": "Most components lack error boundary wrappers - only ErrorBoundary component exists but rarely used",
+          "impact": "App crashes propagate to root, poor user experience",
+          "suggested_fix": "Wrap major feature components with ErrorBoundary:\n- Wrap ClaudeCodeSession\n- Wrap Settings\n- Wrap AgentExecution\n- Wrap PreviewPanel"
+        }
+      ],
+      "medium": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "148-156",
+          "severity": "Medium",
+          "category": "Prop Drilling",
+          "description": "Multiple props passed through component tree: onProjectPathChange, onStreamingChange, onSessionCreated, etc.",
+          "impact": "Components tightly coupled, hard to refactor",
+          "suggested_fix": "Use Context API for shared state or implement custom hooks for cross-component communication."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "704-750",
+          "severity": "Medium",
+          "category": "Listener Setup Complexity",
+          "description": "Complex event listener setup logic with conditional session-specific vs generic listeners",
+          "impact": "Hard to understand, potential memory leaks, difficult to debug",
+          "suggested_fix": "Extract to useEventListeners hook with clear setup/teardown lifecycle."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/stores/authStore.ts",
+          "lines": "43-55",
+          "severity": "Medium",
+          "category": "Development Mode Hardcoding",
+          "description": "Dev user and token hardcoded in production code with isDev flag",
+          "impact": "Security risk if isDev flag is misconfigured, code clutter",
+          "suggested_fix": "Move dev overrides to separate config file, use environment variables properly."
+        }
+      ]
+    },
+    "code_quality_problems": {
+      "critical": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/lib/api.ts",
+          "lines": "Multiple locations",
+          "severity": "Critical",
+          "category": "Type Safety - Excessive 'any' Usage",
+          "description": "58 files use 'any' type including critical API layer - 127 console.log statements in api.ts alone",
+          "impact": "No type safety, runtime errors, hard to refactor, poor IDE support",
+          "suggested_fix": "Define proper TypeScript interfaces for all API responses:\n- Create types/api/ directory\n- Define response types for each endpoint\n- Remove 'any' types incrementally\n- Use 'unknown' when type is truly unknown"
+        }
+      ],
+      "high": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "Multiple",
+          "severity": "High",
+          "category": "Console Logging Pollution",
+          "description": "659 console.log statements across 91 files - extensive debug logging left in production code",
+          "impact": "Performance overhead, console spam, potential data leaks in logs",
+          "suggested_fix": "1. Create proper logging utility with levels (debug, info, warn, error)\n2. Remove debug console.logs\n3. Keep only error logging\n4. Use conditional logging based on environment"
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "1172-1178",
+          "severity": "High",
+          "category": "Hardcoded Copy Functionality",
+          "description": "Copy to clipboard functionality directly accesses navigator.clipboard without error handling",
+          "impact": "May fail in some browsers, no user feedback on failure",
+          "suggested_fix": "Create useCopyToClipboard hook with proper error handling, fallback, and success/error notifications."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ToolWidgets.tsx",
+          "lines": "Multiple",
+          "severity": "High",
+          "category": "Duplicate Widget Code",
+          "description": "TodoWidget defined twice - once in ToolWidgets.tsx (line 123) and again in widgets/TodoWidget.tsx",
+          "impact": "Code duplication, maintenance burden, potential inconsistencies",
+          "suggested_fix": "Keep only the widgets/ directory version, remove duplicates from ToolWidgets.tsx"
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/constants/workflows/",
+          "lines": "Multiple files",
+          "severity": "High",
+          "category": "Large Constant Files",
+          "description": "Workflow constant files are 900-2000 lines each with massive string templates",
+          "impact": "Hard to maintain, slow to parse, large bundle size",
+          "suggested_fix": "Move workflow templates to separate .md files in public/ or assets/, load dynamically at runtime."
+        }
+      ],
+      "medium": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "906-915",
+          "severity": "Medium",
+          "category": "Debugging Code in Production",
+          "description": "window._streamEventLogged flag used for debug logging with counter",
+          "impact": "Pollutes global scope, debug code in production",
+          "suggested_fix": "Remove debug code or gate behind proper debug flag/environment check."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/FloatingPromptInput.tsx",
+          "lines": "30-41",
+          "severity": "Medium",
+          "category": "Try-Catch for Imports",
+          "description": "Tauri imports wrapped in try-catch with fallback - pattern repeated across files",
+          "impact": "Code smell, makes debugging harder, should use build-time solution",
+          "suggested_fix": "Use Vite's conditional imports or create proper platform abstraction layer."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/lib/analytics/consent.ts",
+          "lines": "126",
+          "severity": "Medium",
+          "category": "UUID Generation Pattern",
+          "description": "Manual UUID generation using regex replace instead of proper UUID library",
+          "impact": "Not cryptographically secure, potential collisions",
+          "suggested_fix": "Use crypto.randomUUID() or proper UUID library like 'uuid' package."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/",
+          "lines": "Multiple",
+          "severity": "Medium",
+          "category": "Inconsistent File Naming",
+          "description": "Mix of PascalCase and kebab-case for component files - ClaudeCodeSession.tsx vs claude-code-session/",
+          "impact": "Harder to navigate, inconsistent conventions",
+          "suggested_fix": "Standardize on PascalCase for components, kebab-case for directories."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/FilePicker.optimized.tsx",
+          "lines": "1",
+          "severity": "Medium",
+          "category": "Duplicate Files",
+          "description": "FilePicker has both .tsx and .optimized.tsx versions",
+          "impact": "Confusing which version is used, maintenance burden",
+          "suggested_fix": "Keep optimized version, remove old file, or merge improvements."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/SessionList.optimized.tsx",
+          "lines": "1",
+          "severity": "Medium",
+          "category": "Duplicate Files",
+          "description": "SessionList has both .tsx and .optimized.tsx versions",
+          "impact": "Confusing which version is used, maintenance burden",
+          "suggested_fix": "Keep optimized version, remove old file."
+        }
+      ],
+      "low": [
+        {
+          "file": "Multiple components",
+          "lines": "N/A",
+          "severity": "Low",
+          "category": "Inconsistent Import Ordering",
+          "description": "No consistent import ordering - React imports sometimes first, sometimes after libraries",
+          "impact": "Reduced code readability",
+          "suggested_fix": "Use ESLint plugin-import with auto-fix: React -> External libs -> Internal modules -> Components -> Types"
+        }
+      ]
+    },
+    "technical_debt": {
+      "high": [
+        {
+          "file": "Multiple files",
+          "lines": "N/A",
+          "severity": "High",
+          "category": "TODO Comments",
+          "description": "Multiple TODO comments indicating incomplete features:\n- WebviewPreview: 'TODO: Enable when implementing actual navigation'\n- MCPImportExport: 'TODO: Implement export functionality'\n- ClaudeCodeSession: Multiple 'TODO: Pass from agent execution'\n- TabContent: 'TODO: Implement import agent component'",
+          "impact": "Incomplete features, technical debt accumulation",
+          "suggested_fix": "Create GitHub issues for each TODO, track in project board, assign priorities."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/preview/Problems.tsx",
+          "lines": "234-240",
+          "severity": "High",
+          "category": "Commented Out Code",
+          "description": "TODO comments for unimplemented Tauri commands for TypeScript problem checking",
+          "impact": "Non-functional feature, misleading code",
+          "suggested_fix": "Either implement the feature or remove the placeholder code."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.refactored.tsx",
+          "lines": "1",
+          "severity": "High",
+          "category": "Refactored File Not In Use",
+          "description": "ClaudeCodeSession.refactored.tsx exists but original massive file still used",
+          "impact": "Wasted refactoring effort, technical debt continues",
+          "suggested_fix": "Complete the refactoring migration or remove the .refactored file."
+        }
+      ],
+      "medium": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/hooks/useApiCall.ts",
+          "lines": "65, 84",
+          "severity": "Medium",
+          "category": "TODO - Missing Toast Notifications",
+          "description": "TODO comments for implementing toast notifications on API errors",
+          "impact": "Poor user feedback on errors",
+          "suggested_fix": "Implement toast notification system or use existing UI toast component."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/widgets/index.ts",
+          "lines": "6-27",
+          "severity": "Medium",
+          "category": "Commented Out Widget Exports",
+          "description": "Multiple widget exports commented out with 'TODO: Add these widgets as they are implemented'",
+          "impact": "Unclear widget implementation status",
+          "suggested_fix": "Either implement the widgets or remove the comments."
+        }
+      ]
+    },
+    "performance_issues": {
+      "critical": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ToolWidgets.tsx",
+          "lines": "1-3386",
+          "severity": "Critical",
+          "category": "Large Bundle Size",
+          "description": "3,386 line file with 20+ widgets always loaded even when not needed",
+          "impact": "Slow initial load, large bundle size, poor tree-shaking",
+          "suggested_fix": "Code split each widget, use dynamic imports:\nconst TodoWidget = lazy(() => import('./widgets/TodoWidget'));"
+        }
+      ],
+      "high": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "253-368",
+          "severity": "High",
+          "category": "Missing React.memo",
+          "description": "Large components like StreamMessage not memoized, re-rendering on every parent update",
+          "impact": "Unnecessary re-renders, poor performance with long message lists",
+          "suggested_fix": "Wrap StreamMessage with React.memo, use useCallback for event handlers."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "370-375",
+          "severity": "High",
+          "category": "Virtualizer Not Optimized",
+          "description": "useVirtualizer with estimateSize: 150 but messages vary greatly in size",
+          "impact": "Scroll jumping, poor UX with mixed message sizes",
+          "suggested_fix": "Implement proper dynamic sizing with measureElement, increase overscan for smoother scrolling."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/UsageDashboard.tsx",
+          "lines": "Multiple",
+          "severity": "High",
+          "category": "Missing useMemo for Expensive Calculations",
+          "description": "Usage statistics calculations not memoized, recalculated on every render",
+          "impact": "Wasted CPU cycles, potential UI lag",
+          "suggested_fix": "Wrap expensive calculations in useMemo with proper dependencies."
+        }
+      ],
+      "medium": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "433-465",
+          "severity": "Medium",
+          "category": "Excessive useEffect Dependencies",
+          "description": "Auto-scroll useEffect with displayableMessages.length dependency may trigger too often",
+          "impact": "Unnecessary scroll calculations",
+          "suggested_fix": "Debounce scroll updates or use more specific dependencies."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/FileTree.tsx",
+          "lines": "Multiple",
+          "severity": "Medium",
+          "category": "Missing Debounce on Search",
+          "description": "File tree search likely not debounced, searches on every keystroke",
+          "impact": "Performance degradation with large file trees",
+          "suggested_fix": "Use useDebounce hook for search input."
+        }
+      ]
+    },
+    "best_practice_violations": {
+      "high": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "1467-1517",
+          "severity": "High",
+          "category": "Complex useEffect Cleanup",
+          "description": "Massive cleanup useEffect with analytics tracking, listener cleanup, and API calls",
+          "impact": "Hard to test, potential race conditions, memory leaks",
+          "suggested_fix": "Split into separate effects with specific purposes, use custom hooks for cleanup logic."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "1-2074",
+          "severity": "High",
+          "category": "Hook Rules Violation Risk",
+          "description": "Conditional hook setup in handleSendPrompt - useImperativeHandle and event listeners set up conditionally",
+          "impact": "Potential React hook rules violation, bugs in certain conditions",
+          "suggested_fix": "Always call hooks unconditionally, use hook parameters to control behavior."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/FloatingPromptInput.tsx",
+          "lines": "291-300",
+          "severity": "High",
+          "category": "Too Many useState Calls",
+          "description": "10+ useState calls in single component - complex state management",
+          "impact": "Hard to track state changes, potential for stale closures",
+          "suggested_fix": "Use useReducer for related state or extract to custom hooks:\n- useModelSelection()\n- useFileAttachments()\n- useComponentSelection()"
+        },
+        {
+          "file": "Multiple components",
+          "lines": "N/A",
+          "severity": "High",
+          "category": "Missing Accessibility",
+          "description": "Many interactive elements lack ARIA labels and keyboard navigation support",
+          "impact": "Poor accessibility, fails WCAG guidelines",
+          "suggested_fix": "Add:\n- aria-label to icon buttons\n- role attributes where needed\n- keyboard event handlers (onKeyDown)\n- focus management"
+        }
+      ],
+      "medium": [
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ClaudeCodeSession.tsx",
+          "lines": "649-664",
+          "severity": "Medium",
+          "category": "useImperativeHandle Pattern",
+          "description": "useImperativeHandle exposes internal methods - potential abstraction leak",
+          "impact": "Tighter coupling between parent and child",
+          "suggested_fix": "Consider using callback props instead of imperative handle where possible."
+        },
+        {
+          "file": "/Users/cosmos/Documents/1/anyon-claude/src/components/ErrorBoundary.tsx",
+          "lines": "1",
+          "severity": "Medium",
+          "category": "Class Component for Error Boundary",
+          "description": "ErrorBoundary is a class component but rarely used in the app",
+          "impact": "Inconsistent with functional component pattern, not integrated",
+          "suggested_fix": "Wrap major components with error boundaries, or migrate to react-error-boundary library."
+        }
+      ]
+    },
+    "recommendations": {
+      "immediate_actions": [
+        "1. Split ToolWidgets.tsx into individual widget files (3,386 lines → ~100-200 lines each)",
+        "2. Split api.ts by domain (2,496 lines → 8 files of ~300 lines)",
+        "3. Migrate to ClaudeCodeSession.refactored.tsx or complete the refactoring",
+        "4. Remove all debug console.log statements (659 occurrences)",
+        "5. Fix 'any' types in critical paths (58 files affected)",
+        "6. Add error boundaries to major feature components",
+        "7. Implement missing features or remove TODO placeholders"
+      ],
+      "short_term_improvements": [
+        "1. Extract complex hooks from large components (useSessionMetrics, useEventListeners, etc.)",
+        "2. Standardize file naming conventions (PascalCase for components)",
+        "3. Remove duplicate files (.optimized.tsx versions)",
+        "4. Implement proper logging utility to replace console.log",
+        "5. Add React.memo to frequently re-rendering components",
+        "6. Implement useMemo for expensive calculations in UsageDashboard",
+        "7. Add proper TypeScript interfaces for all API responses",
+        "8. Create useCopyToClipboard hook with error handling"
+      ],
+      "long_term_refactoring": [
+        "1. Migrate workflow templates to external .md files (reduce bundle size)",
+        "2. Implement proper code splitting for widgets and heavy components",
+        "3. Create platform abstraction layer for Tauri vs Web differences",
+        "4. Standardize state management patterns across components",
+        "5. Add comprehensive accessibility support (ARIA labels, keyboard nav)",
+        "6. Implement proper error handling strategy across the app",
+        "7. Add comprehensive component test coverage",
+        "8. Set up ESLint rules for import ordering and best practices"
+      ],
+      "architecture_improvements": [
+        "1. Consider feature-based folder structure instead of component type-based",
+        "2. Implement proper dependency injection for services",
+        "3. Use Context API or Redux for truly global state (avoid prop drilling)",
+        "4. Create consistent patterns for async state management",
+        "5. Implement proper loading and error states across all data fetching",
+        "6. Consider micro-frontend architecture for Settings and other large sections"
+      ]
+    }
+  },
+  "metrics": {
+    "largest_files": [
+      { "file": "ToolWidgets.tsx", "lines": 3386, "status": "Critical - needs immediate splitting" },
+      { "file": "api.ts", "lines": 2496, "status": "Critical - needs domain split" },
+      { "file": "ClaudeCodeSession.tsx", "lines": 2074, "status": "Critical - refactored version exists" },
+      { "file": "pm-orchestrator.ts", "lines": 1997, "status": "High - move to external files" },
+      { "file": "FloatingPromptInput.tsx", "lines": 1543, "status": "High - extract sub-components" },
+      { "file": "Settings.tsx", "lines": 1279, "status": "High - split by section" }
+    ],
+    "code_duplication": [
+      { "pattern": "TodoWidget", "occurrences": 2, "files": ["ToolWidgets.tsx", "widgets/TodoWidget.tsx"] },
+      { "pattern": "FilePicker", "occurrences": 2, "files": ["FilePicker.tsx", "FilePicker.optimized.tsx"] },
+      { "pattern": "SessionList", "occurrences": 2, "files": ["SessionList.tsx", "SessionList.optimized.tsx"] },
+      { "pattern": "ClaudeCodeSession", "occurrences": 2, "files": ["ClaudeCodeSession.tsx", "ClaudeCodeSession.refactored.tsx"] }
+    ],
+    "type_safety": {
+      "files_with_any": 58,
+      "percentage": "48.3%",
+      "recommendation": "Target: Reduce to < 10% (12 files)"
+    },
+    "console_logging": {
+      "total_statements": 659,
+      "files_affected": 91,
+      "recommendation": "Remove debug logs, keep only error logging"
+    },
+    "bundle_size_impact": {
+      "large_components": "ToolWidgets.tsx (3,386 lines) - ~150KB uncompressed",
+      "workflow_constants": "~200KB of string templates in constants/workflows/",
+      "recommendation": "Code split and lazy load to reduce initial bundle by ~30%"
+    }
+  }
+}

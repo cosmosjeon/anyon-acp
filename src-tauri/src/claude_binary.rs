@@ -7,6 +7,29 @@ use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::process::Command;
 use tauri::Manager;
+use tokio::process::Command as TokioCommand;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+// ============================================================================
+// Windows Hidden Command Helper
+// ============================================================================
+
+/// Creates a Command that runs hidden on Windows (no terminal window popup)
+#[cfg(target_os = "windows")]
+fn create_hidden_command(program: &str) -> Command {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+/// Creates a Command (non-Windows - no special flags needed)
+#[cfg(not(target_os = "windows"))]
+fn create_hidden_command(program: &str) -> Command {
+    Command::new(program)
+}
 
 /// Type of Claude installation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -170,7 +193,7 @@ fn discover_system_installations() -> Vec<ClaudeInstallation> {
 fn try_which_command() -> Option<ClaudeInstallation> {
     debug!("Trying 'which claude' to find binary...");
 
-    match Command::new("which").arg("claude").output() {
+    match create_hidden_command("which").arg("claude").output() {
         Ok(output) if output.status.success() => {
             let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -214,7 +237,7 @@ fn try_which_command() -> Option<ClaudeInstallation> {
 fn try_which_command() -> Option<ClaudeInstallation> {
     debug!("Trying 'where claude' to find binary...");
 
-    match Command::new("where").arg("claude").output() {
+    match create_hidden_command("where").arg("claude").output() {
         Ok(output) if output.status.success() => {
             let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -412,7 +435,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
     }
 
     // Also check if claude is available in PATH (without full path)
-    if let Ok(output) = Command::new("claude").arg("--version").output() {
+    if let Ok(output) = create_hidden_command("claude").arg("--version").output() {
         if output.status.success() {
             debug!("claude is available in PATH");
             let version = extract_version_from_output(&output.stdout);
@@ -481,7 +504,10 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
     }
 
     // Also check if claude is available in PATH (without full path)
-    if let Ok(output) = Command::new("claude.exe").arg("--version").output() {
+    if let Ok(output) = create_hidden_command("claude.exe")
+        .arg("--version")
+        .output()
+    {
         if output.status.success() {
             debug!("claude.exe is available in PATH");
             let version = extract_version_from_output(&output.stdout);
@@ -500,7 +526,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
 
 /// Get Claude version by running --version command
 fn get_claude_version(path: &str) -> Result<Option<String>, String> {
-    match Command::new(path).arg("--version").output() {
+    match create_hidden_command(path).arg("--version").output() {
         Ok(output) => {
             if output.status.success() {
                 Ok(extract_version_from_output(&output.stdout))
@@ -616,40 +642,151 @@ fn compare_versions(a: &str, b: &str) -> Ordering {
     Ordering::Equal
 }
 
-/// Helper function to create a Command with proper environment variables
-/// This ensures commands like Claude can find Node.js and other dependencies
-pub fn create_command_with_env(program: &str) -> Command {
-    let mut cmd = Command::new(program);
+// ============================================================================
+// Environment Configuration Helpers
+// ============================================================================
 
-    info!("Creating command for: {}", program);
+/// Environment variables to inherit exactly as-is
+const ENV_VARS_EXACT: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "LANG",
+    "LC_ALL",
+    "NODE_PATH",
+    "NVM_DIR",
+    "NVM_BIN",
+    "HOMEBREW_PREFIX",
+    "HOMEBREW_CELLAR",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+    // Claude Code API keys
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+];
 
-    // Inherit essential environment variables from parent process
-    for (key, value) in std::env::vars() {
-        // Pass through PATH and other essential environment variables
-        if key == "PATH"
-            || key == "HOME"
-            || key == "USER"
-            || key == "SHELL"
-            || key == "LANG"
-            || key == "LC_ALL"
-            || key.starts_with("LC_")
-            || key == "NODE_PATH"
-            || key == "NVM_DIR"
-            || key == "NVM_BIN"
-            || key == "HOMEBREW_PREFIX"
-            || key == "HOMEBREW_CELLAR"
-            // Add proxy environment variables (only uppercase)
-            || key == "HTTP_PROXY"
-            || key == "HTTPS_PROXY"
-            || key == "NO_PROXY"
-            || key == "ALL_PROXY"
-        {
-            debug!("Inheriting env var: {}={}", key, value);
-            cmd.env(&key, &value);
+/// Determines if an environment variable should be inherited
+fn should_inherit_env_var(key: &str) -> bool {
+    ENV_VARS_EXACT.contains(&key) || key.starts_with("LC_")
+}
+
+/// Returns the path separator for the current platform
+fn get_path_separator() -> &'static str {
+    if cfg!(windows) {
+        ";"
+    } else {
+        ":"
+    }
+}
+
+/// Collects environment variables to inherit from the parent process
+fn get_inherited_env_vars() -> Vec<(String, String)> {
+    std::env::vars()
+        .filter(|(key, _)| should_inherit_env_var(key))
+        .collect()
+}
+
+/// Computes a modified PATH if the program is in a special directory (NVM or Homebrew)
+fn compute_modified_path(program: &str, current_path: &str) -> Option<String> {
+    // Check for NVM directory
+    if program.contains("/.nvm/versions/node/") {
+        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
+            let node_bin_str = node_bin_dir.to_string_lossy();
+            if !current_path.contains(&node_bin_str.as_ref()) {
+                debug!("Adding NVM bin directory to PATH: {}", node_bin_str);
+                return Some(format!(
+                    "{}{}{}",
+                    node_bin_str,
+                    get_path_separator(),
+                    current_path
+                ));
+            }
         }
     }
 
-    // Log proxy-related environment variables for debugging
+    // Check for Homebrew directory
+    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
+        if let Some(program_dir) = std::path::Path::new(program).parent() {
+            let homebrew_bin_str = program_dir.to_string_lossy();
+            if !current_path.contains(&homebrew_bin_str.as_ref()) {
+                debug!(
+                    "Adding Homebrew bin directory to PATH: {}",
+                    homebrew_bin_str
+                );
+                return Some(format!(
+                    "{}{}{}",
+                    homebrew_bin_str,
+                    get_path_separator(),
+                    current_path
+                ));
+            }
+        }
+    }
+
+    None
+}
+
+/// Configuration for command environment setup
+struct CommandEnvConfig {
+    env_vars: Vec<(String, String)>,
+    modified_path: Option<String>,
+}
+
+/// Prepares environment configuration for a command
+fn prepare_command_env_config(program: &str) -> CommandEnvConfig {
+    info!("Preparing environment config for: {}", program);
+
+    // Collect inherited environment variables
+    let mut env_vars = get_inherited_env_vars();
+
+    // Priority 1: Check if Claude OAuth is active
+    // If OAuth is active, don't inject any API keys - let Claude CLI handle it
+    if is_claude_oauth_active() {
+        info!("Claude OAuth is active - using OAuth authentication");
+        return CommandEnvConfig {
+            env_vars,
+            modified_path: compute_modified_path(
+                program,
+                &std::env::var("PATH").unwrap_or_default(),
+            ),
+        };
+    }
+
+    // Priority 2: Check for ANYON API mode (settings.local.json with ANTHROPIC_BASE_URL)
+    if let Some(claude_env_vars) = get_claude_settings_env_vars() {
+        // Only use settings.local.json if ANTHROPIC_BASE_URL is present (indicates ANYON API mode)
+        let has_base_url = claude_env_vars
+            .iter()
+            .any(|(k, _)| k == "ANTHROPIC_BASE_URL");
+        if has_base_url {
+            info!("ANYON API mode detected - using proxy authentication");
+            for (key, value) in claude_env_vars {
+                info!("Injecting env var from Claude settings: {}", key);
+                env_vars.push((key, value));
+            }
+            return CommandEnvConfig {
+                env_vars,
+                modified_path: compute_modified_path(
+                    program,
+                    &std::env::var("PATH").unwrap_or_default(),
+                ),
+            };
+        }
+    }
+
+    // Priority 3: Fall back to keychain API key
+    if !env_vars.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY") {
+        if let Some(api_key) = get_api_key_from_keychain() {
+            info!("Using API key from keychain");
+            env_vars.push(("ANTHROPIC_API_KEY".to_string(), api_key));
+        }
+    }
+
+    // Log proxy settings for debugging
     info!("Command will use proxy settings:");
     if let Ok(http_proxy) = std::env::var("HTTP_PROXY") {
         info!("  HTTP_PROXY={}", http_proxy);
@@ -658,35 +795,241 @@ pub fn create_command_with_env(program: &str) -> Command {
         info!("  HTTPS_PROXY={}", https_proxy);
     }
 
-    // Add NVM support if the program is in an NVM directory
-    if program.contains("/.nvm/versions/node/") {
-        if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
-            // Ensure the Node.js bin directory is in PATH
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let node_bin_str = node_bin_dir.to_string_lossy();
-            if !current_path.contains(&node_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", node_bin_str, current_path);
-                debug!("Adding NVM bin directory to PATH: {}", node_bin_str);
-                cmd.env("PATH", new_path);
+    // Compute modified PATH if needed
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    let modified_path = compute_modified_path(program, &current_path);
+
+    CommandEnvConfig {
+        env_vars,
+        modified_path,
+    }
+}
+
+/// Service name for ANYON keychain entries
+const ANYON_SERVICE_NAME: &str = "anyon-claude";
+/// Account name for API key in keychain
+const API_KEY_ACCOUNT: &str = "anthropic_api_key";
+/// Claude Code keychain service name for OAuth
+const CLAUDE_CODE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+/// Legacy Claude Safe Storage service name
+const CLAUDE_LEGACY_SERVICE: &str = "Claude Safe Storage";
+const CLAUDE_LEGACY_ACCOUNT: &str = "Claude Key";
+
+/// Get account candidates to try (username first, then default)
+fn get_oauth_account_candidates() -> Vec<String> {
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "default".to_string());
+
+    if username == "default" {
+        vec!["default".to_string()]
+    } else {
+        vec![username, "default".to_string()]
+    }
+}
+
+/// Check if OAuth credentials are valid in the given JSON
+fn check_oauth_valid(creds_json: &str) -> bool {
+    if let Ok(creds) = serde_json::from_str::<serde_json::Value>(creds_json) {
+        if let Some(oauth) = creds.get("claudeAiOauth") {
+            if let Some(expires_at) = oauth.get("expiresAt").and_then(|v| v.as_i64()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+
+                return expires_at > now;
+            }
+        }
+    }
+    false
+}
+
+/// Check if Claude OAuth is active by reading keychain
+fn is_claude_oauth_active() -> bool {
+    #[cfg(not(target_os = "windows"))]
+    {
+        use keyring::Entry;
+
+        // Try Claude Code-credentials with multiple account names
+        for account in get_oauth_account_candidates() {
+            if let Ok(entry) = Entry::new(CLAUDE_CODE_KEYCHAIN_SERVICE, &account) {
+                if let Ok(creds_json) = entry.get_password() {
+                    if check_oauth_valid(&creds_json) {
+                        debug!(
+                            "Claude OAuth found (service: {}, account: {}), valid: true",
+                            CLAUDE_CODE_KEYCHAIN_SERVICE, account
+                        );
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Try legacy Claude Safe Storage
+        if let Ok(entry) = Entry::new(CLAUDE_LEGACY_SERVICE, CLAUDE_LEGACY_ACCOUNT) {
+            if let Ok(creds_json) = entry.get_password() {
+                if check_oauth_valid(&creds_json) {
+                    debug!("Claude OAuth found (legacy service), valid: true");
+                    return true;
+                }
             }
         }
     }
 
-    // Add Homebrew support if the program is in a Homebrew directory
-    if program.contains("/homebrew/") || program.contains("/opt/homebrew/") {
-        if let Some(program_dir) = std::path::Path::new(program).parent() {
-            // Ensure the Homebrew bin directory is in PATH
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let homebrew_bin_str = program_dir.to_string_lossy();
-            if !current_path.contains(&homebrew_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", homebrew_bin_str, current_path);
-                debug!(
-                    "Adding Homebrew bin directory to PATH: {}",
-                    homebrew_bin_str
-                );
-                cmd.env("PATH", new_path);
+    #[cfg(target_os = "windows")]
+    {
+        use keyring::Entry;
+        use std::fs;
+
+        // 1. Try credentials file first
+        if let Some(home) = dirs::home_dir() {
+            let creds_path = home.join(".claude").join(".credentials.json");
+            if let Ok(content) = fs::read_to_string(&creds_path) {
+                if check_oauth_valid(&content) {
+                    debug!("Claude OAuth found (file), valid: true");
+                    return true;
+                }
             }
         }
+
+        // 2. Try Credential Manager
+        let accounts_to_try = get_oauth_account_candidates();
+        let services_to_try = vec![CLAUDE_CODE_KEYCHAIN_SERVICE, CLAUDE_LEGACY_SERVICE];
+
+        for service in &services_to_try {
+            for account in &accounts_to_try {
+                if let Ok(entry) = Entry::new(service, account) {
+                    if let Ok(creds_json) = entry.get_password() {
+                        if check_oauth_valid(&creds_json) {
+                            debug!(
+                                "Claude OAuth found (service: {}, account: {}), valid: true",
+                                service, account
+                            );
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    debug!("No valid Claude OAuth found");
+    false
+}
+
+/// Get environment variables from ~/.claude/settings.local.json
+fn get_claude_settings_env_vars() -> Option<Vec<(String, String)>> {
+    use std::fs;
+
+    let home = dirs::home_dir()?;
+    let settings_path = home.join(".claude").join("settings.local.json");
+
+    if !settings_path.exists() {
+        debug!("No Claude settings file found at {:?}", settings_path);
+        return None;
+    }
+
+    let content = fs::read_to_string(&settings_path).ok()?;
+    let settings: serde_json::Value = serde_json::from_str(&content).ok()?;
+
+    let env_obj = settings.get("env")?.as_object()?;
+    let mut env_vars = Vec::new();
+
+    for (key, value) in env_obj {
+        if let Some(val_str) = value.as_str() {
+            debug!(
+                "Found env var in Claude settings: {}={}",
+                key,
+                &val_str[..val_str.len().min(20)]
+            );
+            env_vars.push((key.clone(), val_str.to_string()));
+        }
+    }
+
+    if env_vars.is_empty() {
+        None
+    } else {
+        Some(env_vars)
+    }
+}
+
+/// Get API key from system keychain
+fn get_api_key_from_keychain() -> Option<String> {
+    match keyring::Entry::new(ANYON_SERVICE_NAME, API_KEY_ACCOUNT) {
+        Ok(entry) => match entry.get_password() {
+            Ok(key) if key.starts_with("sk-ant-") => {
+                debug!("Retrieved API key from keychain");
+                Some(key)
+            }
+            Ok(_) => {
+                warn!("Invalid API key format in keychain");
+                None
+            }
+            Err(keyring::Error::NoEntry) => {
+                debug!("No API key found in keychain");
+                None
+            }
+            Err(e) => {
+                warn!("Failed to read API key from keychain: {}", e);
+                None
+            }
+        },
+        Err(e) => {
+            warn!("Failed to access keychain: {}", e);
+            None
+        }
+    }
+}
+
+// ============================================================================
+// Command Creation Functions
+// ============================================================================
+
+/// Helper function to create a Command with proper environment variables
+/// This ensures commands like Claude can find Node.js and other dependencies
+pub fn create_command_with_env(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    let config = prepare_command_env_config(program);
+
+    // Set inherited environment variables
+    for (key, value) in config.env_vars {
+        debug!("Inheriting env var: {}={}", key, value);
+        cmd.env(&key, &value);
+    }
+
+    // Apply modified PATH if needed
+    if let Some(new_path) = config.modified_path {
+        cmd.env("PATH", new_path);
+    }
+
+    cmd
+}
+
+/// Helper function to create a tokio::process::Command with proper environment variables
+/// This is the async version of create_command_with_env for use with tokio
+pub fn create_tokio_command_with_env(program: &str) -> TokioCommand {
+    let mut cmd = TokioCommand::new(program);
+    let config = prepare_command_env_config(program);
+
+    // Set inherited environment variables
+    for (key, value) in config.env_vars {
+        debug!("Inheriting env var: {}={}", key, value);
+        cmd.env(&key, &value);
+    }
+
+    // Apply modified PATH if needed
+    if let Some(new_path) = config.modified_path {
+        cmd.env("PATH", new_path);
+    }
+
+    // Windows: Hide console window when spawning child process
+    // This prevents a separate terminal window from appearing when Claude CLI is executed
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        cmd.creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS);
     }
 
     cmd

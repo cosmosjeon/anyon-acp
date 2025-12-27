@@ -141,7 +141,7 @@ import {
   Watch,
   Wrench,
   type LucideIcon,
-} from "lucide-react";
+} from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -460,4 +460,7 @@ export const AVAILABLE_ICONS = Object.values(ICON_CATEGORIES)
 // Export icon map for easy access
 export const ICON_MAP = Object.values(ICON_CATEGORIES)
   .flat()
-  .reduce((acc, { name, icon }) => ({ ...acc, [name]: icon }), {} as Record<string, LucideIcon>); 
+  .reduce((acc, { name, icon }) => ({ ...acc, [name]: icon }), {} as Record<string, LucideIcon>);
+
+// Export type for agent icon names
+export type AgentIconName = keyof typeof ICON_MAP; 

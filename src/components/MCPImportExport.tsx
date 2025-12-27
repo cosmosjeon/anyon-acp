@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Download, Upload, FileText, Info, Network, Settings2 } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { Download, Upload, FileText, Info, Network, Settings2 , Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -214,7 +213,7 @@ export const MCPImportExport: React.FC<MCPImportExportProps> = ({
             >
               {importingDesktop ? (
                 <>
-                  <VideoLoader size="sm" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Importing...
                 </>
               ) : (
@@ -258,7 +257,7 @@ export const MCPImportExport: React.FC<MCPImportExportProps> = ({
               >
                 {importingJson ? (
                   <>
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Importing...
                   </>
                 ) : (

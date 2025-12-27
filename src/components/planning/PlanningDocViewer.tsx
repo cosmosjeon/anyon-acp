@@ -1,16 +1,38 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface PlanningDocViewerProps {
   content: string;
+  filename?: string;
 }
 
 /**
- * Markdown document viewer for planning documents
- * Renders GFM-compatible markdown with proper styling
+ * Document viewer for planning documents
+ * Supports both Markdown and HTML content
  */
-export const PlanningDocViewer: React.FC<PlanningDocViewerProps> = ({ content }) => {
+export const PlanningDocViewer: React.FC<PlanningDocViewerProps> = ({ content, filename }) => {
+  // Detect if content is HTML
+  const isHtml = useMemo(() => {
+    if (filename?.endsWith('.html')) return true;
+    // Check if content starts with HTML doctype or html tag
+    const trimmed = content.trim().toLowerCase();
+    return trimmed.startsWith('<!doctype') || trimmed.startsWith('<html');
+  }, [content, filename]);
+
+  if (isHtml) {
+    return (
+      <div className="h-full w-full overflow-hidden bg-background">
+        <iframe
+          srcDoc={content}
+          className="w-full h-full border-0"
+          title="UX Design Preview"
+          sandbox="allow-scripts allow-same-origin"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto p-6 bg-background">
       <div className="prose prose-sm dark:prose-invert max-w-none

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Terminal, Globe, Trash2, Info } from "lucide-react";
-import { VideoLoader } from "@/components/VideoLoader";
+import { Plus, Terminal, Globe, Trash2, Info , Loader2 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -361,7 +360,7 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
               >
                 {saving ? (
                   <>
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Adding Server...
                   </>
                 ) : (
@@ -430,7 +429,7 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
               >
                 {saving ? (
                   <>
-                    <VideoLoader size="sm" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Adding Server...
                   </>
                 ) : (
