@@ -308,7 +308,7 @@ app.get('/auth/google/callback', async (req, res) => {
     const jwtToken = generateToken(user.id);
 
     // Serve HTML page with deep link
-    const deepLink = `anyon://auth/callback?token=${jwtToken}`;
+    const deepLink = `anyon://auth/callback?token=${encodeURIComponent(jwtToken)}`;
     const html = oauthCallbackTemplate.replace(/\{\{DEEP_LINK\}\}/g, deepLink);
     res.send(html);
   } catch (error) {
