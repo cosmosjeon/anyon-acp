@@ -69,7 +69,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             >
               <img src={logoAnyon} alt="ANYON" className="w-9 h-9 object-contain logo-invert" />
               {!collapsed && (
-                <img src={logoText} alt="ANYON" className="h-6 object-contain" />
+                <img src={logoText} alt="ANYON" className="h-6 object-contain logo-invert" />
               )}
             </button>
           </TooltipSimple>
