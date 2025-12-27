@@ -5,9 +5,22 @@
 ERD 워크플로우는 Architecture 이후에 Physical Database Schema를 생성하는 마지막 단계입니다.
 
 **핵심 원칙:**
-- **질문 없음**: Architecture/TRD에서 모든 정보 획득
+- **질문 형식**: 모든 질문은 객관식 + "기타(직접 입력)" 옵션
+- **질문 최소화**: Architecture/TRD에서 대부분 정보 획득
 - **자동 변환**: Entity → Table, 타입 매핑, 인덱스/제약조건 자동 생성
 - **구현 가능 수준**: AI가 바로 Migration 파일 생성 가능
+
+## ⚠️ 질문 형식 규칙
+
+모든 질문은 반드시 객관식으로 제시:
+```
+1. 옵션 1
+2. 옵션 2
+3. 옵션 3
+4. 기타 (직접 입력)
+
+번호로 선택하거나, 직접 답변해주세요!
+```
 
 ## 파일 위치
 - **프롬프트 파일**: `src/constants/workflows/planning/startup-erd.ts`
@@ -34,6 +47,20 @@ AI가 수행하는 작업:
 1. Architecture 로드 → Entities, Value Objects, Repository Interfaces
 2. TRD 로드 → database, backend_framework → ORM 자동 추론
 3. PRD 로드 → success_metrics (확장성 계산용)
+
+### Step 0.5: 유사 서비스 ERD 연구 (WebSearch)
+
+**검색 쿼리:**
+- "{{service_type}} database schema 2025"
+- "{{service_type}} ERD example"
+- "how to design {{service_type}} database"
+
+**수집 정보:**
+- 4-8개 유사 서비스의 실제 ERD/데이터베이스 스키마
+- 핵심 테이블 구조
+- 테이블 간 관계 (1:N, N:M)
+- 인덱싱 전략
+- 실제 링크 (블로그 포스트, GitHub)
 
 **ORM 자동 추론:**
 | Backend | Database | ORM |

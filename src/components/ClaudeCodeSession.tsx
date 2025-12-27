@@ -148,6 +148,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const [streamingText, setStreamingText] = useState<string>('');
   const accumulatedTextRef = useRef<string>('');
   const [isFirstPrompt, setIsFirstPrompt] = useState(!session);
+  const isFirstPromptRef = useRef(!session);  // Ref to avoid stale closure in startNewSession
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
   const [claudeSessionId, setClaudeSessionId] = useState<string | null>(null);
@@ -178,6 +179,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   const isListeningRef = useRef(false);
   const sessionStartTime = useRef<number>(Date.now());
   const currentSessionIdRef = useRef<string | null>(null);
+  // 워크플로우 프롬프트의 displayText 매핑을 위한 임시 저장소
+  const pendingDisplayTextRef = useRef<{ prompt: string; displayText: string } | null>(null);
   
   // Session metrics state for enhanced analytics
   const sessionMetrics = useRef({
@@ -213,6 +216,11 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   useEffect(() => {
     queuedPromptsRef.current = queuedPrompts;
   }, [queuedPrompts]);
+
+  // Keep isFirstPromptRef in sync with state (for stale closure avoidance)
+  useEffect(() => {
+    isFirstPromptRef.current = isFirstPrompt;
+  }, [isFirstPrompt]);
 
   // Get effective session info (from prop or extracted) - use useMemo to ensure it updates
   const effectiveSession = useMemo(() => {
@@ -713,6 +721,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           isListeningRef,
           accumulatedTextRef,
           setStreamingText,
+          unlistenRefs,
           effectiveSession,
           claudeSessionId,
           messages,
@@ -720,6 +729,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           sessionStartTime,
           totalTokens,
           queuedPrompts,
+          queuedPromptsRef,  // ref를 전달하여 stale closure 문제 해결
           trackEvent,
           setQueuedPrompts,
           handleSendPrompt
@@ -740,7 +750,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
           projectPath,
           tabType,
           messages,
-          onSessionCreated
+          onSessionCreated,
+          pendingDisplayTextRef,  // 워크플로우 displayText 매핑 전달
         });
       }
 
@@ -772,9 +783,12 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       // 9. Execute the command
       // Combine visible prompt with hidden context for AI
       const fullPrompt = hiddenContext ? `${prompt}${hiddenContext}` : prompt;
+      // Use isFirstPromptRef.current to avoid stale closure issues when called from startNewSession
+      // If isFirstPromptRef is true, ignore effectiveSession (it may be stale from previous render)
+      const shouldStartNew = isFirstPromptRef.current;
       await executePromptCommand({
-        effectiveSession,
-        isFirstPrompt,
+        effectiveSession: shouldStartNew ? null : effectiveSession,
+        isFirstPrompt: shouldStartNew,
         projectPath,
         prompt: fullPrompt,
         model,
@@ -806,11 +820,21 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         setError(null);
         setIsFirstPrompt(true);
         setTotalTokens(0);
+        // Also reset session-related state to ensure clean slate
+        setExtractedSessionInfo(null);
+        setClaudeSessionId(null);
       });
+      // Reset refs synchronously (not affected by React batching)
+      isFirstPromptRef.current = true;
+      currentSessionIdRef.current = null;
 
       // Add display message to UI if provided (for workflow prompts)
       // userMessage는 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
       if (userMessage) {
+        // backendPrompt(전체 프롬프트)와 userMessage(짧은 텍스트) 매핑 저장
+        // handleSessionInit에서 세션 ID가 확정되면 SessionPersistenceService에 저장됨
+        pendingDisplayTextRef.current = { prompt: backendPrompt, displayText: userMessage };
+
         addUserMessageToUI({
           prompt: userMessage,
           displayText: userMessage,  // displayText로도 저장하여 세션 복원 시 사용

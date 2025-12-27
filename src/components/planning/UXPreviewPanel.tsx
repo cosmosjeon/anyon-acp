@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { MousePointer2, RefreshCw } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { TooltipSimple } from '@/components/ui/tooltip-modern';
 import { cn } from '@/lib/utils';
 import { injectSelectorScript } from '@/lib/previewSelector';
@@ -101,6 +102,7 @@ export const UXPreviewPanel: React.FC<UXPreviewPanelProps> = ({
   }, [handleToggleSelector]);
 
   return (
+    <TooltipProvider>
     <div className={cn('flex flex-col h-full bg-background', className)}>
       {/* Preview iframe area */}
       <div className="flex-1 relative overflow-hidden">
@@ -162,6 +164,7 @@ export const UXPreviewPanel: React.FC<UXPreviewPanelProps> = ({
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 };
 

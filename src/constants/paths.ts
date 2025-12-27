@@ -18,6 +18,15 @@ export const ANYON_DOCS = {
   DEV_FILES: {
     COMPLETE_MARKER: 'DEVELOPMENT_COMPLETE.md',
     EXECUTION_PLAN: 'execution-plan.md',
+    EXECUTION_PROGRESS: 'execution-progress.md',
+    DEPENDENCY_GRAPH: 'dependency-graph.md',
+    API_SPEC: 'api-spec.md',
+    OPENSOURCE_UTILIZATION: 'opensource-utilization-plan.md',
+    CLAUDE_MD: 'CLAUDE.md',
+  },
+  FOLDERS: {
+    EPICS: 'anyon-docs/dev-plan/epics',
+    CONVERSATION: 'anyon-docs/conversation',
   },
 } as const;
 
@@ -33,4 +42,18 @@ export const getPlanningFilePath = (projectPath: string, filename: string): stri
  */
 export const getDevFilePath = (projectPath: string, filename: string): string => {
   return `${projectPath}/${ANYON_DOCS.DEV_PLAN}/${filename}`;
+};
+
+/**
+ * Build full path for Epic ticket file
+ */
+export const getEpicFilePath = (projectPath: string, epicId: string): string => {
+  return `${projectPath}/${ANYON_DOCS.FOLDERS.EPICS}/${epicId}.md`;
+};
+
+/**
+ * Build full path for conversation file
+ */
+export const getConversationFilePath = (projectPath: string, filename: string): string => {
+  return `${projectPath}/${ANYON_DOCS.FOLDERS.CONVERSATION}/${filename}`;
 };

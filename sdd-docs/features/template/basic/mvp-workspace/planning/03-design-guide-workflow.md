@@ -121,18 +121,14 @@ AI가 수행하는 작업:
 
 ## dembrandt 도구
 
-GitHub: https://github.com/dembrandt/dembrandt (1.1k stars)
+GitHub: https://github.com/dembrandt/dembrandt (참고용)
 
-### 설치
+### 사용법
 ```bash
-npm install -g dembrandt
-npx playwright install chromium
+npx dembrandt <url> --json-only
 ```
 
-### 사용
-```bash
-dembrandt https://toss.im --json-only
-```
+**참고**: dembrandt가 실행되지 않을 경우, 잘 알려진 서비스 테이블 또는 스타일 선택 기반으로 자동 결정됩니다.
 
 ### 추출 항목
 - 색상 팔레트 + CSS 변수 + 호버/포커스 상태

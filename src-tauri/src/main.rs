@@ -25,7 +25,7 @@ use commands::claude::{
     get_system_prompt, list_directory_contents, list_projects,
     list_running_claude_sessions, load_session_history, open_new_session, read_claude_md_file,
     read_file_content, check_file_exists, get_file_metadata, list_anyon_docs, resume_claude_code,
-    run_npx_anyon_agents, check_is_git_repo, init_git_repo, git_add_all, git_commit, git_set_remote, git_push, git_status, git_current_branch, save_claude_md_file, save_claude_settings,
+    install_anyon_templates, check_is_git_repo, init_git_repo, git_add_all, git_commit, git_set_remote, git_push, git_status, git_current_branch, save_claude_md_file, save_claude_settings,
     save_system_prompt, search_files, ClaudeProcessState,
 };
 use commands::mcp::{
@@ -355,7 +355,7 @@ macro_rules! create_handlers {
             commands::claude::settings::read_claude_md_file,
             commands::claude::settings::save_claude_md_file,
             commands::claude::settings::check_anyon_installed,
-            commands::claude::settings::run_npx_anyon_agents,
+            commands::claude::settings::install_anyon_templates,
             commands::claude::settings::check_is_git_repo,
             commands::claude::settings::init_git_repo,
             commands::claude::settings::git_add_all,

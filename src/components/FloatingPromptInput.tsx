@@ -1008,22 +1008,24 @@ const FloatingPromptInputInner = (
             {/* Bottom Bar - Execution mode toggle & badges */}
             <div className="flex items-center justify-between mt-2 px-1">
               <div className="flex items-center gap-2">
-                {/* Execution Mode Badge - Always visible, clickable to toggle */}
-                <button
-                  onClick={() => setSelectedExecutionMode(prev => prev === "execute" ? "plan" : "execute")}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200",
-                    selectedExecutionMode === "plan"
-                      ? "bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 ring-1 ring-violet-500/30"
-                      : "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 ring-1 ring-emerald-500/20"
-                  )}
-                >
-                  <span className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    selectedExecutionMode === "plan" ? "bg-violet-400" : "bg-emerald-500"
-                  )} />
-                  {selectedExecutionMode === "plan" ? "계획 세우기" : "개발 모드"}
-                </button>
+                {/* Execution Mode Badge - Only visible when showExecutionMode is true */}
+                {showExecutionMode && (
+                  <button
+                    onClick={() => setSelectedExecutionMode(prev => prev === "execute" ? "plan" : "execute")}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200",
+                      selectedExecutionMode === "plan"
+                        ? "bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 ring-1 ring-violet-500/30"
+                        : "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 ring-1 ring-emerald-500/20"
+                    )}
+                  >
+                    <span className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      selectedExecutionMode === "plan" ? "bg-violet-400" : "bg-emerald-500"
+                    )} />
+                    {selectedExecutionMode === "plan" ? "계획 세우기" : "개발 모드"}
+                  </button>
+                )}
 
                 {/* Thinking Mode Badge */}
                 {selectedThinkingMode !== "auto" && (

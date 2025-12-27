@@ -10,6 +10,7 @@ import type { SelectedElement } from "@/types/preview";
 import { listen as tauriListen } from "@tauri-apps/api/event";
 import { usePreviewStore } from "@/stores/previewStore";
 import { detectPortFromMessage } from "@/lib/portDetection";
+import { flushSync } from "react-dom";
 
 type UnlistenFn = () => void;
 
@@ -265,10 +266,11 @@ export function createStreamMessageHandler(
           options.setStreamingText('');
         }
 
-        // For message_stop, also clear
+        // For message_stop, keep streaming text visible until completion
+        // Don't clear here to avoid showing thinking indicator between message_stop and claude-complete
         if (streamEvent.event?.type === 'message_stop') {
-          options.accumulatedTextRef.current = '';
-          options.setStreamingText('');
+          // Stream has stopped, but keep text visible
+          // It will be cleared in completion handler
         }
 
         return; // Don't add stream_event to message list
@@ -307,6 +309,7 @@ export interface SessionInitHandlerOptions {
   messages: ClaudeStreamMessage[];
   onSessionCreated?: (sessionId: string) => void;
   attachSessionSpecificListeners: (sessionId: string) => Promise<void>;
+  pendingDisplayTextRef?: React.MutableRefObject<{ prompt: string; displayText: string } | null>;
 }
 
 export async function handleSessionInit(
@@ -357,6 +360,19 @@ export async function handleSessionInit(
           }
         });
 
+        // 워크플로우 프롬프트의 displayText 매핑 저장 (백엔드 프롬프트 → 짧은 표시 텍스트)
+        // startNewSession에서 설정된 pendingDisplayText가 있으면 저장
+        if (options.pendingDisplayTextRef?.current) {
+          const { prompt, displayText } = options.pendingDisplayTextRef.current;
+          SessionPersistenceService.saveDisplayText(
+            message.session_id,
+            prompt,  // 백엔드로 전송된 전체 프롬프트
+            displayText  // 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
+          );
+          // 저장 후 초기화
+          options.pendingDisplayTextRef.current = null;
+        }
+
         // Notify parent about new session
         options.onSessionCreated?.(message.session_id);
       }
@@ -380,6 +396,7 @@ export interface CompletionHandlerOptions {
   isListeningRef: React.MutableRefObject<boolean>;
   accumulatedTextRef: React.MutableRefObject<string>;
   setStreamingText: (text: string) => void;
+  unlistenRefs: React.MutableRefObject<UnlistenFn[]>;
   effectiveSession: Session | null;
   claudeSessionId: string | null;
   messages: ClaudeStreamMessage[];
@@ -401,6 +418,7 @@ export interface CompletionHandlerOptions {
   sessionStartTime: React.MutableRefObject<number>;
   totalTokens: number;
   queuedPrompts: QueuedPrompt[];
+  queuedPromptsRef: React.MutableRefObject<QueuedPrompt[]>;  // ref를 사용하여 stale closure 문제 해결
   trackEvent: {
     enhancedSessionStopped: (params: any) => void;
   };
@@ -410,13 +428,20 @@ export interface CompletionHandlerOptions {
 
 export function createCompletionHandler(options: CompletionHandlerOptions) {
   return async function processComplete(success: boolean) {
-    options.setIsLoading(false);
+    // Clean up event listeners FIRST to prevent buffered messages from being processed
+    options.unlistenRefs.current.forEach((unlisten) => unlisten());
+    options.unlistenRefs.current = [];
+
+    // Use flushSync to atomically update all states and prevent race condition
+    // that shows thinking indicator after streaming completes
+    flushSync(() => {
+      options.setIsLoading(false);
+      options.setStreamingText('');
+      options.accumulatedTextRef.current = '';
+    });
+
     options.hasActiveSessionRef.current = false;
     options.isListeningRef.current = false; // Reset listening state
-
-    // Clear streaming text on completion
-    options.accumulatedTextRef.current = '';
-    options.setStreamingText('');
 
     // Track enhanced session stopped metrics when session completes
     if (options.effectiveSession && options.claudeSessionId) {
@@ -469,14 +494,15 @@ export function createCompletionHandler(options: CompletionHandlerOptions) {
         // Stop context
         stop_source: 'completed',
         final_state: success ? 'success' : 'failed',
-        has_pending_prompts: options.queuedPrompts.length > 0,
-        pending_prompts_count: options.queuedPrompts.length,
+        has_pending_prompts: options.queuedPromptsRef.current.length > 0,
+        pending_prompts_count: options.queuedPromptsRef.current.length,
       });
     }
 
     // Process queued prompts after completion
-    if (options.queuedPrompts.length > 0) {
-      const [nextPrompt, ...remainingPrompts] = options.queuedPrompts;
+    // ref를 사용하여 최신 큐 상태를 확인 (stale closure 문제 해결)
+    if (options.queuedPromptsRef.current.length > 0) {
+      const [nextPrompt, ...remainingPrompts] = options.queuedPromptsRef.current;
       options.setQueuedPrompts(remainingPrompts);
 
       // Small delay to ensure UI updates
@@ -506,6 +532,7 @@ export interface EventListenersSetupOptions {
   tabType?: TabType;
   messages: ClaudeStreamMessage[];
   onSessionCreated?: (sessionId: string) => void;
+  pendingDisplayTextRef?: React.MutableRefObject<{ prompt: string; displayText: string } | null>;
 }
 
 export async function setupEventListeners(
@@ -555,7 +582,8 @@ export async function setupEventListeners(
         tabType: options.tabType,
         messages: options.messages,
         onSessionCreated: options.onSessionCreated,
-        attachSessionSpecificListeners
+        attachSessionSpecificListeners,
+        pendingDisplayTextRef: options.pendingDisplayTextRef,
       });
 
       if (newSessionId) {

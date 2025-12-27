@@ -336,10 +336,11 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
                       size="lg"
                       className="gap-2 w-full max-w-xs"
                     >
-                      {activeWorkflows.has(activeStep.id) ? (
+                      {/* 워크플로우 실행 중이거나, 문서가 아직 없는 상태에서 세션 로딩 중일 때 "작성중..." 표시 */}
+                      {activeWorkflows.has(activeStep.id) || (isSessionLoading && !documents.find(d => d.id === activeStep.id)?.content) ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          작성 중...
+                          {activeStep.title} 작성중...
                         </>
                       ) : (
                         <>
@@ -380,10 +381,12 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
             }}
             disabled={isSessionLoading || !progress.nextStep || activeWorkflows.has(progress.nextStep.id)}
           >
-            {progress.nextStep && activeWorkflows.has(progress.nextStep.id) ? (
+            {/* 워크플로우 실행 중이거나, 문서가 아직 없는 상태에서 세션 로딩 중일 때 "작성중..." 표시 */}
+            {(progress.nextStep && activeWorkflows.has(progress.nextStep.id)) ||
+             (isSessionLoading && progress.nextStep && !documents.find(d => d.id === progress.nextStep?.id)?.content) ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                작성 중...
+                {progress.nextStep?.title} 작성중...
               </>
             ) : (
               <>

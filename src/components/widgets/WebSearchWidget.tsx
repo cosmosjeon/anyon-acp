@@ -8,8 +8,9 @@ export const WebSearchWidget: React.FC<{
   query: string;
   result?: ToolResult;
 }> = ({ query, result }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
-  
+
   // Parse the result to extract all links sections and build a structured representation
   const parseSearchResult = (resultContent: string) => {
     const sections: Array<{
@@ -89,15 +90,23 @@ export const WebSearchWidget: React.FC<{
   
   return (
     <div className="flex flex-col gap-2">
-      {/* Subtle Search Query Header */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
+      {/* Collapsible Search Query Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10 hover:bg-blue-500/10 transition-colors w-full"
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-4 w-4 text-blue-500/70" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-blue-500/70" />
+        )}
         <Globe className="h-4 w-4 text-blue-500/70" />
         <span className="text-xs font-medium uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">Web Search</span>
-        <span className="text-sm text-muted-foreground/80 flex-1 truncate">{query}</span>
-      </div>
-      
+        <span className="text-sm text-muted-foreground/80 flex-1 truncate text-left">{query}</span>
+      </button>
+
       {/* Results */}
-      {result && (
+      {isExpanded && result && (
         <div className="rounded-lg border bg-background/50 backdrop-blur-sm overflow-hidden">
           {!searchResults.sections.length ? (
             <div className="px-3 py-2 flex items-center gap-2 text-muted-foreground">

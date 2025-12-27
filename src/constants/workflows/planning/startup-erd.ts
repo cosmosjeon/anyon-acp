@@ -49,32 +49,37 @@ Create a comprehensive Entity Relationship Diagram (ERD) document that:
 - 번호로 선택지를 제공 (1, 2, 3, 4...)
 - 마지막 번호는 항상 "기타 (직접 입력)" 또는 주관식 옵션
 </critical>
+<critical>
+이 프롬프트 자체가 ERD 워크플로우입니다.
+절대로 Skill 도구를 사용하지 마세요.
+지금 바로 Step 0부터 실행하세요.
+</critical>
 
 ---
 
 ## Step 0: Load All Previous Documents
 
-<action>Read ALL five input documents to understand the complete context:
+<action>전체 맥락 이해를 위해 5개 입력 문서 모두 읽기:
 
-1. **Read PRD** ({input_prd}):
-   - Extract: service_type, platform, core_features, target_users, success_metrics
-   - Understand: What data needs to be stored for each feature
+1. **PRD 읽기** ({input_prd}):
+   - 추출: service_type, platform, core_features, target_users, success_metrics
+   - 이해: 각 기능에 저장해야 할 데이터
 
-2. **Read UX Design** ({input_ux}):
-   - Extract: all screens, user flows, data displayed/collected at each step
-   - Understand: What data is shown to users, what data users create
+2. **UX Design 읽기** ({input_ux}):
+   - 추출: 모든 화면, 유저 플로우, 각 단계의 표시/수집 데이터
+   - 이해: 사용자에게 보여줄 데이터, 사용자가 생성하는 데이터
 
-3. **Read UI Design Guide** ({input_ui}):
-   - Extract: any data-related components (forms, lists, tables)
-   - Understand: Data presentation requirements
+3. **UI Design Guide 읽기** ({input_ui}):
+   - 추출: 데이터 관련 컴포넌트 (폼, 리스트, 테이블)
+   - 이해: 데이터 표시 요구사항
 
-4. **Read TRD** ({input_trd}):
-   - Extract: database system (PostgreSQL/MongoDB/etc), migration tool, ORM/schema tool
-   - Understand: Database technology constraints
+4. **TRD 읽기** ({input_trd}):
+   - 추출: 데이터베이스 시스템 (PostgreSQL/MongoDB/etc), 마이그레이션 도구, ORM/스키마 도구
+   - 이해: 데이터베이스 기술 제약사항
 
-5. **Read Architecture** ({input_architecture}):
-   - Extract: database architecture section, table previews, relationships preview
-   - Understand: High-level data model structure already defined
+5. **Architecture 읽기** ({input_architecture}):
+   - 추출: 데이터베이스 아키텍처 섹션, 테이블 프리뷰, 관계 프리뷰
+   - 이해: 이미 정의된 고수준 데이터 모델 구조
 
 <critical>
 The ERD MUST use the exact database system from TRD.
@@ -86,7 +91,49 @@ The ERD MUST expand on the table previews from Architecture.
 
 ---
 
-## Step 1: Analyze Data Requirements
+## Step 1: 유사 서비스 ERD 연구
+
+<action>WebSearch로 유사 서비스의 실제 데이터베이스 설계 조사:
+
+검색 쿼리:
+- "{{service_type}} database schema 2025"
+- "{{service_type}} ERD example"
+- "how to design {{service_type}} database"
+- "{{service_type}} data model best practices"
+
+수집 정보:
+- 4-8개 유사 서비스의 실제 ERD/데이터베이스 스키마
+- 각 서비스의 핵심 테이블 구조
+- 테이블 간 관계 (1:N, N:M)
+- 인덱싱 전략
+- 실제 링크 (블로그 포스트, 기술 문서, GitHub)
+</action>
+
+<action>WebSearch 결과 요약 (내부 저장, 사용자에게는 간단히):
+"
+참고할 만한 서비스들의 데이터베이스 설계를 조사했어요:
+
+| 서비스 | 핵심 테이블 | 특징 | 참고 링크 |
+|--------|------------|------|-----------|
+| [결과1] | [테이블들] | [특징] | [링크] |
+| [결과2] | [테이블들] | [특징] | [링크] |
+...
+
+**주요 패턴:**
+- [패턴1: 설명]
+- [패턴2: 설명]
+
+**참고 자료:**
+- [링크1: 제목]
+- [링크2: 제목]
+"
+</action>
+
+<action>{{reference_erds}}에 저장</action>
+
+---
+
+## Step 2: Analyze Data Requirements
 
 <action>UX 목업과 PRD를 기반으로 데이터 요구사항을 분석합니다.
 
@@ -98,6 +145,7 @@ The ERD MUST expand on the table previews from Architecture.
    - 관계 → 화면 간 연결 (예: 목록 → 상세)
 2. PRD의 핵심 기능에서 필요한 데이터 식별
 3. Architecture의 API 엔드포인트에서 데이터 구조 파악
+4. **{{reference_erds}}의 유사 서비스 패턴 참고**
 
 **서비스 유형별 표준 패턴 적용:**
 | 서비스 유형 | 표준 테이블 패턴 |
@@ -111,7 +159,7 @@ The ERD MUST expand on the table previews from Architecture.
 
 ---
 
-## Step 2: Define Database Design Principles
+## Step 3: Define Database Design Principles
 
 <action>Establish 3-5 database design principles for this project.
 
@@ -126,7 +174,7 @@ The ERD MUST expand on the table previews from Architecture.
 
 ---
 
-## Step 3: Identify All Required Tables
+## Step 4: Identify All Required Tables
 
 <action>Create a comprehensive list of all tables needed for the project.
 
@@ -161,7 +209,7 @@ Based on PRD features:
 
 ---
 
-## Step 4: Design Each Table in Detail
+## Step 5: Design Each Table in Detail
 
 <action>For EACH table identified in Step 3, design complete schema.
 
@@ -216,7 +264,7 @@ Based on PRD features:
 
 ---
 
-## Step 5: Define All Table Relationships
+## Step 6: Define All Table Relationships
 
 <action>Map out all relationships between tables.
 
@@ -248,7 +296,7 @@ Based on PRD features:
 
 ---
 
-## Step 6: Define Indexing Strategy
+## Step 7: Define Indexing Strategy
 
 <action>For each table, identify which fields need indexes.
 
@@ -276,7 +324,7 @@ Based on PRD features:
 
 ---
 
-## Step 7: Define Constraints and Validations
+## Step 8: Define Constraints and Validations
 
 <action>Document all database-level constraints.
 
@@ -312,7 +360,7 @@ is_active BOOLEAN NOT NULL DEFAULT true
 
 ---
 
-## Step 8: Define Data Types and Sizes
+## Step 9: Define Data Types and Sizes
 
 <action>For each field, choose appropriate data type based on TRD's database.
 
@@ -340,7 +388,7 @@ is_active BOOLEAN NOT NULL DEFAULT true
 
 ---
 
-## Step 9: Define Migration Strategy
+## Step 10: Define Migration Strategy
 
 <action>Based on TRD's migration tool, define how to create and manage schema.
 
@@ -365,7 +413,7 @@ migrations/
 
 ---
 
-## Step 10: Create Sample Data
+## Step 11: Create Sample Data
 
 <action>For each major table, provide realistic sample data.
 
@@ -377,7 +425,7 @@ migrations/
 
 ---
 
-## Step 11: Estimate Data Volume
+## Step 12: Estimate Data Volume
 
 <action>Based on PRD success_metrics, estimate database growth.
 
@@ -391,7 +439,7 @@ migrations/
 
 ---
 
-## Step 12: Scalability Considerations
+## Step 13: Scalability Considerations
 
 <action>Document database scalability strategies.
 
@@ -413,7 +461,7 @@ migrations/
 
 ---
 
-## Step 13: Data Security Considerations
+## Step 14: Data Security Considerations
 
 <action>Document security measures at database level.
 
@@ -442,7 +490,7 @@ migrations/
 
 ---
 
-## Step 14: Test Data Scenarios
+## Step 15: Test Data Scenarios
 
 <action>Define test scenarios for development and QA.
 
@@ -455,7 +503,7 @@ migrations/
 
 ---
 
-## Step 15: Generate Complete ERD Document
+## Step 16: Generate Complete ERD Document
 
 <action>Load template and fill in ALL sections.
 
@@ -491,7 +539,7 @@ erDiagram
 
 ---
 
-## Step 16: Validate Against Checklist
+## Step 17: Validate Against Checklist
 
 <action>Ensure the ERD document meets all criteria:
 - [ ] All YAML metadata complete
@@ -518,7 +566,7 @@ erDiagram
 
 ---
 
-## Step 17: Completion Message
+## Step 18: Completion Message
 
 <action>Since this is the FINAL workflow in the chain, display completion message.
 
@@ -559,33 +607,6 @@ erDiagram
 `;
 
 const TEMPLATE = `
----
-document_type: Entity Relationship Diagram (ERD)
-project_name: {{project_name}}
-created_date: {{date}}
-author: {{user_name}}
-based_on_documents:
-  - prd.md
-  - ui-ux.html
-  - design-guide.md
-  - trd.md
-  - architecture.md
-
-# Quick Reference
-service_type: {{service_type}}
-platform: {{platform}}
-database_type: {{database_type}}
-
-tables:
-{{tables_list}}
-
-relationships:
-{{relationships_list}}
-
-key_indexes:
-{{indexes_list}}
----
-
 # {{project_name}} - Entity Relationship Diagram (ERD)
 
 **작성일**: {{date}}
@@ -596,9 +617,6 @@ key_indexes:
 ## 문서 개요
 
 이 문서는 {{project_name}}의 데이터베이스 스키마를 상세히 정의합니다.
-
-**비개발자를 위한 설명:**
-{{non_technical_explanation}}
 
 **참조 정보:**
 - 서비스 유형: {{service_type}}
@@ -623,9 +641,6 @@ key_indexes:
 
 ### 전체 ERD 개요
 {{erd_diagram}}
-
-### 비개발자를 위한 설명
-{{erd_explanation_for_non_tech}}
 
 ---
 
@@ -732,6 +747,20 @@ const CHECKLIST = `
 - [ ] indexes_list가 메타데이터에 있음
 - [ ] table_count가 정확함
 - [ ] 모든 섹션이 존재하고 placeholder가 없음
+
+## 검색 품질 (매우 중요!)
+
+### Web Search 실행 확인
+- [ ] **유사 서비스 ERD 검색이 실제로 수행됨**
+- [ ] **4-8개 실제 서비스의 데이터베이스 스키마가 분석됨**
+- [ ] **각 서비스의 실제 링크 포함됨**
+- [ ] **최신 정보 (2025년 기준)**
+
+### 정보의 정확성
+- [ ] 유사 서비스의 테이블 구조가 정확히 분석됨
+- [ ] 모든 링크가 작동함
+- [ ] 참고한 ERD 패턴이 실제 프로젝트에 적용됨
+- [ ] WebSearch 결과가 테이블 설계에 반영됨
 
 ## 이전 문서 일관성
 

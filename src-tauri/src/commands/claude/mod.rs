@@ -74,7 +74,7 @@ pub use settings::{
     read_claude_md_file,
     save_claude_md_file,
     check_anyon_installed,
-    run_npx_anyon_agents,
+    install_anyon_templates,
     check_is_git_repo,
     init_git_repo,
     git_add_all,

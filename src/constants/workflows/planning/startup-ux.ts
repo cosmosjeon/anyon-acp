@@ -3,8 +3,6 @@
  * 핵심 비즈니스 플로우에 집중, 엣지케이스는 AI가 자동 처리
  */
 
-import { WORKFLOW_ENGINE } from '../engine';
-
 const WORKFLOW_CONFIG = `
 # Startup UX Design Workflow Configuration
 name: startup-ux
@@ -30,6 +28,11 @@ const INSTRUCTIONS = `
 
 <critical>Communicate in Korean</critical>
 <critical>Target audience: NON-TECHNICAL FOUNDERS - 쉬운 말로, 전문 용어 피하기</critical>
+<critical>
+이 프롬프트 자체가 UX Design 워크플로우입니다.
+절대로 Skill 도구를 사용하지 마세요.
+지금 바로 Step 1부터 실행하세요.
+</critical>
 
 ## 핵심 원칙
 
@@ -65,9 +68,9 @@ const INSTRUCTIONS = `
 <workflow>
 
 <step n="1" goal="PRD 읽기 + 유저 플로우 개념 설명">
-<action>Load PRD document from {input_prd}</action>
+<action>PRD 문서 로드 from {input_prd}</action>
 
-<action>Extract from PRD:
+<action>PRD에서 추출:
 - project_name
 - service_type
 - platform
@@ -130,7 +133,7 @@ PRD 기반으로 함께 만들어갈 수 있어요.
 <action>사용자 응답 패턴별 처리:
 
 **패턴 1: 상세한 플로우 제공됨**
-→ Store as {{user_core_flow}}
+→ {{user_core_flow}}에 저장
 → Step 3으로 진행
 
 **패턴 2: '없어요', '모르겠어요', '잘 모르겠어요'**
@@ -179,7 +182,7 @@ PRD 기반으로 함께 만들어갈 수 있어요.
 라고 안내하고 UX 설계를 계속하세요.
 </critical>
 
-<action>Store as {{user_core_flow}}</action>
+<action>{{user_core_flow}}에 저장</action>
 </step>
 
 <step n="3" goal="핵심 플로우 구체화 대화">
@@ -345,18 +348,27 @@ const CHECKLIST = `
  * 완성된 UX Design 워크플로우 프롬프트
  */
 export const STARTUP_UX_PROMPT = `
-# Workflow Execution
+# UX Design 워크플로우
 
-## 1. Workflow Engine (MUST FOLLOW)
-${WORKFLOW_ENGINE}
+## 목표
+PRD 문서를 바탕으로 사용자와 대화하며 핵심 유저 플로우를 정의하고,
+클릭 가능한 HTML 와이어프레임을 생성합니다.
 
-## 2. Workflow Configuration
+## 실행 환경
+- **언어**: 한국어
+- **출력 파일**: anyon-docs/planning/ui-ux.html
+- **입력 파일**: anyon-docs/planning/prd.md
+
+---
+
 ${WORKFLOW_CONFIG}
 
-## 3. Instructions (Execute step by step)
+---
+
 ${INSTRUCTIONS}
 
-## 4. Validation Checklist
+---
+
 ${CHECKLIST}
 
 ---
