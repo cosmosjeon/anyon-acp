@@ -2,13 +2,18 @@ import React, { useEffect, useState, Suspense, lazy, useCallback, useRef } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
+  ArrowRight,
   Wrench,
   X,
   Lightbulb,
   PanelRightClose,
   PanelRightOpen,
   Loader2,
+  FileText,
+  Code,
+  Search,
 } from "@/lib/icons";
+import type { ExecutionMode } from './FloatingPromptInput';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { EnhancedPreviewPanel } from '@/components/preview';
@@ -27,6 +32,9 @@ const ClaudeCodeSession = lazy(() =>
 const FileTree = lazy(() => import('@/components/FileTree'));
 
 
+
+// Maintenance tab types
+type MaintenanceTabType = 'planning' | 'development';
 
 interface MaintenanceWorkspaceProps {
   projectId: string;
@@ -51,6 +59,12 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionKey, _setSessionKey] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Tab state - default to planning mode
+  const [activeTab, setActiveTab] = useState<MaintenanceTabType>('planning');
+
+  // Session loading state - to prevent tab switching during AI work
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
 
   // Sidebar state - collapsed by default
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -198,6 +212,16 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   }, [project?.path, project?.id]);
 
   const projectName = project?.path.split('/').pop() || 'Project';
+
+  // Handle execution mode change from FloatingPromptInput button
+  const handleExecutionModeChange = useCallback((mode: ExecutionMode) => {
+    setActiveTab(mode === 'plan' ? 'planning' : 'development');
+  }, []);
+
+  // Handle streaming state change to prevent tab switching during AI work
+  const handleStreamingChange = useCallback((isStreaming: boolean) => {
+    setIsSessionLoading(isStreaming);
+  }, []);
 
   if (loading) {
     return (
@@ -350,15 +374,18 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               initialProjectPath={project?.path}
               onBack={handleBack}
               onProjectPathChange={() => {}}
+              onStreamingChange={handleStreamingChange}
               embedded={true}
               tabType="maintenance"
               onSessionCreated={handleSessionCreated}
+              defaultExecutionMode={activeTab === 'planning' ? 'plan' : 'execute'}
+              onExecutionModeChange={handleExecutionModeChange}
             />
           </Suspense>
         </div>
       </div>
 
-      {/* Right Panel (Code/Preview) */}
+      {/* Right Panel (Planning/Development) */}
       <AnimatePresence>
         {rightPanelVisible && (
           <>
@@ -378,9 +405,84 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               transition={{ duration: 0.2 }}
               className="h-full bg-background border-l border-border overflow-hidden flex flex-col shadow-[-2px_0_8px_rgba(0,0,0,0.08)]"
             >
-              {/* Panel Content - EnhancedPreviewPanel with built-in tabs (Preview, Problems, Code, Console) */}
+              {/* Tabs Header */}
+              <div className="flex-shrink-0 border-b border-border bg-card/50">
+                <div className="flex">
+                  {/* 계획 세우기 탭 */}
+                  <button
+                    onClick={() => !isSessionLoading && setActiveTab('planning')}
+                    disabled={isSessionLoading}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'planning'
+                        ? "border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      isSessionLoading && "opacity-50 cursor-not-allowed pointer-events-none"
+                    )}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>계획 세우기</span>
+                    {isSessionLoading && activeTab === 'planning' && (
+                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                    )}
+                  </button>
+
+                  {/* 개발 탭 */}
+                  <button
+                    onClick={() => !isSessionLoading && setActiveTab('development')}
+                    disabled={isSessionLoading}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors border-b-2",
+                      activeTab === 'development'
+                        ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      isSessionLoading && "opacity-50 cursor-not-allowed pointer-events-none"
+                    )}
+                  >
+                    <Code className="w-4 h-4" />
+                    <span>개발</span>
+                    {isSessionLoading && activeTab === 'development' && (
+                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
-                <EnhancedPreviewPanel projectPath={project?.path} projectId={project?.id} />
+                {activeTab === 'planning' ? (
+                  // 계획 세우기: 심플한 안내 화면
+                  <div className="h-full flex flex-col items-center justify-center p-8">
+                    <div className="text-center max-w-sm">
+                      <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
+                        <Search className="w-8 h-8 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <p className="text-lg font-medium mb-2">문제 분석 & 계획 수립</p>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        채팅으로 버그를 분석하고 수정 계획을 세우세요.
+                      </p>
+
+                      {/* 계획 완료 안내 */}
+                      <div className="pt-6 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-3">
+                          계획이 완료되었나요?
+                        </p>
+                        <Button
+                          onClick={() => setActiveTab('development')}
+                          variant="outline"
+                          className="gap-2"
+                          disabled={isSessionLoading}
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                          개발 탭으로 이동
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // 개발: EnhancedPreviewPanel
+                  <EnhancedPreviewPanel projectPath={project?.path} projectId={project?.id} />
+                )}
               </div>
             </motion.div>
           </>

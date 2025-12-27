@@ -91,6 +91,10 @@ interface FloatingPromptInputProps {
    * Default execution mode
    */
   defaultExecutionMode?: ExecutionMode;
+  /**
+   * Callback when execution mode changes (for syncing with tab)
+   */
+  onExecutionModeChange?: (mode: ExecutionMode) => void;
 }
 
 export interface FloatingPromptInputRef {
@@ -114,6 +118,7 @@ const FloatingPromptInputInner = (
     embedded = false,
     showExecutionMode = false,
     defaultExecutionMode = "execute",
+    onExecutionModeChange,
   }: FloatingPromptInputProps,
   ref: React.Ref<FloatingPromptInputRef>,
 ) => {
@@ -128,6 +133,20 @@ const FloatingPromptInputInner = (
   const [embeddedImages, setEmbeddedImages] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+
+  // Sync internal execution mode with external defaultExecutionMode
+  useEffect(() => {
+    setSelectedExecutionMode(defaultExecutionMode);
+  }, [defaultExecutionMode]);
+
+  // Handle execution mode toggle with callback
+  const handleExecutionModeToggle = useCallback(() => {
+    setSelectedExecutionMode(prev => {
+      const newMode = prev === "execute" ? "plan" : "execute";
+      onExecutionModeChange?.(newMode);
+      return newMode;
+    });
+  }, [onExecutionModeChange]);
 
   // Preview store - 선택된 요소 연동
   const {
@@ -718,7 +737,7 @@ const FloatingPromptInputInner = (
     // Shift+Tab: Toggle Plan/Execute mode
     if (e.key === "Tab" && e.shiftKey) {
       e.preventDefault();
-      setSelectedExecutionMode(prev => prev === "execute" ? "plan" : "execute");
+      handleExecutionModeToggle();
       return;
     }
 
@@ -1010,7 +1029,7 @@ const FloatingPromptInputInner = (
               <div className="flex items-center gap-2">
                 {/* Execution Mode Badge - Always visible, clickable to toggle */}
                 <button
-                  onClick={() => setSelectedExecutionMode(prev => prev === "execute" ? "plan" : "execute")}
+                  onClick={handleExecutionModeToggle}
                   className={cn(
                     "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200",
                     selectedExecutionMode === "plan"

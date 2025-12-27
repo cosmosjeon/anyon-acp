@@ -101,6 +101,14 @@ interface ClaudeCodeSessionProps {
    * Callback when a new session is created
    */
   onSessionCreated?: (sessionId: string, firstMessage?: string) => void;
+  /**
+   * Default execution mode (for maintenance tab)
+   */
+  defaultExecutionMode?: ExecutionMode;
+  /**
+   * Callback when execution mode changes (for syncing with tab)
+   */
+  onExecutionModeChange?: (mode: ExecutionMode) => void;
 }
 
 /**
@@ -130,6 +138,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
   embedded = false,
   tabType,
   onSessionCreated,
+  defaultExecutionMode,
+  onExecutionModeChange,
 }, ref) => {
   const [projectPath, setProjectPath] = useState(initialProjectPath || session?.project_path || "");
 
@@ -1333,6 +1343,8 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
               projectPath={projectPath}
               embedded={embedded}
               showExecutionMode={tabType === "maintenance"}
+              defaultExecutionMode={defaultExecutionMode}
+              onExecutionModeChange={onExecutionModeChange}
               extraMenuItems={
                 <button
                   onClick={() => {

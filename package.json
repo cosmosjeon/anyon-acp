@@ -14,6 +14,7 @@
     "dev:bun:clean": "bun run clean:cache && bun run dev:bun",
     "clean:cache": "rm -rf node_modules/.vite dist .parcel-cache",
     "kill:servers": "bash scripts/kill-dev-servers.sh",
+    "kill:servers:win": "powershell -ExecutionPolicy Bypass -File scripts/kill-dev-servers.ps1",
     "tauri:bun": "tauri dev --config src-tauri/tauri.bun.conf.json",
     "build": "tsc && vite build",
     "build:bun": "bun run build",
