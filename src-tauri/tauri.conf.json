@@ -109,6 +109,11 @@
         ]
       }
     },
+    "windows": {
+      "nsis": {
+        "installerHooks": "nsis-hooks.nsh"
+      }
+    },
     "macOS": {
       "frameworks": [],
       "minimumSystemVersion": "10.15",
