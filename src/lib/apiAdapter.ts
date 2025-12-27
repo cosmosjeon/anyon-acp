@@ -311,10 +311,6 @@ function mapCommandToEndpoint(command: string, _params?: any): string {
     'get_session_timeline': '/api/sessions/{sessionId}/timeline',
     'list_anyon_docs': '/api/anyon/docs',
 
-    // Proxy settings
-    'get_proxy_settings': '/api/proxy/settings',
-    'save_proxy_settings': '/api/proxy/settings',
-
     // Claude Auth
     'claude_auth_check': '/api/claude-auth/status',
     'claude_auth_open_terminal': '/api/claude-auth/terminal-login',

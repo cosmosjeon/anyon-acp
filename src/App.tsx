@@ -3,7 +3,7 @@ import { HashRouter } from "react-router-dom";
 import logoAnyon from "@/assets/logo-anyon.png";
 import { useAuthStore } from "@/stores/authStore";
 import { LoginPage } from "@/components/LoginPage";
-import { api } from "@/lib/api";
+import { api as _api } from "@/lib/api";
 import { initializeWebMode } from "@/lib/apiAdapter";
 import { OutputCacheProvider } from "@/lib/outputCache";
 import { TabProvider } from "@/contexts/TabContext";
@@ -12,7 +12,6 @@ import { CustomTitlebar } from "@/components/CustomTitlebar";
 import { AppLayout } from "@/components/AppLayout";
 import { NFOCredits } from "@/components/NFOCredits";
 import { Toast, ToastContainer } from "@/components/ui/toast";
-import { StartupIntro } from "@/components/StartupIntro";
 import { UpdateNotification } from "@/components/UpdateNotification";
 import { AnalyticsConsentModal, hasAnalyticsConsent } from "@/components/AnalyticsConsentModal";
 import { useAppLifecycle } from "@/hooks";
@@ -78,16 +77,6 @@ function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
   const [showConsentModal, setShowConsentModal] = useState(false);
-  const [showIntro, setShowIntro] = useState(() => {
-    try {
-      const cached = typeof window !== 'undefined'
-        ? window.localStorage.getItem('app_setting:startup_intro_enabled')
-        : null;
-      if (cached === 'true') return true;
-      if (cached === 'false') return false;
-    } catch (_ignore) { }
-    return true;
-  });
 
   // Check authentication on mount
   useEffect(() => {
@@ -104,26 +93,6 @@ function App() {
 
     verifyAuth();
   }, [checkAuth]);
-
-  useEffect(() => {
-    let timer: number | undefined;
-    (async () => {
-      try {
-        const pref = await api.getSetting('startup_intro_enabled');
-        const enabled = pref === null ? true : pref === 'true';
-        if (enabled) {
-          timer = window.setTimeout(() => setShowIntro(false), 2000);
-        } else {
-          setShowIntro(false);
-        }
-      } catch (err) {
-        timer = window.setTimeout(() => setShowIntro(false), 2000);
-      }
-    })();
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
-  }, []);
 
   // Check analytics consent after authentication
   useEffect(() => {
@@ -166,7 +135,6 @@ function App() {
         <OutputCacheProvider>
           <TabProvider>
             <AppContent />
-            <StartupIntro visible={showIntro} />
             <UpdateNotification />
             <AnalyticsConsentModal
               open={showConsentModal}

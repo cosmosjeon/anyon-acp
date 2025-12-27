@@ -11,8 +11,6 @@ const en = {
   'settings.simple.theme': 'Display Mode',
   'settings.simple.themeDark': 'Dark mode reduces eye strain',
   'settings.simple.themeLight': 'Light mode for clear visibility',
-  'settings.simple.welcomeAnimation': 'Welcome Animation',
-  'settings.simple.welcomeAnimationDesc': 'Show a welcome screen when the app starts',
   'settings.simple.privacy': 'Privacy & Data',
   'settings.simple.privacyDesc': 'Manage data storage and privacy settings',
   'settings.simple.rememberTabs': 'Remember Open Tabs',
@@ -61,10 +59,6 @@ const en = {
   'settings.ai.envValuePlaceholder': 'Value',
   'settings.ai.commonEnvVars': 'Common variables',
   'settings.ai.envModelDesc': 'Specify a custom AI model name',
-
-  // Proxy
-  'settings.ai.proxy': 'Proxy Settings',
-  'settings.ai.proxyDesc': 'Connect to the AI through a network proxy',
 
   // Claude Auth section
   'settings.claudeAuth.title': 'Claude Authentication',
@@ -126,10 +120,6 @@ const en = {
   'settings.account.title': 'Account Information',
   'settings.account.name': 'Name',
   'settings.account.email': 'Email',
-  'settings.account.subscription': 'Subscription',
-  'settings.account.currentPlan': 'Current Plan',
-  'settings.account.comingSoon': 'Coming Soon',
-  'settings.account.proDescription': 'Pro plan will be available soon. Unlimited projects, priority support, and more benefits.',
   'settings.account.logout': 'Logout',
   'settings.account.logoutDescription': 'Sign out of your account',
 
@@ -227,24 +217,6 @@ const en = {
   'settings.storage.sqlPlaceholder': 'Enter SQL query...',
 
   // Settings - Proxy Tab
-  'settings.proxy.title': 'Proxy Settings',
-  'settings.proxy.description': 'Configure proxy settings for Claude API requests',
-  'settings.proxy.enable': 'Enable Proxy',
-  'settings.proxy.enableDesc': 'Use proxy for all Claude API requests',
-  'settings.proxy.httpProxy': 'HTTP Proxy',
-  'settings.proxy.httpProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.httpsProxy': 'HTTPS Proxy',
-  'settings.proxy.httpsProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.noProxy': 'No Proxy',
-  'settings.proxy.noProxyPlaceholder': 'localhost,127.0.0.1,.example.com',
-  'settings.proxy.noProxyDesc': 'Comma-separated list of hosts that should bypass the proxy',
-  'settings.proxy.allProxy': 'All Proxy (Optional)',
-  'settings.proxy.allProxyPlaceholder': 'socks5://proxy.example.com:1080',
-  'settings.proxy.allProxyDesc': 'Proxy URL to use for all protocols if protocol-specific proxies are not set',
-  'settings.proxy.saved': 'Proxy settings saved and applied successfully.',
-  'settings.proxy.saveFailed': 'Failed to save proxy settings',
-  'settings.proxy.loadFailed': 'Failed to load proxy settings',
-
   // Language names
   'language.en': 'English',
   'language.ko': '한국어',

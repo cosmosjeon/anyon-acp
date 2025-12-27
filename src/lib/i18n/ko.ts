@@ -11,8 +11,6 @@ const ko = {
   'settings.simple.theme': '화면 모드',
   'settings.simple.themeDark': '어두운 화면으로 눈의 피로를 줄여요',
   'settings.simple.themeLight': '밝은 화면으로 선명하게 볼 수 있어요',
-  'settings.simple.welcomeAnimation': '시작 애니메이션',
-  'settings.simple.welcomeAnimationDesc': '앱 시작 시 환영 화면을 보여줘요',
   'settings.simple.privacy': '개인정보 및 데이터',
   'settings.simple.privacyDesc': '데이터 저장과 개인정보 설정',
   'settings.simple.rememberTabs': '열린 탭 기억하기',
@@ -61,10 +59,6 @@ const ko = {
   'settings.ai.envValuePlaceholder': '값',
   'settings.ai.commonEnvVars': '자주 사용하는 변수',
   'settings.ai.envModelDesc': 'AI 모델 이름을 직접 지정할 수 있어요',
-
-  // Proxy
-  'settings.ai.proxy': '프록시 설정',
-  'settings.ai.proxyDesc': '네트워크 프록시를 통해 AI에 연결할 수 있어요',
 
   // Claude Auth 섹션
   'settings.claudeAuth.title': 'Claude 인증',
@@ -126,10 +120,6 @@ const ko = {
   'settings.account.title': '계정 정보',
   'settings.account.name': '이름',
   'settings.account.email': '이메일',
-  'settings.account.subscription': '구독 정보',
-  'settings.account.currentPlan': '현재 플랜',
-  'settings.account.comingSoon': '출시 예정',
-  'settings.account.proDescription': 'Pro 플랜이 곧 출시될 예정입니다. 프로젝트 무제한, 우선 지원 등 다양한 혜택을 누리실 수 있습니다.',
   'settings.account.logout': '로그아웃',
   'settings.account.logoutDescription': '계정에서 로그아웃합니다',
 
@@ -227,24 +217,6 @@ const ko = {
   'settings.storage.sqlPlaceholder': 'SQL 쿼리를 입력하세요...',
 
   // Settings - Proxy Tab
-  'settings.proxy.title': '프록시 설정',
-  'settings.proxy.description': 'Claude API 요청에 대한 프록시 설정 구성',
-  'settings.proxy.enable': '프록시 활성화',
-  'settings.proxy.enableDesc': '모든 Claude API 요청에 프록시 사용',
-  'settings.proxy.httpProxy': 'HTTP 프록시',
-  'settings.proxy.httpProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.httpsProxy': 'HTTPS 프록시',
-  'settings.proxy.httpsProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.noProxy': '프록시 제외',
-  'settings.proxy.noProxyPlaceholder': 'localhost,127.0.0.1,.example.com',
-  'settings.proxy.noProxyDesc': '프록시를 우회할 호스트 목록 (쉼표로 구분)',
-  'settings.proxy.allProxy': '전체 프록시 (선택사항)',
-  'settings.proxy.allProxyPlaceholder': 'socks5://proxy.example.com:1080',
-  'settings.proxy.allProxyDesc': '프로토콜별 프록시가 설정되지 않은 경우 사용할 프록시 URL',
-  'settings.proxy.saved': '프록시 설정이 저장되고 적용되었습니다.',
-  'settings.proxy.saveFailed': '프록시 설정 저장에 실패했습니다',
-  'settings.proxy.loadFailed': '프록시 설정 불러오기에 실패했습니다',
-
   // Language names
   'language.en': 'English',
   'language.ko': '한국어',

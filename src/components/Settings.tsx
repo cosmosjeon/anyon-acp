@@ -3,14 +3,11 @@ import { motion } from "framer-motion";
 import {
   User,
   Mail,
-  Crown,
   LogOut,
-  Sparkles,
   Moon,
   Sun,
   Languages,
   Palette,
-  Wifi,
   Loader2,
   Key,
   Code,
@@ -20,13 +17,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { api } from "@/lib/api";
+import { api as _api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Toast, ToastContainer } from "@/components/ui/toast";
-import { ProxySettings } from "./ProxySettings";
 import { ClaudeAuthSettings } from "./ClaudeAuthSettings";
 import { PlanningCompleteModal, PreviewWelcomeModal } from "./help";
-import { useTheme, useTrackEvent, useTranslation } from "@/hooks";
+import { useTheme, useTranslation } from "@/hooks";
 import { useAuthStore } from "@/stores/authStore";
 import { SUPPORT_CONFIG } from "@/constants/support";
 
@@ -40,9 +36,7 @@ interface SettingsProps {
 type SettingsSection =
   | "appearance"
   | "ai-auth"
-  | "ai-proxy"
   | "account"
-  | "subscription"
   | "dev-tools";
 
 interface NavItem {
@@ -65,26 +59,18 @@ export const Settings: React.FC<SettingsProps> = ({
   // Translation hook
   const { t, language, setLanguage } = useTranslation();
 
-  const trackEvent = useTrackEvent();
-
-
-  // Startup intro preference
-  const [startupIntroEnabled, setStartupIntroEnabled] = useState(true);
-
   // Dev tools modal states
   const [showPlanningModal, setShowPlanningModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   // Auth store
-  const { user, logout, getUserSettings, updateUserSetting } = useAuthStore();
+  const { user, logout } = useAuthStore();
 
   // Navigation items
   const navItems: NavItem[] = [
     { id: "appearance", label: t('settings.simple.appearance'), icon: Palette, category: "general" },
     { id: "ai-auth", label: t('settings.claudeAuth.title'), icon: Key, category: "ai" },
-    { id: "ai-proxy", label: t('settings.ai.proxy'), icon: Wifi, category: "ai" },
     { id: "account", label: t('settings.account.title'), icon: User, category: "account" },
-    { id: "subscription", label: t('settings.account.subscription'), icon: Crown, category: "account" },
     ...(isDev ? [{ id: "dev-tools" as const, label: "개발자 도구", icon: Code, category: "dev" as const }] : []),
   ];
 
@@ -96,22 +82,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const loadSettings = async () => {
     try {
       setLoading(true);
-
-      // Load startup intro setting
-      const startupPref = await api.getSetting('startup_intro_enabled');
-      setStartupIntroEnabled(startupPref === null ? true : startupPref === 'true');
-
-      // Try to load from server
-      try {
-        const userSettings = await getUserSettings();
-        if (userSettings && typeof userSettings === 'object') {
-          if (userSettings.startup_intro_enabled !== undefined) {
-            setStartupIntroEnabled(userSettings.startup_intro_enabled === true);
-          }
-        }
-      } catch (serverError) {
-        console.warn('Failed to load from server, trying local:', serverError);
-      }
+      // Settings loaded
     } catch (err) {
       console.error("Failed to load settings:", err);
     } finally {
@@ -178,32 +149,6 @@ export const Settings: React.FC<SettingsProps> = ({
                 />
               </div>
 
-              {/* Startup Animation */}
-              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <Label className="text-base font-medium">{t('settings.simple.welcomeAnimation')}</Label>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {t('settings.simple.welcomeAnimationDesc')}
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={startupIntroEnabled}
-                  onCheckedChange={async (checked) => {
-                    setStartupIntroEnabled(checked);
-                    try {
-                      await updateUserSetting('startup_intro_enabled', checked);
-                      await api.saveSetting('startup_intro_enabled', checked ? 'true' : 'false');
-                      trackEvent.settingsChanged('startup_intro_enabled', checked);
-                    } catch (e) {
-                      console.error(e);
-                    }
-                  }}
-                />
-              </div>
-
             </div>
           </div>
         );
@@ -213,34 +158,6 @@ export const Settings: React.FC<SettingsProps> = ({
           <ClaudeAuthSettings
             setToast={setToast}
           />
-        );
-
-      case "ai-proxy":
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-cyan-500/10">
-                <Wifi className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">{t('settings.ai.proxy')}</h3>
-                <p className="text-sm text-muted-foreground">{t('settings.ai.proxyDesc')}</p>
-              </div>
-            </div>
-
-            <ProxySettings
-              setToast={setToast}
-              onChange={async (hasChanges, _getSettings, save) => {
-                if (hasChanges && save) {
-                  try {
-                    await save();
-                  } catch (err) {
-                    console.error("Failed to auto-save proxy settings:", err);
-                  }
-                }
-              }}
-            />
-          </div>
         );
 
       case "account":
@@ -304,38 +221,6 @@ export const Settings: React.FC<SettingsProps> = ({
                   <LogOut size={16} />
                   {t('settings.account.logout')}
                 </Button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case "subscription":
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-yellow-500/10">
-                <Crown className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">{t('settings.account.subscription')}</h3>
-              </div>
-            </div>
-
-            <div className="p-4 bg-muted/40 rounded-xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Crown size={18} className="text-yellow-500" />
-                  <span className="font-medium">{t('settings.account.currentPlan')}</span>
-                </div>
-                <div className="px-3 py-1 rounded-full bg-muted border border-border">
-                  <span className="text-sm font-medium">{t('settings.account.comingSoon')}</span>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-border">
-                <p className="text-sm text-muted-foreground">
-                  {t('settings.account.proDescription')}
-                </p>
               </div>
             </div>
           </div>

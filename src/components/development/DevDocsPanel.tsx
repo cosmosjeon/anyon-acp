@@ -477,7 +477,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
           if (currentRunningStep === 'pm-executor' && nextStep?.id === 'pm-reviewer') {
             // execution-progress.md에서 workflow_state 확인
             const progressPath = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/execution-progress.md`;
-            const progressContent = await api.readFile(progressPath);
+            const progressContent = await api.readFileContent(progressPath);
             const stateMatch = progressContent.match(/workflow_state:\s*["']?(\w+)["']?/i);
             const workflowState = stateMatch ? stateMatch[1] : null;
 
