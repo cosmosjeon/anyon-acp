@@ -30,11 +30,12 @@ import {
   MultiEditWidget,
   SystemReminderWidget,
   TaskWidget,
+  TaskOutputWidget,
   ThinkingWidget,
   WebSearchWidget,
   WebFetchWidget,
+  AskUserQuestionWidget,
 } from "./ToolWidgets";
-import { InlineToolBadge, ToolBadgeGroup } from "./InlineToolBadge";
 import { getPromptDisplayInfo, isAnyonWorkflowCommand, type PromptIconType } from "@/lib/promptDisplay";
 import {
   FileText as FileTextIcon,
@@ -230,25 +231,25 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
         // Tool-only message - minimal style like screenshot
         return (
           <div className={cn("py-2", className)}>
-            <ToolBadgeGroup>
+            <div className="space-y-0.5">
               {toolBadges}
-            </ToolBadgeGroup>
+            </div>
           </div>
         );
       }
-      
+
       // Has text content - show with prose styling, no avatar
       return (
         <div className={cn("py-4", className)}>
           <div className="space-y-3">
             {/* Text content */}
             {contentParts}
-            
+
             {/* Tool badges */}
             {toolBadges.length > 0 && (
-              <ToolBadgeGroup>
+              <div className="space-y-0.5">
                 {toolBadges}
-              </ToolBadgeGroup>
+              </div>
             )}
           </div>
         </div>
@@ -335,7 +336,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
                   const toolUse = prevMsg.message.content.find((c: any) => c.type === 'tool_use' && c.id === content.tool_use_id);
                   if (toolUse) {
                     const tn = toolUse.name?.toLowerCase();
-                    const toolsWithWidgets = ['task','edit','multiedit','todowrite','todoread','ls','read','glob','bash','write','grep','websearch','webfetch'];
+                    const toolsWithWidgets = ['task','taskoutput','edit','multiedit','todowrite','todoread','ls','read','glob','bash','write','grep','websearch','webfetch','askuserquestion'];
                     if (toolsWithWidgets.includes(tn) || toolUse.name?.startsWith('mcp__')) {
                       hasWidget = true;
                     }
@@ -475,9 +476,6 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
           )}
 
           {message.error && <span className="text-destructive">{message.error}</span>}
-          {message.duration_ms !== undefined && (
-            <span>{(message.duration_ms / 1000).toFixed(1)}s</span>
-          )}
         </div>
       );
     }
@@ -525,248 +523,171 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
     // Task tool
     if (toolName === "task" && input) {
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Task"
-          detail={input.description}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <TaskWidget description={input.description} prompt={input.prompt} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
+    // TaskOutput tool
+    if (toolName === "taskoutput") {
+      return (
+        <div key={`tool-${idx}`} className="space-y-2">
+          <TaskOutputWidget {...input} result={toolResult} />
+        </div>
+      );
+    }
+
     // Edit tool
     if (toolName === "edit" && input?.file_path) {
-      const fileName = input.file_path.split('/').pop() || input.file_path;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Edit"
-          detail={fileName}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <EditWidget {...input} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // MultiEdit tool
     if (toolName === "multiedit" && input?.file_path) {
-      const fileName = input.file_path.split('/').pop() || input.file_path;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="MultiEdit"
-          detail={`${fileName} (${input.edits?.length || 0})`}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <MultiEditWidget {...input} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // MCP tools
     if (originalName?.startsWith("mcp__")) {
-      const parts = originalName.split('__');
-      const namespace = parts[1] || '';
-      const method = parts[2] || '';
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label={originalName}
-          detail={`${namespace}/${method}`}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <MCPWidget toolName={originalName} input={input} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
     
     // TodoWrite
     if (toolName === "todowrite" && input?.todos) {
-      const count = input.todos?.length || 0;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="TodoWrite"
-          detail={`${count} items`}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <TodoWidget todos={input.todos} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
     
     // TodoRead
     if (toolName === "todoread") {
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="TodoRead"
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <TodoReadWidget todos={input?.todos} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // LS
     if (toolName === "ls" && input?.path) {
-      const dirName = input.path.split('/').pop() || input.path;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="LS"
-          detail={dirName}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <LSWidget path={input.path} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // Read
     if (toolName === "read" && input?.file_path) {
-      const fileName = input.file_path.split('/').pop() || input.file_path;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Read"
-          detail={fileName}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <ReadWidget filePath={input.file_path} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // Glob
     if (toolName === "glob" && input?.pattern) {
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Glob"
-          detail={input.pattern}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <GlobWidget pattern={input.pattern} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // Bash
     if (toolName === "bash" && input?.command) {
-      const cmdPreview = input.command.length > 30 ? input.command.substring(0, 30) + '...' : input.command;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Bash"
-          detail={input.description || cmdPreview}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <BashWidget command={input.command} description={input.description} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // Write
     if (toolName === "write" && input?.file_path) {
-      const fileName = input.file_path.split('/').pop() || input.file_path;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Write"
-          detail={fileName}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <WriteWidget filePath={input.file_path} content={input.content} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
+
     // Grep
     if (toolName === "grep" && input?.pattern) {
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="Grep"
-          detail={input.pattern}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <GrepWidget pattern={input.pattern} include={input.include} path={input.path} exclude={input.exclude} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
     
     // WebSearch
     if (toolName === "websearch" && input?.query) {
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="WebSearch"
-          detail={input.query}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <WebSearchWidget query={input.query} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
     
     // WebFetch
     if (toolName === "webfetch" && input?.url) {
-      const urlPreview = input.url.length > 40 ? input.url.substring(0, 40) + '...' : input.url;
       return (
-        <InlineToolBadge
-          key={`tool-${idx}`}
-          label="WebFetch"
-          detail={urlPreview}
-          input={input}
-          output={output}
-        >
+        <div key={`tool-${idx}`} className="space-y-2">
           <WebFetchWidget url={input.url} prompt={input.prompt} result={toolResult} />
-        </InlineToolBadge>
+        </div>
       );
     }
-    
-    // Fallback - generic tool badge
-    return (
-      <InlineToolBadge
-        key={`tool-${idx}`}
-        label={originalName || toolName}
-        input={input}
-        output={output}
-      >
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Tool Input</div>
-          <pre className="text-xs font-mono bg-muted rounded p-2 overflow-x-auto">
-            {JSON.stringify(input, null, 2)}
-          </pre>
-          {toolResult && (
-            <>
-              <div className="text-sm font-medium mt-4">Result</div>
-              <pre className="text-xs font-mono bg-muted rounded p-2 overflow-x-auto">
-                {typeof toolResult.content === 'string' 
-                  ? toolResult.content 
-                  : JSON.stringify(toolResult.content, null, 2)}
-              </pre>
-            </>
-          )}
+
+    // AskUserQuestion
+    if (toolName === "askuserquestion" && input?.questions) {
+      console.log('[StreamMessage] AskUserQuestion data:', {
+        input,
+        output,
+        toolResult,
+        'input.answers': input.answers,
+        'toolResult?.answers': toolResult?.answers
+      });
+
+      return (
+        <div key={`tool-${idx}`} className="space-y-2">
+          <AskUserQuestionWidget
+            questions={input.questions}
+            answers={input.answers}
+            result={toolResult}
+          />
         </div>
-      </InlineToolBadge>
+      );
+    }
+
+    // Fallback - generic tool
+    return (
+      <div key={`tool-${idx}`} className="space-y-2 rounded-lg border border-muted bg-muted/20 p-3">
+        <div className="text-sm font-medium text-primary">{originalName || toolName}</div>
+        {toolResult && (
+          <pre className="text-xs font-mono bg-background/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
+            {typeof toolResult.content === 'string'
+              ? toolResult.content
+              : JSON.stringify(toolResult.content, null, 2)}
+          </pre>
+        )}
+      </div>
     );
   }
 };

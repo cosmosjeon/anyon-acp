@@ -50,6 +50,6 @@ pub use filesystem::{
 pub use settings::{
     check_anyon_installed, check_claude_version, check_is_git_repo, find_claude_md_files,
     get_claude_settings, get_system_prompt, git_add_all, git_commit, git_current_branch, git_push,
-    git_set_remote, git_status, init_git_repo, read_claude_md_file, run_npx_anyon_agents,
+    git_set_remote, git_status, init_git_repo, install_anyon_templates, read_claude_md_file,
     save_claude_md_file, save_claude_settings, save_system_prompt,
 };

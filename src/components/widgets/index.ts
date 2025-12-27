@@ -30,3 +30,5 @@ export { WebSearchWidget } from "./WebSearchWidget";
 export { ThinkingWidget } from "./ThinkingWidget";
 export { WebFetchWidget } from "./WebFetchWidget";
 export { TodoReadWidget } from "./TodoReadWidget";
+export { AskUserQuestionWidget } from "./AskUserQuestionWidget";
+export { TaskOutputWidget } from "./TaskOutputWidget";

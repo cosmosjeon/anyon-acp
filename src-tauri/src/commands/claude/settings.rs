@@ -337,62 +337,79 @@ pub async fn check_anyon_installed(
 }
 
 #[tauri::command]
-pub async fn run_npx_anyon_agents(
+pub async fn install_anyon_templates(
     project_path: String,
     app_handle: AppHandle,
 ) -> Result<NpxRunResult, String> {
-    use tokio::io::AsyncWriteExt;
+    let project_dir = PathBuf::from(&project_path);
 
-    let path = PathBuf::from(&project_path);
-
-    if !path.exists() {
+    if !project_dir.exists() {
         return Err(format!("Project path does not exist: {}", project_path));
     }
 
     // Emit start event
     let _ = app_handle.emit("anyon-install-start", &project_path);
 
-    log::info!("[Rust] Using system npx command");
+    log::info!("[Rust] Installing Anyon templates locally (no NPM)");
 
-    // Windows: Use npx.cmd explicitly
-    #[cfg(target_os = "windows")]
-    let npx_cmd = "npx.cmd";
-    #[cfg(not(target_os = "windows"))]
-    let npx_cmd = "npx";
+    // Get the template source directory
+    // In development: templates are at the project root
+    // In production: templates will be bundled with the app
+    #[cfg(debug_assertions)]
+    let template_source = {
+        // Development mode: use local .anyon directory
+        let current_exe = std::env::current_exe()
+            .map_err(|e| format!("Failed to get current exe path: {}", e))?;
 
-    let mut cmd = Command::new(npx_cmd);
-    cmd.arg("anyon-agents@latest")
-        .current_dir(&path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        // Navigate up from target/debug/anyon-claude to find project root
+        let mut project_root = current_exe.parent()
+            .and_then(|p| p.parent()) // target/debug -> target
+            .and_then(|p| p.parent()) // target -> project root
+            .ok_or("Failed to find project root")?;
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Failed to spawn npx command: {}", e))?;
+        // If we're in src-tauri/target, go up two more levels
+        if project_root.ends_with("src-tauri") {
+            project_root = project_root.parent()
+                .ok_or("Failed to find project root from src-tauri")?;
+        }
 
-    // Write "y" to stdin for auto-confirmation of "Ok to proceed? (y)"
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(b"y\n").await;
-        let _ = stdin.flush().await;
+        project_root.join(".anyon")
+    };
+
+    #[cfg(not(debug_assertions))]
+    let template_source = {
+        // Production mode: use bundled resources
+        app_handle.path().resource_dir()
+            .map_err(|e| format!("Failed to get resource dir: {}", e))?
+            .join(".anyon")
+    };
+
+    log::info!("[Rust] Template source: {:?}", template_source);
+
+    if !template_source.exists() {
+        return Err(format!("Template source not found: {:?}", template_source));
     }
 
-    // Wait for the process to complete
-    let output = child
-        .wait_with_output()
-        .await
-        .map_err(|e| format!("Failed to wait for npx command: {}", e))?;
+    // Create .anyon directory in project
+    let anyon_dest = project_dir.join(".anyon");
+    let claude_dest = project_dir.join(".claude");
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let success = output.status.success();
-    let exit_code = output.status.code();
+    // Copy .anyon directory
+    log::info!("[Rust] Copying .anyon to {:?}", anyon_dest);
+    copy_dir_recursive(&template_source, &anyon_dest)
+        .map_err(|e| format!("Failed to copy .anyon directory: {}", e))?;
+
+    // Create .claude/agents directory
+    log::info!("[Rust] Creating .claude/agents directory");
+    let agents_dest = claude_dest.join("agents");
+    fs::create_dir_all(&agents_dest)
+        .map_err(|e| format!("Failed to create .claude/agents directory: {}", e))?;
 
     let result = NpxRunResult {
-        success,
-        stdout,
-        stderr,
-        exit_code,
+        success: true,
+        stdout: format!("Successfully installed Anyon templates to {}", project_path),
+        stderr: String::new(),
+        exit_code: Some(0),
     };
 
     // Emit completion event
@@ -721,6 +738,28 @@ pub async fn git_current_branch(project_path: String) -> Result<NpxRunResult, St
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         exit_code: output.status.code(),
     })
+}
+
+/// Recursively copy a directory
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if !dst.exists() {
+        fs::create_dir_all(dst)?;
+    }
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

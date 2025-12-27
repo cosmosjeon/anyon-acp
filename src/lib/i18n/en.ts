@@ -11,8 +11,6 @@ const en = {
   'settings.simple.theme': 'Display Mode',
   'settings.simple.themeDark': 'Dark mode reduces eye strain',
   'settings.simple.themeLight': 'Light mode for clear visibility',
-  'settings.simple.welcomeAnimation': 'Welcome Animation',
-  'settings.simple.welcomeAnimationDesc': 'Show a welcome screen when the app starts',
   'settings.simple.privacy': 'Privacy & Data',
   'settings.simple.privacyDesc': 'Manage data storage and privacy settings',
   'settings.simple.rememberTabs': 'Remember Open Tabs',
@@ -61,10 +59,6 @@ const en = {
   'settings.ai.envValuePlaceholder': 'Value',
   'settings.ai.commonEnvVars': 'Common variables',
   'settings.ai.envModelDesc': 'Specify a custom AI model name',
-
-  // Proxy
-  'settings.ai.proxy': 'Proxy Settings',
-  'settings.ai.proxyDesc': 'Connect to the AI through a network proxy',
 
   // Claude Auth section
   'settings.claudeAuth.title': 'Claude Authentication',
@@ -126,10 +120,6 @@ const en = {
   'settings.account.title': 'Account Information',
   'settings.account.name': 'Name',
   'settings.account.email': 'Email',
-  'settings.account.subscription': 'Subscription',
-  'settings.account.currentPlan': 'Current Plan',
-  'settings.account.comingSoon': 'Coming Soon',
-  'settings.account.proDescription': 'Pro plan will be available soon. Unlimited projects, priority support, and more benefits.',
   'settings.account.logout': 'Logout',
   'settings.account.logoutDescription': 'Sign out of your account',
 
@@ -227,24 +217,6 @@ const en = {
   'settings.storage.sqlPlaceholder': 'Enter SQL query...',
 
   // Settings - Proxy Tab
-  'settings.proxy.title': 'Proxy Settings',
-  'settings.proxy.description': 'Configure proxy settings for Claude API requests',
-  'settings.proxy.enable': 'Enable Proxy',
-  'settings.proxy.enableDesc': 'Use proxy for all Claude API requests',
-  'settings.proxy.httpProxy': 'HTTP Proxy',
-  'settings.proxy.httpProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.httpsProxy': 'HTTPS Proxy',
-  'settings.proxy.httpsProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.noProxy': 'No Proxy',
-  'settings.proxy.noProxyPlaceholder': 'localhost,127.0.0.1,.example.com',
-  'settings.proxy.noProxyDesc': 'Comma-separated list of hosts that should bypass the proxy',
-  'settings.proxy.allProxy': 'All Proxy (Optional)',
-  'settings.proxy.allProxyPlaceholder': 'socks5://proxy.example.com:1080',
-  'settings.proxy.allProxyDesc': 'Proxy URL to use for all protocols if protocol-specific proxies are not set',
-  'settings.proxy.saved': 'Proxy settings saved and applied successfully.',
-  'settings.proxy.saveFailed': 'Failed to save proxy settings',
-  'settings.proxy.loadFailed': 'Failed to load proxy settings',
-
   // Language names
   'language.en': 'English',
   'language.ko': '한국어',
@@ -257,6 +229,40 @@ const en = {
   'analyticsConsent.privacyPoints.noPII': 'No personal information is collected',
   'analyticsConsent.privacyPoints.aggregated': 'Data is used in aggregate only',
   'analyticsConsent.continueButton': 'Continue',
+
+  // Onboarding Modal
+  'onboarding.auth.title': 'Choose your AI authentication method',
+  'onboarding.auth.description': 'Authentication is required to use Claude AI',
+  'onboarding.auth.skipForNow': 'Set up later',
+  'onboarding.auth.oauth.title': 'Claude Account',
+  'onboarding.auth.oauth.description': 'For Claude Max/Pro subscribers',
+  'onboarding.auth.oauth.detail': 'Login with your Anthropic account in browser',
+  'onboarding.auth.oauth.badge': 'Subscribers',
+  'onboarding.auth.anyonApi.title': 'ANYON API',
+  'onboarding.auth.anyonApi.description': 'Start for free',
+  'onboarding.auth.anyonApi.detail': 'Use for free within the $5/day limit',
+  'onboarding.auth.anyonApi.badge': 'Recommended',
+  'onboarding.auth.apiKey.title': 'API Key',
+  'onboarding.auth.apiKey.description': 'Enter your Anthropic API key',
+  'onboarding.auth.apiKey.detail': 'For developers and enterprises. Use your own API key',
+  'onboarding.auth.apiKey.badge': 'Developers',
+  'onboarding.auth.apiKey.placeholder': 'sk-ant-api03-...',
+  'onboarding.auth.apiKey.submit': 'Connect',
+  'onboarding.welcome.title': 'Welcome to ANYON',
+  'onboarding.welcome.description': 'Build your app idea without writing code',
+  'onboarding.planning.title': 'Step 1: Plan Your App',
+  'onboarding.planning.description': 'Describe what you want to build. AI will create the planning documents.',
+  'onboarding.development.title': 'Step 2: AI Builds It',
+  'onboarding.development.description': 'Based on your plan, AI writes the code. No coding skills needed.',
+  'onboarding.preview.title': 'Step 3: See the Result',
+  'onboarding.preview.description': 'Preview your app in real-time. Make changes anytime.',
+  'onboarding.skip': 'Skip',
+  'onboarding.next': 'Next',
+  'onboarding.back': 'Back',
+  'onboarding.getStarted': 'Create Your First Project',
+  'onboarding.authenticating': 'Authenticating...',
+  'onboarding.authSuccess': 'Authentication complete!',
+  'onboarding.authFailed': 'Authentication failed. Please try again.',
 } as const;
 
 export default en;

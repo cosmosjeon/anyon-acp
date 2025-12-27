@@ -13,6 +13,21 @@
 Architecture에서 Entity를 추출하고 Physical Schema로 변환할게요...
 ```
 
+---
+
+### Step 0.5: 유사 서비스 ERD 연구 (WebSearch)
+
+**Claude (내부 동작):**
+```
+[WebSearch 실행 중...]
+- "pet sitting database schema 2025"
+- "booking service ERD example"
+- "review system database design"
+
+유사 서비스 ERD 4-8개 조사 완료!
+테이블 구조 및 관계 패턴 수집 완료!
+```
+
 **로드된 정보:**
 
 | 문서 | 추출 내용 |

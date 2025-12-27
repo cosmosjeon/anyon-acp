@@ -11,13 +11,15 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Loader2,
+  History,
 } from "@/lib/icons";
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { PlanningDocsPanel } from '@/components/planning';
-import { DevDocsPanel } from '@/components/development';
+import { DevDocsPanel, DevDocsPanelRef } from '@/components/development';
 import { EnhancedPreviewPanel } from '@/components/preview';
+import { VersionControlPanel } from '@/components/version-control';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
 import { FloatingHelpButton, AIChatModal, PlanningCompleteModal, PreviewWelcomeModal } from '@/components/help';
 import { SUPPORT_CONFIG } from '@/constants/support';
@@ -123,6 +125,10 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   const [filePanelOpen, setFilePanelOpen] = useState(false);
   const filePanelWidth = 280;
 
+  // Version control panel state
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const versionPanelWidth = 320;
+
   // Right panel state
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
   const [rightPanelWidth, setRightPanelWidth] = useState(45); // percentage
@@ -131,6 +137,9 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
 
   // Ref for ClaudeCodeSession
   const claudeSessionRef = useRef<ClaudeCodeSessionRef>(null);
+  
+  // Ref for DevDocsPanel
+  const devDocsPanelRef = useRef<DevDocsPanelRef>(null);
 
   // Check planning docs completion
   const { progress } = usePlanningDocs(project?.path);
@@ -228,6 +237,11 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
           case '\\':
             e.preventDefault();
             setRightPanelVisible(prev => !prev);
+            break;
+          case 'h':
+          case 'H':
+            e.preventDefault();
+            setVersionPanelOpen(prev => !prev);
             break;
         }
       }
@@ -340,6 +354,12 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
   // View preview action from modal
   const handleViewPreview = useCallback(() => {
     setActiveTab('preview');
+  }, []);
+
+  // Handle stop workflow signal from chat input stop button
+  const handleStopWorkflow = useCallback(() => {
+    // Propagate stop signal to DevDocsPanel to stop automated workflow progression
+    devDocsPanelRef.current?.stop();
   }, []);
 
   const projectName = project?.path.split('/').pop() || 'Project';
@@ -478,19 +498,36 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               },
             ]}
           />
-          {/* Panel Toggle Button */}
-          <button
-            onClick={() => setRightPanelVisible(prev => !prev)}
-            className={cn(
-              'p-2 rounded-md transition-colors',
-              rightPanelVisible
-                ? 'text-primary hover:bg-primary/10'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            )}
-            title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
-          >
-            {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
-          </button>
+          {/* Header Buttons */}
+          <div className="flex items-center gap-1">
+            {/* Version Control Toggle Button */}
+            <button
+              onClick={() => setVersionPanelOpen(prev => !prev)}
+              className={cn(
+                'p-2 rounded-md transition-colors',
+                versionPanelOpen
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+              title={versionPanelOpen ? '버전 관리 닫기 (Cmd+H)' : '버전 관리 열기 (Cmd+H)'}
+            >
+              <History className="w-5 h-5" />
+            </button>
+
+            {/* Panel Toggle Button */}
+            <button
+              onClick={() => setRightPanelVisible(prev => !prev)}
+              className={cn(
+                'p-2 rounded-md transition-colors',
+                rightPanelVisible
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+              title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
+            >
+              {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Chat Content */}
@@ -507,10 +544,29 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
               embedded={true}
               tabType="mvp"
               onSessionCreated={handleSessionCreated}
+              onStopWorkflow={handleStopWorkflow}
             />
           </Suspense>
         </div>
       </div>
+
+      {/* Version Control Panel */}
+      <AnimatePresence>
+        {versionPanelOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: versionPanelWidth, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="h-full border-l border-border bg-background flex flex-col overflow-hidden flex-shrink-0"
+          >
+            <VersionControlPanel
+              projectPath={project?.path}
+              onClose={() => setVersionPanelOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Right Panel (Planning/Dev/Preview) */}
       <AnimatePresence>
@@ -607,6 +663,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
                 )}
                 {activeTab === 'development' && (
                   <DevDocsPanel
+                    ref={devDocsPanelRef}
                     projectPath={project?.path}
                     isPlanningComplete={isPlanningComplete}
                     onStartWorkflow={handleStartNewWorkflow}
@@ -630,7 +687,7 @@ export const MvpWorkspace: React.FC<MvpWorkspaceProps> = ({ projectId }) => {
       {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
 
       {/* Floating Help Button */}
-      <FloatingHelpButton onOpenAIChat={() => setShowAIChat(true)} />
+      <FloatingHelpButton />
 
       {/* AI Chat Modal */}
       <AIChatModal

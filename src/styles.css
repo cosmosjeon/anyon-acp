@@ -968,14 +968,14 @@ button:focus-visible,
 }
 
 /* Logo and video inversion for light/dark mode */
-/* Invert in light mode (light background) */
+/* Keep normal in light mode (light background) - logos are dark/black */
 .light .logo-invert,
 .light .video-invert {
-  filter: invert(1);
+  filter: invert(0);
 }
 
-/* Keep normal in dark mode (dark background) */
+/* Invert in dark mode (dark background) - make dark logos white */
 :not(.light) .logo-invert,
 :not(.light) .video-invert {
-  filter: invert(0);
+  filter: invert(1);
 }

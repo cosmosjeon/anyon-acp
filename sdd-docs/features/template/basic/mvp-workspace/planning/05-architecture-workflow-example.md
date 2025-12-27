@@ -24,11 +24,31 @@ AI가 PRD, UX Design, TRD를 자동으로 로드합니다.
 
 ---
 
+### Step 0.5: 유사 서비스 아키텍처 연구 (WebSearch)
+
+**Claude (내부 동작):**
+```
+[WebSearch 실행 중...]
+- "pet sitting service architecture 2025"
+- "booking platform tech stack case study"
+- "real-time notification architecture"
+
+유사 서비스 4-8개 조사 완료!
+참고 아키텍처 패턴 수집 완료!
+```
+
+---
+
 ### Step 1: AI 자동 결정
 
 **Claude:**
 ```
 아키텍처 설계가 완료됐어요!
+
+**참고한 유사 서비스:**
+- Rover.com (펫시터 매칭) - Monolithic + Microservices
+- Care.com (돌봄 서비스) - Serverless Architecture
+- TaskRabbit (서비스 매칭) - Event-Driven Architecture
 
 **패턴 결정:**
 - Clean Architecture (3-Layer)

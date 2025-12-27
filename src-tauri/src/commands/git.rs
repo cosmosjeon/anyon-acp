@@ -175,3 +175,85 @@ pub struct GitDiffSummary {
     pub changed_files: Vec<String>,
     pub stat_summary: String,
 }
+
+/// Git log entry for version control panel
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GitLogEntry {
+    pub sha: String,        // Short SHA (7 chars)
+    pub full_sha: String,   // Full SHA
+    pub message: String,    // First line of commit message
+    pub author: String,     // Author name
+    pub timestamp: u64,     // Unix timestamp
+}
+
+/// Get git commit history
+#[tauri::command]
+pub async fn get_git_log(
+    project_path: String,
+    limit: Option<u32>,
+) -> Result<Vec<GitLogEntry>, String> {
+    let limit = limit.unwrap_or(50);
+    log::info!("Getting git log for: {} (limit: {})", project_path, limit);
+
+    // Format: full_sha|short_sha|message|author|timestamp
+    let output = Command::new("git")
+        .args([
+            "log",
+            &format!("-{}", limit),
+            "--format=%H|%h|%s|%an|%at",
+        ])
+        .current_dir(&project_path)
+        .output()
+        .map_err(|e| format!("Failed to execute git log: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git log failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let entries: Vec<GitLogEntry> = stdout
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.splitn(5, '|').collect();
+            if parts.len() == 5 {
+                Some(GitLogEntry {
+                    full_sha: parts[0].to_string(),
+                    sha: parts[1].to_string(),
+                    message: parts[2].to_string(),
+                    author: parts[3].to_string(),
+                    timestamp: parts[4].parse().unwrap_or(0),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    log::info!("Found {} commits", entries.len());
+    Ok(entries)
+}
+
+/// Get count of changed files (staged + unstaged + untracked)
+#[tauri::command]
+pub async fn get_git_changes_count(project_path: String) -> Result<u32, String> {
+    log::info!("Getting changes count for: {}", project_path);
+
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(&project_path)
+        .output()
+        .map_err(|e| format!("Failed to execute git status: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git status failed: {}", stderr));
+    }
+
+    let count = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| !line.is_empty())
+        .count() as u32;
+
+    Ok(count)
+}

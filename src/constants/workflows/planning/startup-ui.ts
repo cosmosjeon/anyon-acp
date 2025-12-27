@@ -32,6 +32,11 @@ const INSTRUCTIONS = `
 <critical>Communicate in Korean</critical>
 <critical>Target audience: NON-TECHNICAL FOUNDERS - 쉬운 말로, 전문 용어 피하기</critical>
 <critical>이 워크플로우는 디자인만 다룸. React, MUI 등 기술 스택은 TRD에서 처리.</critical>
+<critical>
+이 프롬프트 자체가 Design Guide 워크플로우입니다.
+절대로 Skill 도구를 사용하지 마세요.
+지금 바로 Step 0부터 실행하세요.
+</critical>
 
 ## 핵심 원칙
 
@@ -63,9 +68,9 @@ npx dembrandt <url> --json-only
 <workflow>
 
 <step n="0" goal="문서 로드">
-<action>Load PRD from {input_prd}</action>
-<action>Load UX Design HTML from {input_ux}</action>
-<action>Extract: project_name, service_type, platform, target_users</action>
+<action>PRD 문서 로드 from {input_prd}</action>
+<action>UX Design HTML 로드 from {input_ux}</action>
+<action>추출: project_name, service_type, platform, target_users</action>
 </step>
 
 <step n="1" goal="스타일 + 참고 서비스 질문">
@@ -90,7 +95,7 @@ npx dembrandt <url> --json-only
 - Extract reference_service (서비스명 또는 URL, 없으면 null)
 </action>
 
-<action>Store as {{design_style}} and {{design_references}}</action>
+<action>{{design_style}} 및 {{design_references}}에 저장</action>
 </step>
 
 <step n="2" goal="참고 서비스 분석 + AI 자동 결정">
@@ -172,14 +177,14 @@ npx dembrandt <url> --json-only
   - Primary: {{primary_color}} (밝기 조정)
 </action>
 
-<action>Store as {{dark_mode}}</action>
+<action>{{dark_mode}}에 저장</action>
 </step>
 
 <step n="4" goal="문서 생성 + 완료">
-<action>Generate design-guide.md with all collected values</action>
-<action>Save to {default_output_file}</action>
+<action>수집한 모든 값으로 design-guide.md 생성</action>
+<action>{default_output_file}에 저장</action>
 
-<action>Show summary:
+<action>요약 출력:
 "
 디자인 가이드가 완성됐어요!
 
@@ -202,21 +207,6 @@ npx dembrandt <url> --json-only
 `;
 
 const TEMPLATE = `
----
-document_type: Design Guide
-project_name: {{project_name}}
-created_date: {{date}}
-design_style: {{design_style}}
-colors:
-  primary: {{primary_color}}
-  secondary: {{secondary_color}}
-  accent: {{accent_color}}
-fonts:
-  heading: {{heading_font}}
-  body: {{body_font}}
-dark_mode: {{dark_mode}}
----
-
 # {{project_name}} - Design Guide
 
 ## 디자인 스타일

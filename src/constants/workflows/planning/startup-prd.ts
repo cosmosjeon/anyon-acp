@@ -23,6 +23,12 @@ export const STARTUP_PRD_PROMPT = `
 
 ---
 
+<critical>
+이 프롬프트 자체가 PRD 워크플로우입니다.
+절대로 Skill 도구를 사용하지 마세요.
+지금 바로 Step 1부터 실행하세요.
+</critical>
+
 ## 핵심 원칙
 
 1. **대화를 통한 구체화** - 질문을 통해 사용자가 스스로 생각을 정리하게

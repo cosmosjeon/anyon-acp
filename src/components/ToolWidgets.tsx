@@ -42,4 +42,6 @@ export {
   ThinkingWidget,
   WebFetchWidget,
   TodoReadWidget,
+  AskUserQuestionWidget,
+  TaskOutputWidget,
 } from "./widgets";

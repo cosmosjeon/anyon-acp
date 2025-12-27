@@ -95,6 +95,20 @@ AI가 PRD, UX Design, Design Guide를 자동으로 로드합니다.
 번호로 선택하거나, 궁금한 점 물어보세요!
 ```
 
+---
+
+### Step 4: AI 자동 결정 (WebSearch 실행)
+
+**Claude (내부 동작):**
+```
+[WebSearch 실행 중...]
+- "2025 frontend framework comparison"
+- "Supabase vs Firebase 2025"
+- "Vercel pricing 2025"
+
+최신 정보 수집 완료!
+```
+
 **User:**
 ```
 1번이랑 2번 차이가 뭐야?

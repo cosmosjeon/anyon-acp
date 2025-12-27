@@ -109,9 +109,27 @@ Design Guide 참고해서 후보 제시:
 번호로 선택하거나, 궁금한 점 물어보세요!
 ```
 
-### Step 4: AI 자동 결정
+### Step 4: AI 자동 결정 (WebSearch 필수)
 
-사용자에게 묻지 않고 AI가 웹검색으로 결정:
+**WebSearch로 최신 정보 조사:**
+
+1. **프론트엔드 프레임워크 트렌드** (2025년 기준)
+   - 검색: "2025 frontend framework comparison", "Next.js vs Remix vs SvelteKit 2025"
+   - 수집: npm downloads, GitHub stars, 최신 버전 정보
+
+2. **BaaS 서비스 비교**
+   - 검색: "Supabase vs Firebase vs Appwrite 2025", "BaaS pricing comparison"
+   - 수집: 무료 티어 한도, 유료 플랜 가격, 장단점
+
+3. **호스팅 플랫폼 비교**
+   - 검색: "Vercel vs Railway vs Render 2025", "best hosting for Next.js"
+   - 수집: 가격, 성능, 배포 편의성
+
+4. **결제 서비스** (필요시)
+   - 한국: "Toss Payments vs 포트원 비교"
+   - 글로벌: "Stripe vs Paddle comparison"
+
+**결정 로직:**
 
 | 항목 | 결정 방식 |
 |-----|----------|

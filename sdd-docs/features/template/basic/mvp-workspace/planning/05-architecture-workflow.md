@@ -49,6 +49,19 @@ AI가 수행하는 작업:
 | /lib/api/ | Infrastructure/repositories |
 | /components/ | Presentation/components |
 
+### Step 0.5: 유사 서비스 아키텍처 연구 (WebSearch)
+
+**검색 쿼리:**
+- "{{service_type}} architecture 2025"
+- "{{service_type}} tech stack case study"
+- "how to build {{service_type}} backend"
+
+**수집 정보:**
+- 4-8개 유사 서비스의 실제 아키텍처
+- 각 서비스의 규모, 트래픽, 사용 기술
+- 아키텍처 패턴 (모놀리식/마이크로서비스/서버리스)
+- 실제 링크 (블로그 포스트, 케이스 스터디)
+
 ### Step 1: AI 자동 결정 (웹검색 기반)
 
 사용자 질문 없이 AI가 모든 것을 결정:

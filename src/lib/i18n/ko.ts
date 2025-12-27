@@ -11,8 +11,6 @@ const ko = {
   'settings.simple.theme': '화면 모드',
   'settings.simple.themeDark': '어두운 화면으로 눈의 피로를 줄여요',
   'settings.simple.themeLight': '밝은 화면으로 선명하게 볼 수 있어요',
-  'settings.simple.welcomeAnimation': '시작 애니메이션',
-  'settings.simple.welcomeAnimationDesc': '앱 시작 시 환영 화면을 보여줘요',
   'settings.simple.privacy': '개인정보 및 데이터',
   'settings.simple.privacyDesc': '데이터 저장과 개인정보 설정',
   'settings.simple.rememberTabs': '열린 탭 기억하기',
@@ -61,10 +59,6 @@ const ko = {
   'settings.ai.envValuePlaceholder': '값',
   'settings.ai.commonEnvVars': '자주 사용하는 변수',
   'settings.ai.envModelDesc': 'AI 모델 이름을 직접 지정할 수 있어요',
-
-  // Proxy
-  'settings.ai.proxy': '프록시 설정',
-  'settings.ai.proxyDesc': '네트워크 프록시를 통해 AI에 연결할 수 있어요',
 
   // Claude Auth 섹션
   'settings.claudeAuth.title': 'Claude 인증',
@@ -126,10 +120,6 @@ const ko = {
   'settings.account.title': '계정 정보',
   'settings.account.name': '이름',
   'settings.account.email': '이메일',
-  'settings.account.subscription': '구독 정보',
-  'settings.account.currentPlan': '현재 플랜',
-  'settings.account.comingSoon': '출시 예정',
-  'settings.account.proDescription': 'Pro 플랜이 곧 출시될 예정입니다. 프로젝트 무제한, 우선 지원 등 다양한 혜택을 누리실 수 있습니다.',
   'settings.account.logout': '로그아웃',
   'settings.account.logoutDescription': '계정에서 로그아웃합니다',
 
@@ -227,24 +217,6 @@ const ko = {
   'settings.storage.sqlPlaceholder': 'SQL 쿼리를 입력하세요...',
 
   // Settings - Proxy Tab
-  'settings.proxy.title': '프록시 설정',
-  'settings.proxy.description': 'Claude API 요청에 대한 프록시 설정 구성',
-  'settings.proxy.enable': '프록시 활성화',
-  'settings.proxy.enableDesc': '모든 Claude API 요청에 프록시 사용',
-  'settings.proxy.httpProxy': 'HTTP 프록시',
-  'settings.proxy.httpProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.httpsProxy': 'HTTPS 프록시',
-  'settings.proxy.httpsProxyPlaceholder': 'http://proxy.example.com:8080',
-  'settings.proxy.noProxy': '프록시 제외',
-  'settings.proxy.noProxyPlaceholder': 'localhost,127.0.0.1,.example.com',
-  'settings.proxy.noProxyDesc': '프록시를 우회할 호스트 목록 (쉼표로 구분)',
-  'settings.proxy.allProxy': '전체 프록시 (선택사항)',
-  'settings.proxy.allProxyPlaceholder': 'socks5://proxy.example.com:1080',
-  'settings.proxy.allProxyDesc': '프로토콜별 프록시가 설정되지 않은 경우 사용할 프록시 URL',
-  'settings.proxy.saved': '프록시 설정이 저장되고 적용되었습니다.',
-  'settings.proxy.saveFailed': '프록시 설정 저장에 실패했습니다',
-  'settings.proxy.loadFailed': '프록시 설정 불러오기에 실패했습니다',
-
   // Language names
   'language.en': 'English',
   'language.ko': '한국어',
@@ -257,6 +229,40 @@ const ko = {
   'analyticsConsent.privacyPoints.noPII': '개인 식별 정보는 수집하지 않습니다',
   'analyticsConsent.privacyPoints.aggregated': '데이터는 집계 형태로만 사용됩니다',
   'analyticsConsent.continueButton': '계속',
+
+  // Onboarding Modal
+  'onboarding.auth.title': 'AI 사용을 위한 인증 방식을 선택하세요',
+  'onboarding.auth.description': 'Claude AI를 사용하기 위해 인증이 필요합니다',
+  'onboarding.auth.skipForNow': '나중에 설정하기',
+  'onboarding.auth.oauth.title': 'Claude 계정',
+  'onboarding.auth.oauth.description': 'Claude Max/Pro 구독자용',
+  'onboarding.auth.oauth.detail': '브라우저에서 Anthropic 계정으로 로그인합니다',
+  'onboarding.auth.oauth.badge': '유료 구독자',
+  'onboarding.auth.anyonApi.title': 'ANYON API',
+  'onboarding.auth.anyonApi.description': '무료로 시작하기',
+  'onboarding.auth.anyonApi.detail': '일 $5 한도 내에서 무료로 사용할 수 있습니다',
+  'onboarding.auth.anyonApi.badge': '추천',
+  'onboarding.auth.apiKey.title': 'API Key',
+  'onboarding.auth.apiKey.description': 'Anthropic API 키 직접 입력',
+  'onboarding.auth.apiKey.detail': '개발자나 기업용. 자체 API 키를 사용합니다',
+  'onboarding.auth.apiKey.badge': '개발자용',
+  'onboarding.auth.apiKey.placeholder': 'sk-ant-api03-...',
+  'onboarding.auth.apiKey.submit': '연결하기',
+  'onboarding.welcome.title': 'ANYON에 오신 것을 환영합니다',
+  'onboarding.welcome.description': '코드 작성 없이 앱 아이디어를 실현하세요',
+  'onboarding.planning.title': '1단계: 앱 기획하기',
+  'onboarding.planning.description': '만들고 싶은 것을 설명하세요. AI가 기획 문서를 작성합니다.',
+  'onboarding.development.title': '2단계: AI가 개발합니다',
+  'onboarding.development.description': '기획을 바탕으로 AI가 코드를 작성합니다. 코딩 실력이 필요없어요.',
+  'onboarding.preview.title': '3단계: 결과 확인하기',
+  'onboarding.preview.description': '앱을 실시간으로 미리보세요. 언제든 수정할 수 있어요.',
+  'onboarding.skip': '건너뛰기',
+  'onboarding.next': '다음',
+  'onboarding.back': '이전',
+  'onboarding.getStarted': '첫 프로젝트 만들기',
+  'onboarding.authenticating': '인증 중...',
+  'onboarding.authSuccess': '인증 완료!',
+  'onboarding.authFailed': '인증 실패. 다시 시도해주세요.',
 } as const;
 
 export default ko;

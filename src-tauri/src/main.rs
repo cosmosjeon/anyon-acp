@@ -22,10 +22,10 @@ use commands::claude::{
     check_is_git_repo, continue_claude_code, create_project, execute_claude_code,
     find_claude_md_files, get_claude_session_output, get_claude_settings, get_file_metadata,
     get_home_directory, get_project_sessions, get_system_prompt, git_add_all, git_commit,
-    git_current_branch, git_push, git_set_remote, git_status, init_git_repo, list_anyon_docs,
-    list_directory_contents, list_projects, list_running_claude_sessions, load_session_history,
-    open_new_session, read_claude_md_file, read_file_content, resume_claude_code,
-    run_npx_anyon_agents, save_claude_md_file, save_claude_settings, save_system_prompt,
+    git_current_branch, git_push, git_set_remote, git_status, init_git_repo, install_anyon_templates,
+    list_anyon_docs, list_directory_contents, list_projects, list_running_claude_sessions,
+    load_session_history, open_new_session, read_claude_md_file, read_file_content,
+    resume_claude_code, save_claude_md_file, save_claude_settings, save_system_prompt,
     search_files, ClaudeProcessState,
 };
 use commands::claude_auth::{
@@ -41,7 +41,6 @@ use commands::mcp::{
 };
 
 use commands::preview::{check_port_alive, scan_ports};
-use commands::proxy::{apply_proxy_settings, get_proxy_settings, save_proxy_settings};
 use commands::storage::{
     storage_delete_row, storage_execute_sql, storage_insert_row, storage_list_tables,
     storage_read_table, storage_reset_database, storage_update_row,
@@ -177,47 +176,6 @@ fn setup_deep_links(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-/// Load proxy settings from database
-fn load_proxy_settings_from_db(conn: &rusqlite::Connection) -> commands::proxy::ProxySettings {
-    let mut settings = commands::proxy::ProxySettings::default();
-
-    let keys = vec![
-        ("proxy_enabled", "enabled"),
-        ("proxy_http", "http_proxy"),
-        ("proxy_https", "https_proxy"),
-        ("proxy_no", "no_proxy"),
-        ("proxy_all", "all_proxy"),
-    ];
-
-    for (db_key, field) in keys {
-        if let Ok(value) = conn.query_row(
-            "SELECT value FROM app_settings WHERE key = ?1",
-            rusqlite::params![db_key],
-            |row| row.get::<_, String>(0),
-        ) {
-            match field {
-                "enabled" => settings.enabled = value == "true",
-                "http_proxy" => settings.http_proxy = Some(value).filter(|s| !s.is_empty()),
-                "https_proxy" => settings.https_proxy = Some(value).filter(|s| !s.is_empty()),
-                "no_proxy" => settings.no_proxy = Some(value).filter(|s| !s.is_empty()),
-                "all_proxy" => settings.all_proxy = Some(value).filter(|s| !s.is_empty()),
-                _ => {}
-            }
-        }
-    }
-
-    log::info!("Loaded proxy settings: enabled={}", settings.enabled);
-    settings
-}
-
-/// Setup proxy settings from database
-fn setup_proxy_settings(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let conn = init_database(app)?;
-    let proxy_settings = load_proxy_settings_from_db(&conn);
-    apply_proxy_settings(&proxy_settings);
-    Ok(())
-}
-
 /// Setup database and initialize tables
 fn setup_database(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let conn = init_database(&app.handle())?;
@@ -311,7 +269,6 @@ fn setup_window_effects(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
 /// Setup application state and services
 fn setup_application(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     setup_deep_links(app)?;
-    setup_proxy_settings(&app.handle())?;
     setup_database(app)?;
     setup_process_registries(app)?;
     setup_auth_server()?;
@@ -356,7 +313,7 @@ macro_rules! create_handlers {
             commands::claude::settings::read_claude_md_file,
             commands::claude::settings::save_claude_md_file,
             commands::claude::settings::check_anyon_installed,
-            commands::claude::settings::run_npx_anyon_agents,
+            commands::claude::settings::install_anyon_templates,
             commands::claude::settings::check_is_git_repo,
             commands::claude::settings::init_git_repo,
             commands::claude::settings::git_add_all,
@@ -425,9 +382,6 @@ macro_rules! create_handlers {
             commands::slash_commands::slash_command_get,
             commands::slash_commands::slash_command_save,
             commands::slash_commands::slash_command_delete,
-            // Proxy Settings
-            get_proxy_settings,
-            save_proxy_settings,
             // Dev Workflow
             commands::dev_workflow::start_dev_workflow,
             commands::dev_workflow::stop_dev_workflow,
@@ -463,6 +417,8 @@ macro_rules! create_handlers {
             commands::git::has_git_uncommitted_changes,
             commands::git::git_reset_hard,
             commands::git::get_git_diff_summary,
+            commands::git::get_git_log,
+            commands::git::get_git_changes_count,
         ]
     };
 }

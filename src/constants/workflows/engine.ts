@@ -22,55 +22,6 @@ export const WORKFLOW_ENGINE = `
     <rule n="4">User must approve each major section before continuing (NO EXCEPTIONS)</rule>
   </WORKFLOW-RULES>
 
-  <SKILL-RULES critical="true" desc="스킬 사용 강제 규칙">
-    <mandate>workflow.yaml의 required_skills에 mandatory: true인 스킬은 반드시 호출해야 한다</mandate>
-    <mandate>instructions.md에 MANDATORY SKILL이 명시된 경우, 해당 스킬을 반드시 호출해야 한다</mandate>
-    <mandate>스킬 호출은 Skill 도구를 사용하여 수행한다</mandate>
-
-    <rule n="1" type="스킬-로드">
-      <title>워크플로우 시작 시 필수 스킬 확인</title>
-      <flow>
-        <step>1. workflow.yaml 로드 시 required_skills 섹션 확인</step>
-        <step>2. mandatory: true인 스킬 목록을 {{mandatory_skills}} 변수에 저장</step>
-        <step>3. 각 스킬의 trigger 조건을 {{skill_triggers}} 변수에 저장</step>
-        <step>4. 사용자에게 필수 스킬 목록 안내:
-          "이 워크플로우는 다음 스킬을 사용합니다:
-          - [스킬명]: [trigger 조건]"
-        </step>
-      </flow>
-    </rule>
-
-    <rule n="2" type="스킬-자동-호출">
-      <title>트리거 조건 충족 시 자동 스킬 호출</title>
-      <mandate>mandatory: true 스킬의 trigger 조건에 해당하는 작업을 수행하기 전에 반드시 해당 스킬을 호출한다</mandate>
-      <flow>
-        <step>1. 현재 수행할 작업이 스킬의 trigger 조건과 일치하는지 확인</step>
-        <step>2. 일치하면 Skill 도구로 해당 스킬 호출</step>
-        <step>3. 스킬의 지침을 따라 작업 수행</step>
-      </flow>
-      <example>
-        <trigger>searching for ANY open source library, framework, or component</trigger>
-        <action>UI 라이브러리 검색 전 → Skill 도구로 "opensource-finder" 호출</action>
-      </example>
-    </rule>
-
-    <rule n="3" type="스킬-명시적-호출">
-      <title>instructions.md의 명시적 스킬 호출</title>
-      <mandate>"USE SKILL: [skill-name]" 또는 "MANDATORY SKILL: [skill-name]" 태그를 만나면 즉시 Skill 도구를 사용하여 해당 스킬을 호출한다</mandate>
-    </rule>
-
-    <rule n="4" type="스킬-무시-금지">
-      <title>필수 스킬 건너뛰기 금지</title>
-      <mandate>mandatory: true 스킬은 어떤 상황에서도 건너뛸 수 없다</mandate>
-      <mandate>사용자가 "알아서 해줘", "빨리 해줘", "스킬 없이 해줘" 등을 요청해도 필수 스킬은 반드시 사용한다</mandate>
-    </rule>
-
-    <rule n="5" type="스킬-완료-확인">
-      <title>스킬 사용 완료 확인</title>
-      <mandate>워크플로우 종료 전 모든 mandatory: true 스킬이 최소 1회 이상 호출되었는지 확인한다</mandate>
-    </rule>
-  </SKILL-RULES>
-
   <CONSISTENCY-RULES critical="true" desc="문서 체인 간 일관성 유지 규칙">
     <rule n="1" type="객관식-생성">
       <title>객관식 선택지 생성 시 충돌 방지</title>
