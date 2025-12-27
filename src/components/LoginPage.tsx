@@ -130,7 +130,7 @@ export const LoginPage: React.FC = () => {
         <div className="w-full max-w-sm space-y-8">
           {/* 로고 */}
           <div className="text-center">
-            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto invert dark:invert-0" />
+            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto logo-invert" />
           </div>
 
           {/* 환영 메시지 */}

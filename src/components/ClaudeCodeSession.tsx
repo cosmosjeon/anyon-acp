@@ -121,7 +121,7 @@ interface ClaudeCodeSessionProps {
  */
 export interface ClaudeCodeSessionRef {
   sendPrompt: (prompt: string, model?: "haiku" | "sonnet" | "opus") => void;
-  startNewSession: (backendPrompt: string, userMessage?: string) => void;
+  startNewSession: (backendPrompt: string, userMessage?: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -710,6 +710,10 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         setClaudeSessionId
       });
 
+      // Use isFirstPromptRef.current to avoid stale closure issues when called from startNewSession
+      // If isFirstPromptRef is true, ignore effectiveSession (it may be stale from previous render)
+      const shouldStartNew = isFirstPromptRef.current;
+
       // 5. Setup event listeners if not already listening
       if (!isListeningRef.current) {
         // Clean up previous listeners
@@ -751,9 +755,10 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         });
 
         // Setup all event listeners
+        // Also nullify claudeSessionId when starting new session to avoid stale closure issue
         await setupEventListeners({
-          claudeSessionId,
-          effectiveSession,
+          claudeSessionId: shouldStartNew ? null : claudeSessionId,
+          effectiveSession: shouldStartNew ? null : effectiveSession,
           handleStreamMessage,
           setError,
           processComplete,
@@ -798,9 +803,6 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
       // 9. Execute the command
       // Combine visible prompt with hidden context for AI
       const fullPrompt = hiddenContext ? `${prompt}${hiddenContext}` : prompt;
-      // Use isFirstPromptRef.current to avoid stale closure issues when called from startNewSession
-      // If isFirstPromptRef is true, ignore effectiveSession (it may be stale from previous render)
-      const shouldStartNew = isFirstPromptRef.current;
       await executePromptCommand({
         effectiveSession: shouldStartNew ? null : effectiveSession,
         isFirstPrompt: shouldStartNew,
@@ -826,8 +828,28 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
     sendPrompt: (prompt: string, model: "haiku" | "sonnet" | "opus" = "sonnet") => {
       handleSendPrompt(prompt, model);
     },
-    startNewSession: (backendPrompt: string, userMessage?: string) => {
-      // Clear current session and start a new one
+    startNewSession: async (backendPrompt: string, userMessage?: string) => {
+      // 1. Cancel any running session first (wait for completion)
+      if (claudeSessionId && isLoading) {
+        try {
+          await api.cancelClaudeExecution(claudeSessionId);
+        } catch (e) {
+          console.warn('[ClaudeCodeSession] Failed to cancel previous session:', e);
+        }
+      }
+
+      // 2. Clean up any existing listeners
+      unlistenRefs.current.forEach(unlisten => unlisten());
+      unlistenRefs.current = [];
+
+      // 3. Reset all session state refs (prevent stale state leaking)
+      isListeningRef.current = false;
+      hasActiveSessionRef.current = false;
+      accumulatedTextRef.current = '';
+      queuedPromptsRef.current = [];
+      pendingDisplayTextRef.current = null;
+
+      // 4. Clear React state with flushSync
       // Use flushSync to ensure state updates are applied before calling handleSendPrompt
       // This prevents race condition where handleSendPrompt sees stale isFirstPrompt value
       flushSync(() => {
@@ -838,12 +860,16 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         // Also reset session-related state to ensure clean slate
         setExtractedSessionInfo(null);
         setClaudeSessionId(null);
+        setIsLoading(false);
+        setStreamingText('');
+        setQueuedPrompts([]);
       });
-      // Reset refs synchronously (not affected by React batching)
+
+      // 5. Reset refs synchronously (not affected by React batching)
       isFirstPromptRef.current = true;
       currentSessionIdRef.current = null;
 
-      // Add display message to UI if provided (for workflow prompts)
+      // 6. Add display message to UI if provided (for workflow prompts)
       // userMessage는 짧은 표시 텍스트 (예: "PRD 문서 작성 시작")
       if (userMessage) {
         // backendPrompt(전체 프롬프트)와 userMessage(짧은 텍스트) 매핑 저장
@@ -857,7 +883,7 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         });
       }
 
-      // Send the backend prompt (full workflow prompt) to Claude
+      // 7. Send the backend prompt (full workflow prompt) to Claude
       handleSendPrompt(backendPrompt, "sonnet", undefined, undefined, undefined, userMessage ? true : false);
     },
     isLoading,
