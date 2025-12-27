@@ -248,8 +248,18 @@ export const ClaudeCodeSession = forwardRef<ClaudeCodeSessionRef, ClaudeCodeSess
         created_at: Date.now(),
       } as Session;
     }
+    // Fallback: if we have claudeSessionId but no extractedSessionInfo,
+    // create a minimal session for resume logic
+    if (claudeSessionId) {
+      return {
+        id: claudeSessionId,
+        project_id: projectPath.replace(/[^a-zA-Z0-9]/g, '-'),
+        project_path: projectPath,
+        created_at: Date.now(),
+      } as Session;
+    }
     return null;
-  }, [session, extractedSessionInfo, projectPath]);
+  }, [session, extractedSessionInfo, projectPath, claudeSessionId]);
 
   // Helper: check if message is tool-only (no text content)
   const isToolOnlyMessage = (msg: ClaudeStreamMessage): boolean => {
