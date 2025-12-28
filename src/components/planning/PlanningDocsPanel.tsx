@@ -52,7 +52,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
   // 이전 문서 상태 추적용 ref (자동 탭 전환용)
   const prevDocsRef = React.useRef<typeof documents>([]);
 
-  // Clear active workflows when documents are created
+  // Clear active workflows when documents are created (only when file actually exists)
   React.useEffect(() => {
     setActiveWorkflows(prev => {
       const updated = new Set(prev);
@@ -412,6 +412,7 @@ export const PlanningDocsPanel: React.FC<PlanningDocsPanelProps> = ({
           </p>
         </div>
       )}
+
     </div>
   );
 };

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,6 +7,20 @@ use super::helpers::{
     decode_project_path, extract_first_user_message, get_claude_dir, get_project_path_from_sessions,
 };
 use super::shared::{Project, Session};
+
+/// Normalizes a path by resolving symlinks and removing Windows extended path prefix
+fn normalize_path(path: &str) -> String {
+    // Try to canonicalize to resolve symlinks and OneDrive redirections
+    let canonical = fs::canonicalize(path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| path.to_string());
+
+    // Remove Windows extended path prefix (\\?\) if present
+    canonical
+        .strip_prefix(r"\\?\")
+        .unwrap_or(&canonical)
+        .to_string()
+}
 
 #[tauri::command]
 pub async fn get_home_directory() -> Result<String, String> {
@@ -143,15 +158,39 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
                 }
             }
 
+            // Normalize the project path to handle OneDrive/symlink duplicates
+            let normalized_project_path = normalize_path(&project_path);
+
             projects.push(Project {
                 id: dir_name.to_lowercase(),
-                path: project_path,
+                path: normalized_project_path,
                 sessions,
                 created_at,
                 most_recent_session,
             });
         }
     }
+
+    // Deduplicate projects by normalized path (keep the one with most recent activity)
+    let mut path_to_project: HashMap<String, Project> = HashMap::new();
+    for project in projects {
+        let path_key = project.path.to_lowercase();
+        match path_to_project.get(&path_key) {
+            Some(existing) => {
+                // Keep the project with more recent activity
+                let existing_time = existing.most_recent_session.unwrap_or(existing.created_at);
+                let new_time = project.most_recent_session.unwrap_or(project.created_at);
+                if new_time > existing_time {
+                    path_to_project.insert(path_key, project);
+                }
+            }
+            None => {
+                path_to_project.insert(path_key, project);
+            }
+        }
+    }
+
+    let mut projects: Vec<Project> = path_to_project.into_values().collect();
 
     // Sort projects by most recent session activity, then by creation time
     projects.sort_by(|a, b| {
@@ -173,10 +212,20 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
 pub async fn create_project(path: String) -> Result<Project, String> {
     log::info!("Creating project for path: {}", path);
 
+    // Normalize the path to resolve symlinks and OneDrive redirections
+    // This prevents duplicate projects when the same folder is accessed via different paths
+    let normalized_path = normalize_path(&path);
+
+    log::info!(
+        "Normalized path: {} -> {}",
+        path,
+        normalized_path
+    );
+
     // Encode the path to create a project ID
     // Replace both forward and backward slashes, and colons (for Windows drive letters)
     // Use lowercase for Windows case-insensitivity
-    let project_id = path
+    let project_id = normalized_path
         .to_lowercase()
         .replace('/', "-")
         .replace('\\', "-")
@@ -199,11 +248,11 @@ pub async fn create_project(path: String) -> Result<Project, String> {
             .map_err(|e| format!("Failed to create project directory: {}", e))?;
     }
 
-    // Save project metadata file with the original path
+    // Save project metadata file with the normalized path
     // This allows us to retrieve the correct path even when there are no sessions yet
     let meta_file = project_dir.join(".project_meta.json");
     let meta_data = serde_json::json!({
-        "path": path,
+        "path": normalized_path,
         "project_id": project_id,
     });
     fs::write(
@@ -224,10 +273,10 @@ pub async fn create_project(path: String) -> Result<Project, String> {
         .unwrap_or_default()
         .as_secs();
 
-    // Return the created project
+    // Return the created project with normalized path
     Ok(Project {
         id: project_id,
-        path,
+        path: normalized_path,
         sessions: Vec::new(),
         created_at,
         most_recent_session: None,

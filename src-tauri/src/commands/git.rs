@@ -196,7 +196,7 @@ pub async fn get_git_log(
     log::info!("Getting git log for: {} (limit: {})", project_path, limit);
 
     // Format: full_sha|short_sha|message|author|timestamp
-    let output = Command::new("git")
+    let output = create_hidden_command("git")
         .args([
             "log",
             &format!("-{}", limit),
@@ -239,7 +239,7 @@ pub async fn get_git_log(
 pub async fn get_git_changes_count(project_path: String) -> Result<u32, String> {
     log::info!("Getting changes count for: {}", project_path);
 
-    let output = Command::new("git")
+    let output = create_hidden_command("git")
         .args(["status", "--porcelain"])
         .current_dir(&project_path)
         .output()
