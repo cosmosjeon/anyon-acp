@@ -555,8 +555,8 @@ export const ClaudeAuthSettings: React.FC<ClaudeAuthSettingsProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-violet-500/10">
-            <Key className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+          <div className="p-2.5 rounded-xl bg-primary/10">
+            <Key className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h3 className="text-lg font-semibold">{t('settings.claudeAuth.title')}</h3>

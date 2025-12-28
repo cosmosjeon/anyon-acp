@@ -13,16 +13,19 @@ import {
   Code,
   Eye,
   FileText,
+  AlertCircle,
 } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api as _api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { ClaudeAuthSettings } from "./ClaudeAuthSettings";
-import { PlanningCompleteModal, PreviewWelcomeModal } from "./help";
+import { PlanningCompleteModal, PreviewWelcomeModal, EnvironmentSetupStep } from "./help";
 import { useTheme, useTranslation } from "@/hooks";
+import { Monitor } from "@/lib/icons";
 import { useAuthStore } from "@/stores/authStore";
 import { SUPPORT_CONFIG } from "@/constants/support";
 
@@ -43,7 +46,7 @@ interface NavItem {
   id: SettingsSection;
   label: string;
   icon: React.ElementType;
-  category: "general" | "ai" | "account" | "dev";
+  category: "general" | "account" | "dev";
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -62,14 +65,16 @@ export const Settings: React.FC<SettingsProps> = ({
   // Dev tools modal states
   const [showPlanningModal, setShowPlanningModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showEnvironmentSetup, setShowEnvironmentSetup] = useState(false);
+  const [showEnvironmentSetupMissing, setShowEnvironmentSetupMissing] = useState(false);
 
   // Auth store
   const { user, logout } = useAuthStore();
 
-  // Navigation items
+  // Navigation items - AI와 General을 합쳐서 "일반" 카테고리로 통합
   const navItems: NavItem[] = [
     { id: "appearance", label: t('settings.simple.appearance'), icon: Palette, category: "general" },
-    { id: "ai-auth", label: t('settings.claudeAuth.title'), icon: Key, category: "ai" },
+    { id: "ai-auth", label: t('settings.claudeAuth.title'), icon: Key, category: "general" },
     { id: "account", label: t('settings.account.title'), icon: User, category: "account" },
     ...(isDev ? [{ id: "dev-tools" as const, label: "개발자 도구", icon: Code, category: "dev" as const }] : []),
   ];
@@ -118,14 +123,15 @@ export const Settings: React.FC<SettingsProps> = ({
                     </p>
                   </div>
                 </div>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as 'en' | 'ko')}
-                  className="h-10 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-                >
-                  <option value="en">{t('language.en')}</option>
-                  <option value="ko">{t('language.ko')}</option>
-                </select>
+                <Select value={language} onValueChange={(value) => setLanguage(value as 'en' | 'ko')}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">{t('language.en')}</SelectItem>
+                    <SelectItem value="ko">{t('language.ko')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Theme Toggle */}
@@ -178,21 +184,15 @@ export const Settings: React.FC<SettingsProps> = ({
                   <User size={28} className="text-primary" />
                 </div>
 
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <User size={16} className="text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">{t('settings.account.name')}</p>
-                      <p className="text-sm font-medium">{user.name}</p>
-                    </div>
+                <div className="flex-1 space-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('settings.account.name')}</p>
+                    <p className="text-sm font-medium">{user.name}</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Mail size={16} className="text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">{t('settings.account.email')}</p>
-                      <p className="text-sm font-medium">{user.email}</p>
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    <Mail size={14} className="text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
                   </div>
                 </div>
               </div>
@@ -271,6 +271,28 @@ export const Settings: React.FC<SettingsProps> = ({
                       <div className="text-xs text-muted-foreground">PreviewWelcomeModal</div>
                     </div>
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3"
+                    onClick={() => setShowEnvironmentSetup(true)}
+                  >
+                    <Monitor className="h-4 w-4 text-purple-500" />
+                    <div className="text-left">
+                      <div className="font-medium">환경 설정 화면 (실제)</div>
+                      <div className="text-xs text-muted-foreground">EnvironmentSetupStep - 실제 환경 체크</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3"
+                    onClick={() => setShowEnvironmentSetupMissing(true)}
+                  >
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <div className="text-left">
+                      <div className="font-medium">환경 설정 화면 (미설치)</div>
+                      <div className="text-xs text-muted-foreground">EnvironmentSetupStep - 모두 미설치 시뮬레이션</div>
+                    </div>
+                  </Button>
                 </div>
               </div>
 
@@ -290,8 +312,8 @@ export const Settings: React.FC<SettingsProps> = ({
 
   return (
     <div className={cn("h-full overflow-y-auto", className)}>
-      {/* Centered Container */}
-      <div className="max-w-5xl mx-auto h-full flex">
+      {/* Full Width Container */}
+      <div className="h-full flex">
         {/* Left Navigation */}
         <div className="w-56 flex-shrink-0 border-r bg-muted/20 flex flex-col">
           {/* Header */}
@@ -311,30 +333,6 @@ export const Settings: React.FC<SettingsProps> = ({
               </p>
               <div className="space-y-0.5">
                 {navItems.filter(item => item.category === "general").map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveSection(item.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors",
-                      activeSection === item.id
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* AI Section */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
-                {t('settings.tab.ai')}
-              </p>
-              <div className="space-y-0.5">
-                {navItems.filter(item => item.category === "ai").map((item) => (
                   <button
                     key={item.id}
                     onClick={() => setActiveSection(item.id)}
@@ -463,6 +461,104 @@ export const Settings: React.FC<SettingsProps> = ({
               setShowPreviewModal(false);
             }}
           />
+          {/* Environment Setup Modal */}
+          {showEnvironmentSetup && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={() => setShowEnvironmentSetup(false)}
+              />
+              <div className="relative w-full max-w-lg mx-4 bg-background rounded-2xl shadow-2xl border overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h2 className="text-lg font-semibold">환경 설정 테스트 (실제)</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowEnvironmentSetup(false)}
+                  >
+                    닫기
+                  </Button>
+                </div>
+                <div className="overflow-y-auto">
+                  <EnvironmentSetupStep
+                    onComplete={() => {
+                      setShowEnvironmentSetup(false);
+                      setToast({ message: '환경 설정 완료!', type: 'success' });
+                    }}
+                    onSkip={() => {
+                      setShowEnvironmentSetup(false);
+                      setToast({ message: '건너뛰기 클릭됨', type: 'success' });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Environment Setup Modal - Missing Dependencies Simulation */}
+          {showEnvironmentSetupMissing && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={() => setShowEnvironmentSetupMissing(false)}
+              />
+              <div className="relative w-full max-w-lg mx-4 bg-background rounded-2xl shadow-2xl border overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h2 className="text-lg font-semibold">환경 설정 테스트 (미설치 시뮬레이션)</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowEnvironmentSetupMissing(false)}
+                  >
+                    닫기
+                  </Button>
+                </div>
+                <div className="overflow-y-auto">
+                  <EnvironmentSetupStep
+                    onComplete={() => {
+                      setShowEnvironmentSetupMissing(false);
+                      setToast({ message: '환경 설정 완료!', type: 'success' });
+                    }}
+                    onSkip={() => {
+                      setShowEnvironmentSetupMissing(false);
+                      setToast({ message: '건너뛰기 클릭됨', type: 'success' });
+                    }}
+                    mockStatus={{
+                      platform: "macos",
+                      all_ready: false,
+                      package_manager: null,
+                      nodejs: {
+                        name: "nodejs",
+                        is_installed: false,
+                        meets_minimum: false,
+                        version: null,
+                        source: "not_found",
+                        path: null,
+                        minimum_version: "18.0.0",
+                      },
+                      git: {
+                        name: "git",
+                        is_installed: false,
+                        meets_minimum: false,
+                        version: null,
+                        source: "not_found",
+                        path: null,
+                        minimum_version: "2.0.0",
+                      },
+                      claude_code: {
+                        name: "claude-code",
+                        is_installed: false,
+                        meets_minimum: false,
+                        version: null,
+                        source: "not_found",
+                        path: null,
+                        minimum_version: "1.0.0",
+                      },
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

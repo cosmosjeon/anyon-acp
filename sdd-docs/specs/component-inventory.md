@@ -8,17 +8,19 @@
 |----------|-------|
 | **React Components** | 70 |
 | **UI Components** | 20 |
-| **Widget Components** | 29 |
+| **Widget Components** | 31 |
 | **Preview Components** | 8 |
 | **Claude Session Components** | 4 |
 | **Zustand Stores** | 5 |
 | **Custom Hooks** | 15 |
 | **Context Providers** | 3 |
 
-> Last synced: 2025-12-26
-> Note: Checkpoint system fully removed (CheckpointSettings, TimelineNavigator deleted; checkpoint/ Rust module deleted)
+> Last synced: 2025-12-27
+> Note: Checkpoint system restored (CheckpointSettings, TimelineNavigator exist; checkpoint/ Rust module restored)
 > Note: Many components refactored/consolidated. git.rs added for Git operations.
 > Note: RetryContext added as new context provider
+> Note: Version control components added (SnapshotTimeline, VersionControlPanel)
+> Note: New widgets added (AskUserQuestionWidget, TaskOutputWidget)
 
 ---
 
@@ -92,6 +94,7 @@
 | `AgentRunsList` | ~200 | Agent runs list |
 | `AgentRunView` | ~180 | Single agent run view |
 | `AgentRunOutputViewer` | ~150 | Run output viewer |
+| `AgentsModal` | ~200 | Agents modal dialog |
 | `CreateAgent` | ~250 | Agent creation form |
 | `CCAgents` | ~200 | Claude Code agents |
 | `GitHubAgentBrowser` | ~300 | GitHub agent browser |
@@ -137,12 +140,13 @@ Located in `src/components/ui/` (20 components):
 
 ## Widget Components
 
-Located in `src/components/widgets/` (29 components):
+Located in `src/components/widgets/` (31 components):
 
 Interactive widgets displayed inline in chat messages to visualize tool executions and results.
 
 | Widget | Purpose |
 |--------|---------|
+| `AskUserQuestionWidget` | User question prompt display |
 | `BackgroundAgentsPanel` | Background agent status display |
 | `BashWidget` | Bash command execution display |
 | `CommandOutputWidget` | Command execution output |
@@ -163,6 +167,7 @@ Interactive widgets displayed inline in chat messages to visualize tool executio
 | `SummaryWidget` | Session summary display |
 | `SystemInitializedWidget` | System initialization status |
 | `SystemReminderWidget` | System reminder messages |
+| `TaskOutputWidget` | Task output display |
 | `TaskWidget` | Task execution display |
 | `ThinkingWidget` | AI thinking process display |
 | `TodoReadWidget` | Todo list reader display |
@@ -420,6 +425,7 @@ interface AnyonApiUsage {
 |-----------|------|---------|
 | `AIChatModal` | `src/components/help/AIChatModal.tsx` | AI-powered help chat modal |
 | `FloatingHelpButton` | `src/components/help/FloatingHelpButton.tsx` | Floating FAB with Kakao/AI chat options (~185 lines) |
+| `OnboardingModal` | `src/components/help/OnboardingModal.tsx` | User onboarding modal |
 | `PlanningCompleteModal` | `src/components/help/PlanningCompleteModal.tsx` | Planning completion modal |
 | `PreviewWelcomeModal` | `src/components/help/PreviewWelcomeModal.tsx` | Preview welcome modal |
 
@@ -430,6 +436,16 @@ interface AnyonApiUsage {
 | `PlanningDocsPanel` | `src/components/planning/PlanningDocsPanel.tsx` | 6-step workflow progress panel (~412 lines) |
 | `UXPreviewPanel` | `src/components/planning/UXPreviewPanel.tsx` | UX preview panel (~168 lines) |
 | `PlanningDocViewer` | `src/components/planning/PlanningDocViewer.tsx` | Planning document viewer |
+
+### Version Control Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `CreateSnapshotDialog` | `src/components/version-control/CreateSnapshotDialog.tsx` | Create snapshot dialog |
+| `RevertConfirmDialog` | `src/components/version-control/RevertConfirmDialog.tsx` | Revert confirmation dialog |
+| `SnapshotItem` | `src/components/version-control/SnapshotItem.tsx` | Single snapshot item display |
+| `SnapshotTimeline` | `src/components/version-control/SnapshotTimeline.tsx` | Snapshot timeline visualization |
+| `VersionControlPanel` | `src/components/version-control/VersionControlPanel.tsx` | Version control main panel |
 
 ### Constants
 

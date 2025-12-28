@@ -29,6 +29,8 @@ export { usageApi } from './usage';
 export { claudeApi } from './claude';
 export { gitApi } from './git';
 export type { GitDiffSummary } from './git';
+export { environmentApi } from './environment';
+export type { DependencyStatus, EnvironmentStatus } from './environment';
 
 // Compose the main api object for backward compatibility
 // This maintains the same interface as the original api.ts
