@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { DEV_WORKFLOW_SEQUENCE, getDevWorkflowPrompt } from '@/constants/development';
 import { ANYON_DOCS } from '@/constants/paths';
 import { api } from '@/lib/api';
+import { useDevWorkflowStore, type BlockedTicket, type ExecutionLogEntry } from '@/stores/devWorkflowStore';
 
 interface DevDocsPanelProps {
   projectPath: string | undefined;
@@ -59,15 +60,6 @@ interface TicketProgress {
   wave: string;              // E01-Wave1
   startTime?: number;
   endTime?: number;
-}
-
-/**
- * Blocked ticket detail
- */
-interface BlockedTicket {
-  id: string;
-  title: string;
-  reason: string;
 }
 
 const DEFAULT_PROGRESS: ProgressData = {
@@ -293,29 +285,37 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
   onStartWorkflow,
   isSessionLoading = false,
 }, ref) => {
-  const [currentRunningStep, setCurrentRunningStep] = useState<string | null>(null);
+  const projectKey = projectPath ?? '__unknown__';
   const prevLoadingRef = useRef(isSessionLoading);
   const isStoppedRef = useRef(false);
+  const emptyLogsRef = useRef<ExecutionLogEntry[]>([]);
+  const emptyExpandedLogsRef = useRef<Set<number>>(new Set());
   const [, forceUpdate] = useState(0);
-  const [isDevComplete, setIsDevComplete] = useState(false);
-  const [isOrchestratorComplete, setIsOrchestratorComplete] = useState(false);
   const [progressData, setProgressData] = useState<ProgressData>(DEFAULT_PROGRESS);
-  const [executionLog, setExecutionLog] = useState<Array<{
-    stepId: string;
-    stepTitle: string;
-    status: 'running' | 'completed' | 'error';
-    timestamp: number;
-    waveInfo?: string;
-    duration?: number;                    // 소요 시간 (ms)
-    ticketsCompleted?: number;            // 완료 티켓 수
-    ticketsTotal?: number;                // 전체 티켓 수
-    ticketsBlocked?: number;              // Blocked 티켓 수
-    generatedFiles?: string[];            // 생성된 파일 목록
-    blockedTickets?: BlockedTicket[];     // Blocked 티켓 상세
-    startTime?: number;                   // 시작 시간
-  }>>([]);
   const [currentWaveTickets, setCurrentWaveTickets] = useState<TicketProgress[]>([]);
-  const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set());
+
+  const executionLog = useDevWorkflowStore(
+    (state) => state.executionLogs[projectKey] ?? emptyLogsRef.current
+  );
+  const currentRunningStep = useDevWorkflowStore(
+    (state) => state.currentRunningSteps[projectKey] ?? null
+  );
+  const expandedLogs = useDevWorkflowStore(
+    (state) => state.expandedLogs[projectKey] ?? emptyExpandedLogsRef.current
+  );
+  const isDevComplete = useDevWorkflowStore(
+    (state) => state.isDevComplete[projectKey] ?? false
+  );
+  const isOrchestratorComplete = useDevWorkflowStore(
+    (state) => state.isOrchestratorComplete[projectKey] ?? false
+  );
+
+  const appendLogEntry = useDevWorkflowStore((state) => state.appendLogEntry);
+  const clearLogs = useDevWorkflowStore((state) => state.clearLogs);
+  const setCurrentRunningStep = useDevWorkflowStore((state) => state.setCurrentRunningStep);
+  const toggleExpandedLog = useDevWorkflowStore((state) => state.toggleExpandedLog);
+  const setIsDevComplete = useDevWorkflowStore((state) => state.setIsDevComplete);
+  const setIsOrchestratorComplete = useDevWorkflowStore((state) => state.setIsOrchestratorComplete);
 
   // execution-progress.md 파일 읽기
   const loadProgressData = useCallback(async () => {
@@ -342,7 +342,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
 
         // 완료 상태 체크
         if (parsed.workflowState === 'completed') {
-          setIsDevComplete(true);
+          setIsDevComplete(projectKey, true);
         }
       }
     } catch (error) {
@@ -365,7 +365,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
 
   const addLogEntry = async (
     stepId: string,
-    status: 'running' | 'completed' | 'error',
+    status: ExecutionLogEntry['status'],
     waveInfo?: string,
     additionalData?: {
       ticketsCompleted?: number;
@@ -407,23 +407,20 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
         }
       }
 
-      setExecutionLog(prev => [
-        ...prev,
-        {
-          stepId,
-          stepTitle: step.title,
-          status,
-          timestamp,
-          waveInfo,
-          duration,
-          startTime: status === 'running' ? timestamp : undefined,
-          ticketsCompleted: additionalData?.ticketsCompleted,
-          ticketsTotal: additionalData?.ticketsTotal,
-          ticketsBlocked: additionalData?.ticketsBlocked,
-          generatedFiles: files || additionalData?.generatedFiles,
-          blockedTickets: blocked || additionalData?.blockedTickets,
-        }
-      ]);
+      appendLogEntry(projectKey, {
+        stepId,
+        stepTitle: step.title,
+        status,
+        timestamp,
+        waveInfo,
+        duration,
+        startTime: status === 'running' ? timestamp : undefined,
+        ticketsCompleted: additionalData?.ticketsCompleted,
+        ticketsTotal: additionalData?.ticketsTotal,
+        ticketsBlocked: additionalData?.ticketsBlocked,
+        generatedFiles: files || additionalData?.generatedFiles,
+        blockedTickets: blocked || additionalData?.blockedTickets,
+      });
     }
   };
 
@@ -454,8 +451,8 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
           const isComplete = await api.checkFileExists(completeFilePath);
 
           if (isComplete) {
-            setIsDevComplete(true);
-            setCurrentRunningStep(null);
+            setIsDevComplete(projectKey, true);
+            setCurrentRunningStep(projectKey, null);
             setProgressData(prev => ({ ...prev, workflowState: 'completed' }));
             return;
           }
@@ -464,7 +461,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
           const orchestratorCompleteFile = `${projectPath}/${ANYON_DOCS.DEV_PLAN}/ORCHESTRATOR_COMPLETE.md`;
           const isOrchComplete = await api.checkFileExists(orchestratorCompleteFile);
           if (isOrchComplete) {
-            setIsOrchestratorComplete(true);
+            setIsOrchestratorComplete(projectKey, true);
           }
 
           // 🛑 중지 상태 재확인 (async 작업 중 중지 눌렀을 수 있음)
@@ -483,7 +480,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
 
             if (workflowState !== 'awaiting_review') {
               console.warn('[DevDocsPanel] Executor finished but workflow_state is not "awaiting_review". Skipping auto-transition to Reviewer.');
-              setCurrentRunningStep(null);
+              setCurrentRunningStep(projectKey, null);
               return;
             }
           }
@@ -492,18 +489,18 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
             setTimeout(() => {
               // 🛑 중지 상태 마지막 확인 (setTimeout 대기 중 중지 눌렀을 수 있음)
               if (!isStoppedRef.current) {
-                setCurrentRunningStep(nextStep.id);
+                setCurrentRunningStep(projectKey, nextStep.id);
                 addLogEntry(nextStep.id, 'running', progressData.currentWave || undefined);
                 onStartWorkflow?.(getDevWorkflowPrompt(nextStep), nextStep.displayText);
               }
             }, 500);
           } else {
             // 다음 단계가 없으면 (Orchestrator 완료 등) currentRunningStep 초기화
-            setCurrentRunningStep(null);
+            setCurrentRunningStep(projectKey, null);
           }
         } catch (error) {
           console.error('[DevDocsPanel] Error checking workflow completion:', error);
-          setCurrentRunningStep(null);
+          setCurrentRunningStep(projectKey, null);
         }
       };
 
@@ -514,8 +511,8 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
   const handleStart = (stepId: string, workflowPrompt: string, displayText?: string) => {
     isStoppedRef.current = false;
     forceUpdate(n => n + 1);
-    setIsDevComplete(false);
-    setCurrentRunningStep(stepId);
+    setIsDevComplete(projectKey, false);
+    setCurrentRunningStep(projectKey, stepId);
     addLogEntry(stepId, 'running', progressData.currentWave || undefined);
     onStartWorkflow?.(workflowPrompt, displayText);
   };
@@ -526,7 +523,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
     if (currentRunningStep) {
       addLogEntry(currentRunningStep, 'error');
     }
-    setCurrentRunningStep(null);
+    setCurrentRunningStep(projectKey, null);
   };
 
   // Expose stop method to parent via ref
@@ -535,7 +532,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
   }), [handleStop]);
 
   const handleClearLog = () => {
-    setExecutionLog([]);
+    clearLogs(projectKey);
   };
 
   const handleRefreshProgress = () => {
@@ -543,15 +540,7 @@ export const DevDocsPanel = forwardRef<DevDocsPanelRef, DevDocsPanelProps>(({
   };
 
   const toggleLogExpanded = (timestamp: number) => {
-    setExpandedLogs(prev => {
-      const next = new Set(prev);
-      if (next.has(timestamp)) {
-        next.delete(timestamp);
-      } else {
-        next.add(timestamp);
-      }
-      return next;
-    });
+    toggleExpandedLog(projectKey, timestamp);
   };
 
   const formatDuration = (ms: number): string => {
