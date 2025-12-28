@@ -1,38 +1,11 @@
 import { getDatabase } from '../index.js';
 
 /**
- * Settings Repository - handles all user settings CRUD operations
+ * Settings Repository - handles all user settings CRUD operations (PostgreSQL)
  */
 class SettingsRepository {
   constructor() {
-    this.db = getDatabase();
-
-    // Prepare statements for better performance
-    this.statements = {
-      set: this.db.prepare(`
-        INSERT INTO user_settings (user_id, key, value)
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id, key) DO UPDATE SET
-          value = excluded.value,
-          updated_at = CURRENT_TIMESTAMP
-      `),
-
-      get: this.db.prepare(`
-        SELECT value FROM user_settings WHERE user_id = ? AND key = ?
-      `),
-
-      getAll: this.db.prepare(`
-        SELECT key, value FROM user_settings WHERE user_id = ?
-      `),
-
-      delete: this.db.prepare(`
-        DELETE FROM user_settings WHERE user_id = ? AND key = ?
-      `),
-
-      deleteAll: this.db.prepare(`
-        DELETE FROM user_settings WHERE user_id = ?
-      `),
-    };
+    this.pool = getDatabase();
   }
 
   /**
@@ -40,26 +13,37 @@ class SettingsRepository {
    * @param {string} userId - User ID
    * @param {string} key - Setting key
    * @param {any} value - Setting value (will be JSON stringified)
-   * @returns {boolean} True if successful
+   * @returns {Promise<boolean>} True if successful
    */
-  set(userId, key, value) {
+  async set(userId, key, value) {
     const stringValue = JSON.stringify(value);
-    const result = this.statements.set.run(userId, key, stringValue);
-    return result.changes > 0;
+    const result = await this.pool.query(
+      `INSERT INTO user_settings (user_id, key, value)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, key) DO UPDATE SET
+         value = EXCLUDED.value,
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, key, stringValue]
+    );
+    return result.rowCount > 0;
   }
 
   /**
    * Get a setting value
    * @param {string} userId - User ID
    * @param {string} key - Setting key
-   * @returns {any|null} Setting value or null if not found
+   * @returns {Promise<any|null>} Setting value or null if not found
    */
-  get(userId, key) {
-    const row = this.statements.get.get(userId, key);
-    if (!row) return null;
+  async get(userId, key) {
+    const result = await this.pool.query(
+      'SELECT value FROM user_settings WHERE user_id = $1 AND key = $2',
+      [userId, key]
+    );
+
+    if (result.rows.length === 0) return null;
 
     try {
-      return JSON.parse(row.value);
+      return JSON.parse(result.rows[0].value);
     } catch (error) {
       console.error(`Error parsing setting value for key "${key}":`, error);
       return null;
@@ -69,13 +53,16 @@ class SettingsRepository {
   /**
    * Get all settings for a user
    * @param {string} userId - User ID
-   * @returns {Object} Object with all settings as key-value pairs
+   * @returns {Promise<Object>} Object with all settings as key-value pairs
    */
-  getAll(userId) {
-    const rows = this.statements.getAll.all(userId);
-    const settings = {};
+  async getAll(userId) {
+    const result = await this.pool.query(
+      'SELECT key, value FROM user_settings WHERE user_id = $1',
+      [userId]
+    );
 
-    for (const row of rows) {
+    const settings = {};
+    for (const row of result.rows) {
       try {
         settings[row.key] = JSON.parse(row.value);
       } catch (error) {
@@ -91,21 +78,34 @@ class SettingsRepository {
    * Set multiple settings at once
    * @param {string} userId - User ID
    * @param {Object} settings - Object with settings as key-value pairs
-   * @returns {boolean} True if successful
+   * @returns {Promise<boolean>} True if successful
    */
-  setAll(userId, settings) {
-    const transaction = this.db.transaction((userId, settings) => {
-      for (const [key, value] of Object.entries(settings)) {
-        this.set(userId, key, value);
-      }
-    });
+  async setAll(userId, settings) {
+    const client = await this.pool.connect();
 
     try {
-      transaction(userId, settings);
+      await client.query('BEGIN');
+
+      for (const [key, value] of Object.entries(settings)) {
+        const stringValue = JSON.stringify(value);
+        await client.query(
+          `INSERT INTO user_settings (user_id, key, value)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (user_id, key) DO UPDATE SET
+             value = EXCLUDED.value,
+             updated_at = CURRENT_TIMESTAMP`,
+          [userId, key, stringValue]
+        );
+      }
+
+      await client.query('COMMIT');
       return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Error setting multiple settings:', error);
       return false;
+    } finally {
+      client.release();
     }
   }
 
@@ -113,43 +113,62 @@ class SettingsRepository {
    * Delete a setting
    * @param {string} userId - User ID
    * @param {string} key - Setting key
-   * @returns {boolean} True if deleted, false otherwise
+   * @returns {Promise<boolean>} True if deleted, false otherwise
    */
-  delete(userId, key) {
-    const result = this.statements.delete.run(userId, key);
-    return result.changes > 0;
+  async delete(userId, key) {
+    const result = await this.pool.query(
+      'DELETE FROM user_settings WHERE user_id = $1 AND key = $2',
+      [userId, key]
+    );
+    return result.rowCount > 0;
   }
 
   /**
    * Delete all settings for a user
    * @param {string} userId - User ID
-   * @returns {boolean} True if successful
+   * @returns {Promise<boolean>} True if successful
    */
-  deleteAll(userId) {
-    const result = this.statements.deleteAll.run(userId);
-    return result.changes >= 0; // 0 or more changes is fine
+  async deleteAll(userId) {
+    const result = await this.pool.query(
+      'DELETE FROM user_settings WHERE user_id = $1',
+      [userId]
+    );
+    return result.rowCount >= 0;
   }
 
   /**
    * Replace all settings for a user (delete all, then set new ones)
    * @param {string} userId - User ID
    * @param {Object} settings - Object with settings as key-value pairs
-   * @returns {boolean} True if successful
+   * @returns {Promise<boolean>} True if successful
    */
-  replaceAll(userId, settings) {
-    const transaction = this.db.transaction((userId, settings) => {
-      this.deleteAll(userId);
-      for (const [key, value] of Object.entries(settings)) {
-        this.set(userId, key, value);
-      }
-    });
+  async replaceAll(userId, settings) {
+    const client = await this.pool.connect();
 
     try {
-      transaction(userId, settings);
+      await client.query('BEGIN');
+
+      // Delete all existing settings
+      await client.query('DELETE FROM user_settings WHERE user_id = $1', [userId]);
+
+      // Insert new settings
+      for (const [key, value] of Object.entries(settings)) {
+        const stringValue = JSON.stringify(value);
+        await client.query(
+          `INSERT INTO user_settings (user_id, key, value)
+           VALUES ($1, $2, $3)`,
+          [userId, key, stringValue]
+        );
+      }
+
+      await client.query('COMMIT');
       return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Error replacing all settings:', error);
       return false;
+    } finally {
+      client.release();
     }
   }
 }

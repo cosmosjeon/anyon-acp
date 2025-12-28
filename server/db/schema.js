@@ -1,5 +1,5 @@
 /**
- * Database schema definitions
+ * Database schema definitions for PostgreSQL
  */
 
 export const SCHEMA = {
@@ -11,12 +11,12 @@ export const SCHEMA = {
       profile_picture TEXT,
       google_id TEXT UNIQUE,
       password_hash TEXT,
-      email_verified INTEGER DEFAULT 0,
+      email_verified BOOLEAN DEFAULT FALSE,
       plan_type TEXT DEFAULT 'FREE' CHECK(plan_type IN ('FREE', 'PRO')),
       subscription_status TEXT DEFAULT 'ACTIVE' CHECK(subscription_status IN ('ACTIVE', 'CANCELED', 'PAST_DUE')),
-      current_period_end TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      current_period_end TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `,
 
@@ -25,8 +25,8 @@ export const SCHEMA = {
       user_id TEXT NOT NULL,
       key TEXT NOT NULL,
       value TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (user_id, key),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
@@ -38,9 +38,9 @@ export const SCHEMA = {
       user_id TEXT NOT NULL,
       code_type TEXT NOT NULL CHECK(code_type IN ('EMAIL_VERIFY', 'PASSWORD_RESET')),
       code TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
       attempts INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `,
@@ -57,36 +57,43 @@ export const SCHEMA = {
 
 /**
  * Initialize database schema
- * @param {Database} db - SQLite database instance
+ * @param {Pool} pool - PostgreSQL pool instance
  */
-export function initializeSchema(db) {
-  // Create tables
-  db.exec(SCHEMA.users);
-  db.exec(SCHEMA.userSettings);
-  db.exec(SCHEMA.authCodes);
+export async function initializeSchema(pool) {
+  const client = await pool.connect();
 
-  // Migrate existing users table to add new columns if needed
   try {
-    // Check if password_hash column exists
-    const columns = db.prepare("PRAGMA table_info(users)").all();
-    const hasPasswordHash = columns.some(col => col.name === 'password_hash');
-    const hasEmailVerified = columns.some(col => col.name === 'email_verified');
+    // Create tables
+    await client.query(SCHEMA.users);
+    await client.query(SCHEMA.userSettings);
+    await client.query(SCHEMA.authCodes);
 
-    if (!hasPasswordHash) {
-      db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
+    // Create indexes
+    for (const indexSql of SCHEMA.indexes) {
+      await client.query(indexSql);
+    }
+
+    // Check and add missing columns (migration)
+    const columnsResult = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'users'
+    `);
+    const columns = columnsResult.rows.map(row => row.column_name);
+
+    if (!columns.includes('password_hash')) {
+      await client.query('ALTER TABLE users ADD COLUMN password_hash TEXT');
       console.log('✅ Added password_hash column to users table');
     }
 
-    if (!hasEmailVerified) {
-      db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0');
+    if (!columns.includes('email_verified')) {
+      await client.query('ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE');
       console.log('✅ Added email_verified column to users table');
     }
   } catch (error) {
-    console.error('Migration error:', error);
+    console.error('Schema initialization error:', error);
+    throw error;
+  } finally {
+    client.release();
   }
-
-  // Create indexes
-  SCHEMA.indexes.forEach(indexSql => {
-    db.exec(indexSql);
-  });
 }

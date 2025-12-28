@@ -2,49 +2,11 @@ import { getDatabase } from '../index.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * AuthCode Repository - handles authentication code operations
+ * AuthCode Repository - handles authentication code operations (PostgreSQL)
  */
 class AuthCodeRepository {
   constructor() {
-    this.db = getDatabase();
-
-    // Prepare statements for better performance
-    this.statements = {
-      create: this.db.prepare(`
-        INSERT INTO auth_codes (id, user_id, code_type, code, expires_at)
-        VALUES (?, ?, ?, ?, ?)
-      `),
-
-      findByCode: this.db.prepare(`
-        SELECT * FROM auth_codes
-        WHERE code = ? AND code_type = ?
-      `),
-
-      findByUserId: this.db.prepare(`
-        SELECT * FROM auth_codes
-        WHERE user_id = ? AND code_type = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-      `),
-
-      incrementAttempts: this.db.prepare(`
-        UPDATE auth_codes
-        SET attempts = attempts + 1
-        WHERE id = ?
-      `),
-
-      deleteCode: this.db.prepare(`
-        DELETE FROM auth_codes WHERE id = ?
-      `),
-
-      deleteUserCodes: this.db.prepare(`
-        DELETE FROM auth_codes WHERE user_id = ? AND code_type = ?
-      `),
-
-      cleanupExpired: this.db.prepare(`
-        DELETE FROM auth_codes WHERE expires_at < CURRENT_TIMESTAMP
-      `),
-    };
+    this.pool = getDatabase();
   }
 
   /**
@@ -53,11 +15,15 @@ class AuthCodeRepository {
    * @param {string} codeType - 'EMAIL_VERIFY' or 'PASSWORD_RESET'
    * @param {string} code - 6-digit code
    * @param {string} expiresAt - ISO timestamp
-   * @returns {object} Created code
+   * @returns {Promise<object>} Created code
    */
-  createCode(userId, codeType, code, expiresAt) {
+  async createCode(userId, codeType, code, expiresAt) {
     const id = uuidv4();
-    this.statements.create.run(id, userId, codeType, code, expiresAt);
+    await this.pool.query(
+      `INSERT INTO auth_codes (id, user_id, code_type, code, expires_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, userId, codeType, code, expiresAt]
+    );
     return { id, userId, codeType, code, expiresAt, attempts: 0 };
   }
 
@@ -65,36 +31,50 @@ class AuthCodeRepository {
    * Find authentication code by code and type
    * @param {string} code - 6-digit code
    * @param {string} codeType - 'EMAIL_VERIFY' or 'PASSWORD_RESET'
-   * @returns {object|null}
+   * @returns {Promise<object|null>}
    */
-  findByCode(code, codeType) {
-    return this.statements.findByCode.get(code, codeType);
+  async findByCode(code, codeType) {
+    const result = await this.pool.query(
+      `SELECT * FROM auth_codes WHERE code = $1 AND code_type = $2`,
+      [code, codeType]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
   }
 
   /**
    * Find latest code for user by type
    * @param {string} userId
    * @param {string} codeType
-   * @returns {object|null}
+   * @returns {Promise<object|null>}
    */
-  findByUserId(userId, codeType) {
-    return this.statements.findByUserId.get(userId, codeType);
+  async findByUserId(userId, codeType) {
+    const result = await this.pool.query(
+      `SELECT * FROM auth_codes
+       WHERE user_id = $1 AND code_type = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId, codeType]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
   }
 
   /**
    * Increment code verification attempts
    * @param {string} codeId
    */
-  incrementAttempts(codeId) {
-    this.statements.incrementAttempts.run(codeId);
+  async incrementAttempts(codeId) {
+    await this.pool.query(
+      `UPDATE auth_codes SET attempts = attempts + 1 WHERE id = $1`,
+      [codeId]
+    );
   }
 
   /**
    * Delete specific authentication code
    * @param {string} codeId
    */
-  deleteCode(codeId) {
-    this.statements.deleteCode.run(codeId);
+  async deleteCode(codeId) {
+    await this.pool.query('DELETE FROM auth_codes WHERE id = $1', [codeId]);
   }
 
   /**
@@ -102,17 +82,22 @@ class AuthCodeRepository {
    * @param {string} userId
    * @param {string} codeType
    */
-  deleteUserCodes(userId, codeType) {
-    this.statements.deleteUserCodes.run(userId, codeType);
+  async deleteUserCodes(userId, codeType) {
+    await this.pool.query(
+      'DELETE FROM auth_codes WHERE user_id = $1 AND code_type = $2',
+      [userId, codeType]
+    );
   }
 
   /**
    * Clean up expired authentication codes
-   * @returns {number} Number of deleted codes
+   * @returns {Promise<number>} Number of deleted codes
    */
-  cleanupExpired() {
-    const result = this.statements.cleanupExpired.run();
-    return result.changes;
+  async cleanupExpired() {
+    const result = await this.pool.query(
+      'DELETE FROM auth_codes WHERE expires_at < CURRENT_TIMESTAMP'
+    );
+    return result.rowCount;
   }
 }
 

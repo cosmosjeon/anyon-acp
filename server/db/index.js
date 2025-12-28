@@ -1,56 +1,66 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import pg from 'pg';
 import { initializeSchema } from './schema.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
 
-// Determine database path based on environment
+// Get database URL from environment
+const DATABASE_URL = process.env.DATABASE_URL;
 const NODE_ENV = process.env.NODE_ENV || 'development';
-let dbPath;
 
-if (NODE_ENV === 'production') {
-  // In production (bundled Tauri app), use application data directory
-  dbPath = path.join(process.resourcesPath || __dirname, '../data/anyon.db');
-} else {
-  // In development, use local data directory
-  dbPath = path.join(__dirname, '../data/anyon.db');
+if (!DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is required');
+  process.exit(1);
 }
 
-console.log(`📦 Database path: ${dbPath}`);
-
-// Create database connection
-const db = new Database(dbPath, {
-  verbose: NODE_ENV === 'development' ? console.log : undefined,
+// Create connection pool
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
+// Test connection and initialize schema
+pool.connect()
+  .then(async (client) => {
+    console.log('✅ Connected to PostgreSQL database');
+    client.release();
 
-// Enable WAL mode for better concurrent access
-db.pragma('journal_mode = WAL');
-
-// Initialize schema
-initializeSchema(db);
-
-console.log('✅ Database initialized');
+    // Initialize schema
+    await initializeSchema(pool);
+    console.log('✅ Database schema initialized');
+  })
+  .catch((err) => {
+    console.error('❌ Failed to connect to database:', err.message);
+    process.exit(1);
+  });
 
 /**
  * Close database connection gracefully
  */
-export function closeDatabase() {
+export async function closeDatabase() {
   console.log('🔒 Closing database connection...');
-  db.close();
+  await pool.end();
   console.log('✅ Database connection closed');
 }
 
 /**
- * Get database instance
- * @returns {Database} SQLite database instance
+ * Get database pool instance
+ * @returns {Pool} PostgreSQL pool instance
  */
 export function getDatabase() {
-  return db;
+  return pool;
 }
 
-export default db;
+/**
+ * Execute a query
+ * @param {string} text - SQL query
+ * @param {Array} params - Query parameters
+ * @returns {Promise<QueryResult>}
+ */
+export async function query(text, params) {
+  return pool.query(text, params);
+}
+
+export default pool;

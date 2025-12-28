@@ -1,84 +1,36 @@
 import { getDatabase } from '../index.js';
 
 /**
- * User Repository - handles all user CRUD operations
+ * User Repository - handles all user CRUD operations (PostgreSQL)
  */
 class UserRepository {
   constructor() {
-    this.db = getDatabase();
-
-    // Prepare statements for better performance
-    this.statements = {
-      create: this.db.prepare(`
-        INSERT INTO users (id, email, name, profile_picture, google_id, password_hash, email_verified, plan_type, subscription_status, current_period_end)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `),
-
-      findById: this.db.prepare(`
-        SELECT * FROM users WHERE id = ?
-      `),
-
-      findByEmail: this.db.prepare(`
-        SELECT * FROM users WHERE email = ?
-      `),
-
-      findByGoogleId: this.db.prepare(`
-        SELECT * FROM users WHERE google_id = ?
-      `),
-
-      update: this.db.prepare(`
-        UPDATE users
-        SET email = ?, name = ?, profile_picture = ?, google_id = ?, plan_type = ?, subscription_status = ?, current_period_end = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `),
-
-      updateSubscription: this.db.prepare(`
-        UPDATE users
-        SET plan_type = ?, subscription_status = ?, current_period_end = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `),
-
-      verifyEmail: this.db.prepare(`
-        UPDATE users
-        SET email_verified = 1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `),
-
-      updatePassword: this.db.prepare(`
-        UPDATE users
-        SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `),
-
-      delete: this.db.prepare(`
-        DELETE FROM users WHERE id = ?
-      `),
-
-      list: this.db.prepare(`
-        SELECT * FROM users ORDER BY created_at DESC
-      `),
-    };
+    this.pool = getDatabase();
   }
 
   /**
    * Create a new user
    * @param {Object} user - User object
-   * @returns {Object} Created user
+   * @returns {Promise<Object>} Created user
    */
-  create(user) {
+  async create(user) {
     const { id, email, name, profilePicture, googleId, passwordHash, emailVerified, subscription } = user;
 
-    this.statements.create.run(
-      id,
-      email,
-      name,
-      profilePicture || null,
-      googleId || null,
-      passwordHash || null,
-      emailVerified ? 1 : 0,
-      subscription.planType,
-      subscription.status,
-      subscription.currentPeriodEnd || null
+    await this.pool.query(
+      `INSERT INTO users (id, email, name, profile_picture, google_id, password_hash, email_verified, plan_type, subscription_status, current_period_end)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        id,
+        email,
+        name,
+        profilePicture || null,
+        googleId || null,
+        passwordHash || null,
+        emailVerified || false,
+        subscription.planType,
+        subscription.status,
+        subscription.currentPeriodEnd || null
+      ]
     );
 
     return this.findById(id);
@@ -87,51 +39,56 @@ class UserRepository {
   /**
    * Find user by ID
    * @param {string} id - User ID
-   * @returns {Object|null} User object or null
+   * @returns {Promise<Object|null>} User object or null
    */
-  findById(id) {
-    const row = this.statements.findById.get(id);
-    return row ? this._mapRowToUser(row) : null;
+  async findById(id) {
+    const result = await this.pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    return result.rows.length > 0 ? this._mapRowToUser(result.rows[0]) : null;
   }
 
   /**
    * Find user by email
    * @param {string} email - User email
-   * @returns {Object|null} User object or null
+   * @returns {Promise<Object|null>} User object or null
    */
-  findByEmail(email) {
-    const row = this.statements.findByEmail.get(email);
-    return row ? this._mapRowToUser(row) : null;
+  async findByEmail(email) {
+    const result = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    return result.rows.length > 0 ? this._mapRowToUser(result.rows[0]) : null;
   }
 
   /**
    * Find user by Google ID
    * @param {string} googleId - Google OAuth ID
-   * @returns {Object|null} User object or null
+   * @returns {Promise<Object|null>} User object or null
    */
-  findByGoogleId(googleId) {
-    const row = this.statements.findByGoogleId.get(googleId);
-    return row ? this._mapRowToUser(row) : null;
+  async findByGoogleId(googleId) {
+    const result = await this.pool.query('SELECT * FROM users WHERE google_id = $1', [googleId]);
+    return result.rows.length > 0 ? this._mapRowToUser(result.rows[0]) : null;
   }
 
   /**
    * Update user
    * @param {string} id - User ID
    * @param {Object} user - Updated user data
-   * @returns {Object|null} Updated user or null
+   * @returns {Promise<Object|null>} Updated user or null
    */
-  update(id, user) {
+  async update(id, user) {
     const { email, name, profilePicture, googleId, subscription } = user;
 
-    this.statements.update.run(
-      email,
-      name,
-      profilePicture || null,
-      googleId || null,
-      subscription.planType,
-      subscription.status,
-      subscription.currentPeriodEnd || null,
-      id
+    await this.pool.query(
+      `UPDATE users
+       SET email = $1, name = $2, profile_picture = $3, google_id = $4, plan_type = $5, subscription_status = $6, current_period_end = $7, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $8`,
+      [
+        email,
+        name,
+        profilePicture || null,
+        googleId || null,
+        subscription.planType,
+        subscription.status,
+        subscription.currentPeriodEnd || null,
+        id
+      ]
     );
 
     return this.findById(id);
@@ -141,16 +98,16 @@ class UserRepository {
    * Update user subscription
    * @param {string} id - User ID
    * @param {Object} subscription - Subscription data
-   * @returns {Object|null} Updated user or null
+   * @returns {Promise<Object|null>} Updated user or null
    */
-  updateSubscription(id, subscription) {
+  async updateSubscription(id, subscription) {
     const { planType, status, currentPeriodEnd } = subscription;
 
-    this.statements.updateSubscription.run(
-      planType,
-      status,
-      currentPeriodEnd || null,
-      id
+    await this.pool.query(
+      `UPDATE users
+       SET plan_type = $1, subscription_status = $2, current_period_end = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [planType, status, currentPeriodEnd || null, id]
     );
 
     return this.findById(id);
@@ -159,10 +116,13 @@ class UserRepository {
   /**
    * Verify user email
    * @param {string} id - User ID
-   * @returns {Object|null} Updated user or null
+   * @returns {Promise<Object|null>} Updated user or null
    */
-  verifyEmail(id) {
-    this.statements.verifyEmail.run(id);
+  async verifyEmail(id) {
+    await this.pool.query(
+      `UPDATE users SET email_verified = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [id]
+    );
     return this.findById(id);
   }
 
@@ -170,30 +130,33 @@ class UserRepository {
    * Update user password
    * @param {string} id - User ID
    * @param {string} passwordHash - Bcrypt password hash
-   * @returns {Object|null} Updated user or null
+   * @returns {Promise<Object|null>} Updated user or null
    */
-  updatePassword(id, passwordHash) {
-    this.statements.updatePassword.run(passwordHash, id);
+  async updatePassword(id, passwordHash) {
+    await this.pool.query(
+      `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [passwordHash, id]
+    );
     return this.findById(id);
   }
 
   /**
    * Delete user
    * @param {string} id - User ID
-   * @returns {boolean} True if deleted, false otherwise
+   * @returns {Promise<boolean>} True if deleted, false otherwise
    */
-  delete(id) {
-    const result = this.statements.delete.run(id);
-    return result.changes > 0;
+  async delete(id) {
+    const result = await this.pool.query('DELETE FROM users WHERE id = $1', [id]);
+    return result.rowCount > 0;
   }
 
   /**
    * List all users
-   * @returns {Array} Array of user objects
+   * @returns {Promise<Array>} Array of user objects
    */
-  list() {
-    const rows = this.statements.list.all();
-    return rows.map(row => this._mapRowToUser(row));
+  async list() {
+    const result = await this.pool.query('SELECT * FROM users ORDER BY created_at DESC');
+    return result.rows.map(row => this._mapRowToUser(row));
   }
 
   /**
@@ -210,7 +173,7 @@ class UserRepository {
       profilePicture: row.profile_picture,
       googleId: row.google_id,
       passwordHash: row.password_hash,
-      emailVerified: row.email_verified === 1,
+      emailVerified: row.email_verified === true,
       subscription: {
         planType: row.plan_type,
         status: row.subscription_status,

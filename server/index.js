@@ -187,7 +187,7 @@ function verifyToken(token) {
 }
 
 // Middleware: Authenticate request
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -200,7 +200,7 @@ function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
-  const user = userRepository.findById(decoded.userId);
+  const user = await userRepository.findById(decoded.userId);
   if (!user) {
     return res.status(401).json({ error: 'User not found' });
   }
@@ -213,9 +213,9 @@ function authenticate(req, res, next) {
 // Routes
 
 // Dev Login endpoint - simplified version
-app.post('/auth/dev/login', (req, res) => {
+app.post('/auth/dev/login', async (req, res) => {
   // Check if dev user already exists
-  let user = userRepository.findByEmail('dev@example.com');
+  let user = await userRepository.findByEmail('dev@example.com');
 
   if (!user) {
     // Create new dev user
@@ -224,7 +224,7 @@ app.post('/auth/dev/login', (req, res) => {
       name: 'Dev User',
       planType: 'PRO',
     });
-    userRepository.create(user);
+    await userRepository.create(user);
   }
 
   const token = generateToken(user.id);
@@ -265,7 +265,7 @@ app.post('/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = userRepository.findByEmail(email);
+    const existingUser = await userRepository.findByEmail(email);
     if (existingUser) {
       return res.status(409).json({ error: '이미 등록된 이메일입니다' });
     }
@@ -288,17 +288,17 @@ app.post('/auth/register', async (req, res) => {
     };
 
     // Store in database
-    userRepository.create(userWithPassword);
+    await userRepository.create(userWithPassword);
 
     // Generate verification code (15 minutes expiration)
     const code = generateVerificationCode();
     const expiresAt = getExpirationTime(15);
 
     // Delete any existing codes for this user
-    authCodeRepository.deleteUserCodes(user.id, 'EMAIL_VERIFY');
+    await authCodeRepository.deleteUserCodes(user.id, 'EMAIL_VERIFY');
 
     // Store verification code
-    authCodeRepository.createCode(user.id, 'EMAIL_VERIFY', code, expiresAt);
+    await authCodeRepository.createCode(user.id, 'EMAIL_VERIFY', code, expiresAt);
 
     // Send verification email
     await sendVerificationCode(email, name, code);
@@ -324,7 +324,7 @@ app.post('/auth/verify-email', async (req, res) => {
     }
 
     // Find user
-    const user = userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       return res.status(404).json({ error: '사용자를 찾을 수 없습니다' });
     }
@@ -335,37 +335,37 @@ app.post('/auth/verify-email', async (req, res) => {
     }
 
     // Find verification code
-    const authCode = authCodeRepository.findByCode(code, 'EMAIL_VERIFY');
+    const authCode = await authCodeRepository.findByCode(code, 'EMAIL_VERIFY');
     if (!authCode || authCode.user_id !== user.id) {
       return res.status(400).json({ error: '유효하지 않은 인증 코드입니다' });
     }
 
     // Check expiration
     if (isExpired(authCode.expires_at)) {
-      authCodeRepository.deleteCode(authCode.id);
+      await authCodeRepository.deleteCode(authCode.id);
       return res.status(400).json({ error: '인증 코드가 만료되었습니다' });
     }
 
     // Check attempts
     if (authCode.attempts >= 5) {
-      authCodeRepository.deleteCode(authCode.id);
+      await authCodeRepository.deleteCode(authCode.id);
       return res.status(400).json({ error: '인증 시도 횟수를 초과했습니다. 코드를 재전송해주세요.' });
     }
 
     // Increment attempts
-    authCodeRepository.incrementAttempts(authCode.id);
+    await authCodeRepository.incrementAttempts(authCode.id);
 
     // Verify email
-    userRepository.verifyEmail(user.id);
+    await userRepository.verifyEmail(user.id);
 
     // Delete code
-    authCodeRepository.deleteCode(authCode.id);
+    await authCodeRepository.deleteCode(authCode.id);
 
     // Generate JWT token
     const token = generateToken(user.id);
 
     // Get updated user
-    const updatedUser = userRepository.findById(user.id);
+    const updatedUser = await userRepository.findById(user.id);
 
     console.log(`✅ Email verified: ${email}`);
     res.json({
@@ -394,7 +394,7 @@ app.post('/auth/login', loginLimiter, async (req, res) => {
     }
 
     // Find user
-    const user = userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user || !user.passwordHash) {
       return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다' });
     }
@@ -440,7 +440,7 @@ app.post('/auth/resend-code', codeLimiter, async (req, res) => {
     }
 
     // Find user
-    const user = userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       // Don't reveal if user exists (security)
       return res.json({ success: true, message: '인증 코드를 이메일로 전송했습니다' });
@@ -452,13 +452,13 @@ app.post('/auth/resend-code', codeLimiter, async (req, res) => {
     }
 
     // Delete old codes
-    authCodeRepository.deleteUserCodes(user.id, 'EMAIL_VERIFY');
+    await authCodeRepository.deleteUserCodes(user.id, 'EMAIL_VERIFY');
 
     // Generate new code
     const code = generateVerificationCode();
     const expiresAt = getExpirationTime(15);
 
-    authCodeRepository.createCode(user.id, 'EMAIL_VERIFY', code, expiresAt);
+    await authCodeRepository.createCode(user.id, 'EMAIL_VERIFY', code, expiresAt);
 
     // Send email
     await sendVerificationCode(email, user.name, code);
@@ -481,20 +481,20 @@ app.post('/auth/forgot-password', codeLimiter, async (req, res) => {
     }
 
     // Find user
-    const user = userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       // Don't reveal if user exists (security)
       return res.json({ success: true, message: '비밀번호 재설정 코드를 이메일로 전송했습니다' });
     }
 
     // Delete old reset codes
-    authCodeRepository.deleteUserCodes(user.id, 'PASSWORD_RESET');
+    await authCodeRepository.deleteUserCodes(user.id, 'PASSWORD_RESET');
 
     // Generate reset code (1 hour expiration)
     const code = generateVerificationCode();
     const expiresAt = getExpirationTime(60);
 
-    authCodeRepository.createCode(user.id, 'PASSWORD_RESET', code, expiresAt);
+    await authCodeRepository.createCode(user.id, 'PASSWORD_RESET', code, expiresAt);
 
     // Send email
     await sendPasswordResetCode(email, user.name, code);
@@ -523,26 +523,26 @@ app.post('/auth/reset-password', async (req, res) => {
     }
 
     // Find user
-    const user = userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       return res.status(404).json({ error: '사용자를 찾을 수 없습니다' });
     }
 
     // Find reset code
-    const authCode = authCodeRepository.findByCode(code, 'PASSWORD_RESET');
+    const authCode = await authCodeRepository.findByCode(code, 'PASSWORD_RESET');
     if (!authCode || authCode.user_id !== user.id) {
       return res.status(400).json({ error: '유효하지 않은 인증 코드입니다' });
     }
 
     // Check expiration
     if (isExpired(authCode.expires_at)) {
-      authCodeRepository.deleteCode(authCode.id);
+      await authCodeRepository.deleteCode(authCode.id);
       return res.status(400).json({ error: '인증 코드가 만료되었습니다' });
     }
 
     // Check attempts
     if (authCode.attempts >= 5) {
-      authCodeRepository.deleteCode(authCode.id);
+      await authCodeRepository.deleteCode(authCode.id);
       return res.status(400).json({ error: '인증 시도 횟수를 초과했습니다. 코드를 재전송해주세요.' });
     }
 
@@ -550,10 +550,10 @@ app.post('/auth/reset-password', async (req, res) => {
     const passwordHash = await hashPassword(newPassword);
 
     // Update password
-    userRepository.updatePassword(user.id, passwordHash);
+    await userRepository.updatePassword(user.id, passwordHash);
 
     // Delete code
-    authCodeRepository.deleteCode(authCode.id);
+    await authCodeRepository.deleteCode(authCode.id);
 
     console.log(`✅ Password reset: ${email}`);
     res.json({ success: true, message: '비밀번호가 재설정되었습니다' });
@@ -586,7 +586,7 @@ app.post('/auth/logout', authenticate, (req, res) => {
 });
 
 // Update subscription (for testing)
-app.post('/auth/subscription', authenticate, (req, res) => {
+app.post('/auth/subscription', authenticate, async (req, res) => {
   const { planType, status } = req.body;
 
   if (!['FREE', 'PRO'].includes(planType)) {
@@ -603,13 +603,13 @@ app.post('/auth/subscription', authenticate, (req, res) => {
     currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  const updatedUser = userRepository.updateSubscription(req.user.id, subscription);
+  const updatedUser = await userRepository.updateSubscription(req.user.id, subscription);
 
   res.json({ subscription: updatedUser.subscription });
 });
 
 // Development: Create test user
-app.post('/dev/create-user', (req, res) => {
+app.post('/dev/create-user', async (req, res) => {
   const { email, name, planType = 'FREE' } = req.body;
 
   const userName = name || 'Test User';
@@ -620,7 +620,7 @@ app.post('/dev/create-user', (req, res) => {
     planType,
   });
 
-  userRepository.create(user);
+  await userRepository.create(user);
   const token = generateToken(user.id);
 
   res.json({
@@ -636,50 +636,51 @@ app.post('/dev/create-user', (req, res) => {
 });
 
 // Development: List all users
-app.get('/dev/users', (req, res) => {
-  const allUsers = userRepository.list().map(user => ({
+app.get('/dev/users', async (req, res) => {
+  const allUsers = await userRepository.list();
+  const mappedUsers = allUsers.map(user => ({
     id: user.id,
     email: user.email,
     name: user.name,
     subscription: user.subscription,
   }));
 
-  res.json({ users: allUsers });
+  res.json({ users: mappedUsers });
 });
 
 // Get user settings
-app.get('/api/settings', authenticate, (req, res) => {
-  const settings = settingsRepository.getAll(req.user.id);
+app.get('/api/settings', authenticate, async (req, res) => {
+  const settings = await settingsRepository.getAll(req.user.id);
   res.json({ settings });
 });
 
 // Save user settings (full replace)
-app.post('/api/settings', authenticate, (req, res) => {
+app.post('/api/settings', authenticate, async (req, res) => {
   const { settings } = req.body;
 
   if (!settings || typeof settings !== 'object') {
     return res.status(400).json({ error: 'Invalid settings object' });
   }
 
-  settingsRepository.replaceAll(req.user.id, settings);
+  await settingsRepository.replaceAll(req.user.id, settings);
   res.json({ success: true, settings });
 });
 
 // Update specific setting
-app.patch('/api/settings/:key', authenticate, (req, res) => {
+app.patch('/api/settings/:key', authenticate, async (req, res) => {
   const { key } = req.params;
   const { value } = req.body;
 
-  settingsRepository.set(req.user.id, key, value);
+  await settingsRepository.set(req.user.id, key, value);
 
   res.json({ success: true, key, value });
 });
 
 // Delete specific setting
-app.delete('/api/settings/:key', authenticate, (req, res) => {
+app.delete('/api/settings/:key', authenticate, async (req, res) => {
   const { key } = req.params;
 
-  settingsRepository.delete(req.user.id, key);
+  await settingsRepository.delete(req.user.id, key);
 
   res.json({ success: true });
 });
@@ -834,7 +835,7 @@ function calculateCost(model, inputTokens, outputTokens) {
 }
 
 // JWT 토큰 기반 인증 미들웨어 (ANTHROPIC_AUTH_TOKEN 헤더용)
-function authenticateAnthropicStyle(req, res, next) {
+async function authenticateAnthropicStyle(req, res, next) {
   // x-api-key 또는 Authorization 헤더에서 JWT 토큰 추출
   const apiKey = req.headers['x-api-key'];
   const authHeader = req.headers.authorization;
@@ -872,7 +873,7 @@ function authenticateAnthropicStyle(req, res, next) {
     });
   }
 
-  const user = userRepository.findById(decoded.userId);
+  const user = await userRepository.findById(decoded.userId);
   if (!user) {
     return res.status(401).json({
       type: 'error',
@@ -1067,12 +1068,12 @@ const server = app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-const shutdown = (signal) => {
+const shutdown = async (signal) => {
   console.log(`\n${signal} received, shutting down gracefully...`);
 
-  server.close(() => {
+  server.close(async () => {
     console.log('✅ HTTP server closed');
-    closeDatabase();
+    await closeDatabase();
     process.exit(0);
   });
 
