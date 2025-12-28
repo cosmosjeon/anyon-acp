@@ -160,9 +160,10 @@ export const ProjectListView: React.FC = () => {
         const project = await api.createProject(selected);
         console.log('[ProjectListView] Created project:', project);
 
-        // Register the project so it appears in the list
-        await api.registerProject(selected);
-        console.log('[ProjectListView] Registered project');
+        // Register the project using the normalized path from createProject
+        // This ensures consistency when OneDrive or symlinks redirect paths
+        await api.registerProject(project.path);
+        console.log('[ProjectListView] Registered project with normalized path:', project.path);
 
         // Refresh project list and get the updated list
         const updatedProjects = await refreshProjects();

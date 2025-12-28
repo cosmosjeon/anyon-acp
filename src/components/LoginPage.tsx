@@ -3,14 +3,17 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2 } from "@/lib/icons";
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { Terminal, Loader2 } from "@/lib/icons";
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import logo4 from '@/assets/logo4.png';
 
+const API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://auth.any-on.com';
+
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);
-  const devLogin = useAuthStore((state) => state.devLogin);
+  const setAuthState = useAuthStore.setState;
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +37,39 @@ export const LoginPage: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Login failed:', error);
       setError(error.message || '로그인에 실패했습니다');
+      setIsLoading(false);
+    }
+  };
+
+  const handleDevLogin = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await tauriFetch(`${API_URL}/auth/dev/login`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Dev login failed');
+      }
+
+      const data = await response.json();
+      if (data.token) {
+        console.log('Dev Login successful!');
+        setAuthState({
+          user: data.user,
+          subscription: data.subscription,
+          accessToken: data.token,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+      }
+    } catch (error) {
+      console.error('Dev login failed:', error);
+      setError('Dev 로그인에 실패했습니다.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -163,6 +199,24 @@ export const LoginPage: React.FC = () => {
                 <span>로그인</span>
               )}
             </Button>
+
+            {/* Dev Login Button (Development Only) */}
+            {import.meta.env.DEV && (
+              <Button
+                onClick={handleDevLogin}
+                disabled={isLoading}
+                variant="ghost"
+                className="w-full h-10 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                size="lg"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Terminal className="w-4 h-4" />
+                )}
+                Dev Login
+              </Button>
+            )}
 
             {/* 비밀번호 찾기 링크 */}
             <div className="text-center">

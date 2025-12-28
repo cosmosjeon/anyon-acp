@@ -51,6 +51,22 @@ export const VerifyEmailPage: React.FC = () => {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '');
+
+    if (pastedData.length === 0) return;
+
+    const newCode = [...code];
+    for (let i = 0; i < 6 && i < pastedData.length; i++) {
+      newCode[i] = pastedData[i];
+    }
+    setCode(newCode);
+
+    const focusIndex = Math.min(pastedData.length, 5);
+    inputRefs.current[focusIndex]?.focus();
+  };
+
   const handleVerify = async () => {
     const codeString = code.join('');
 
@@ -148,6 +164,7 @@ export const VerifyEmailPage: React.FC = () => {
                 value={digit}
                 onChange={(e) => handleCodeChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
+                onPaste={handlePaste}
                 disabled={isLoading}
                 className="w-12 h-14 text-center text-2xl font-bold bg-card border-border"
               />

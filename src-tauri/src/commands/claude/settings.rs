@@ -6,6 +6,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 use super::helpers::{create_command_with_env, find_claude_binary, get_claude_dir};
 use super::shared::{ClaudeMdFile, ClaudeSettings, ClaudeVersionStatus};
 
@@ -458,6 +464,9 @@ pub async fn init_git_repo(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd.output().await.map_err(|e| {
         log::error!("[Rust] Failed to run git init: {}", e);
