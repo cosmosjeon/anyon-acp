@@ -12,6 +12,7 @@ import {
   FileText,
   Code,
   Search,
+  History,
 } from "@/lib/icons";
 import type { ExecutionMode } from './FloatingPromptInput';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ import type { Project, Session } from '@/lib/api';
 import { api } from '@/lib/api';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
+import { VersionControlPanel } from '@/components/version-control';
 
 // Lazy load components
 const ClaudeCodeSession = lazy(() =>
@@ -55,6 +58,7 @@ interface MaintenanceWorkspaceProps {
 export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ projectId }) => {
   const { goToProject, goToProjectList, goToMvp } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
+  const { t } = useTranslation();
   const [project, setProject] = useState<Project | undefined>(undefined);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionKey, _setSessionKey] = useState(0);
@@ -70,6 +74,10 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [filePanelOpen, setFilePanelOpen] = useState(false);
   const filePanelWidth = 280;
+
+  // Version control panel state
+  const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const versionPanelWidth = 320;
 
   // Right panel state
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
@@ -138,6 +146,11 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
           case '\\':
             e.preventDefault();
             setRightPanelVisible(prev => !prev);
+            break;
+          case 'h':
+          case 'H':
+            e.preventDefault();
+            setVersionPanelOpen(prev => !prev);
             break;
         }
       }
@@ -234,10 +247,10 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
   if (!project && !loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
-        <p className="text-muted-foreground">Project not found</p>
+        <p className="text-muted-foreground">{t('maintenance.errors.notFound')}</p>
         <Button variant="outline" onClick={() => goToProjectList()}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Projects
+          {t('maintenance.errors.backButton')}
         </Button>
       </div>
     );
@@ -285,7 +298,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
             className="h-full border-r border-border bg-background flex flex-col overflow-hidden flex-shrink-0"
           >
             <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-sm font-medium">Files</span>
+              <span className="text-sm font-medium">{t('maintenance.files.title')}</span>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setFilePanelOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
@@ -325,20 +338,20 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                 },
               },
               {
-                label: '유지보수',
+                label: t('maintenance.breadcrumb.maintenance'),
                 icon: <Wrench className="w-4 h-4" />,
                 dropdownOptions: [
                   {
-                    label: 'MVP 개발',
+                    label: t('maintenance.breadcrumb.mvp'),
                     value: 'mvp',
                     icon: <Lightbulb className="w-4 h-4" />,
-                    description: '새로운 기능 개발',
+                    description: t('maintenance.breadcrumb.mvpDesc'),
                   },
                   {
-                    label: '유지보수',
+                    label: t('maintenance.breadcrumb.maintenance'),
                     value: 'maintenance',
                     icon: <Wrench className="w-4 h-4" />,
-                    description: '버그 수정 및 개선',
+                    description: t('maintenance.breadcrumb.maintenanceDesc'),
                   },
                 ],
                 dropdownValue: 'maintenance',
@@ -350,19 +363,37 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
               },
             ]}
           />
-          {/* Panel Toggle Button */}
-          <button
-            onClick={() => setRightPanelVisible(prev => !prev)}
-            className={cn(
-              'p-2 rounded-md transition-colors',
-              rightPanelVisible
-                ? 'text-primary hover:bg-primary/10'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            )}
-            title={rightPanelVisible ? '패널 숨기기 (Cmd+\\)' : '패널 보기 (Cmd+\\)'}
-          >
-            {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
-          </button>
+          {/* Header Buttons */}
+          <div className="flex items-center gap-1">
+            {/* Version Control Toggle Button */}
+            <button
+              onClick={() => setVersionPanelOpen(prev => !prev)}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors',
+                versionPanelOpen
+                  ? 'text-primary bg-primary/10'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+              title={versionPanelOpen ? '버전 관리 닫기 (Cmd+H)' : '버전 관리 열기 (Cmd+H)'}
+            >
+              <History className="w-4 h-4" />
+              <span>버전관리</span>
+            </button>
+
+            {/* Panel Toggle Button */}
+            <button
+              onClick={() => setRightPanelVisible(prev => !prev)}
+              className={cn(
+                'p-2 rounded-md transition-colors',
+                rightPanelVisible
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+              title={rightPanelVisible ? t('maintenance.panelToggle.hide') : t('maintenance.panelToggle.show')}
+            >
+              {rightPanelVisible ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Chat Content */}
@@ -384,6 +415,24 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
           </Suspense>
         </div>
       </div>
+
+      {/* Version Control Panel */}
+      <AnimatePresence>
+        {versionPanelOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: versionPanelWidth, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="h-full border-l border-border bg-background flex flex-col overflow-hidden flex-shrink-0"
+          >
+            <VersionControlPanel
+              projectPath={project?.path}
+              onClose={() => setVersionPanelOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Right Panel (Planning/Development) */}
       <AnimatePresence>
@@ -421,7 +470,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                     )}
                   >
                     <FileText className="w-4 h-4" />
-                    <span>계획 세우기</span>
+                    <span>{t('maintenance.tabs.planning')}</span>
                     {isSessionLoading && activeTab === 'planning' && (
                       <Loader2 className="w-3 h-3 animate-spin ml-1" />
                     )}
@@ -440,7 +489,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                     )}
                   >
                     <Code className="w-4 h-4" />
-                    <span>개발</span>
+                    <span>{t('maintenance.tabs.development')}</span>
                     {isSessionLoading && activeTab === 'development' && (
                       <Loader2 className="w-3 h-3 animate-spin ml-1" />
                     )}
@@ -457,15 +506,15 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                       <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
                         <Search className="w-8 h-8 text-violet-600 dark:text-violet-400" />
                       </div>
-                      <p className="text-lg font-medium mb-2">문제 분석 & 계획 수립</p>
+                      <p className="text-lg font-medium mb-2">{t('maintenance.planning.title')}</p>
                       <p className="text-sm text-muted-foreground mb-6">
-                        채팅으로 버그를 분석하고 수정 계획을 세우세요.
+                        {t('maintenance.planning.description')}
                       </p>
 
                       {/* 계획 완료 안내 */}
                       <div className="pt-6 border-t border-border">
                         <p className="text-xs text-muted-foreground mb-3">
-                          계획이 완료되었나요?
+                          {t('maintenance.planning.complete')}
                         </p>
                         <Button
                           onClick={() => setActiveTab('development')}
@@ -474,7 +523,7 @@ export const MaintenanceWorkspace: React.FC<MaintenanceWorkspaceProps> = ({ proj
                           disabled={isSessionLoading}
                         >
                           <ArrowRight className="w-4 h-4" />
-                          개발 탭으로 이동
+                          {t('maintenance.planning.nextButton')}
                         </Button>
                       </div>
                     </div>

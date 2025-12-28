@@ -22,6 +22,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { claudeAuthApi } from "@/lib/api";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import logoAnyon from "@/assets/logo-anyon.png";
+import { EnvironmentSetupStep } from "./EnvironmentSetupStep";
 
 const ONBOARDING_STORAGE_KEY = "anyon-onboarding-completed";
 
@@ -69,10 +70,10 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   const { t } = useTranslation();
   const { accessToken, isAuthenticated } = useAuthStore();
 
-  // Step management (0: auth, 1-4: workflow slides)
+  // Step management (0: environment, 1: auth, 2-5: workflow slides)
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState(0);
-  const totalSteps = 5;
+  const totalSteps = 6;
 
   // Auth state
   const [selectedAuth, setSelectedAuth] = useState<AuthMethod>(null);
@@ -127,7 +128,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       setDirection(1);
       setCurrentStep(prev => prev + 1);
       // Reset auth state when moving from auth step
-      if (currentStep === 0) {
+      if (currentStep === 1) {
         setAuthSuccess(false);
         setAuthError(null);
       }
@@ -271,6 +272,23 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           <div className="min-h-[420px] flex flex-col">
             <AnimatePresence mode="wait" custom={direction}>
               {currentStep === 0 ? (
+                // Environment Setup Step
+                <motion.div
+                  key="environment"
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2 }}
+                  className="flex-1"
+                >
+                  <EnvironmentSetupStep
+                    onComplete={goToNext}
+                    onSkip={goToNext}
+                  />
+                </motion.div>
+              ) : currentStep === 1 ? (
                 // Auth Selection Step
                 <motion.div
                   key="auth"
@@ -473,7 +491,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                   )}
                 </motion.div>
               ) : (
-                // Workflow Slides
+                // Workflow Slides (currentStep 2-5 -> index 0-3)
                 <motion.div
                   key={`slide-${currentStep}`}
                   custom={direction}
@@ -485,13 +503,13 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                   className="flex-1 p-6 pt-10 flex flex-col items-center justify-center text-center"
                 >
                   <div className="mb-6">
-                    {workflowSlides[currentStep - 1].icon}
+                    {workflowSlides[currentStep - 2].icon}
                   </div>
                   <h2 className="text-xl font-semibold mb-3">
-                    {t(workflowSlides[currentStep - 1].titleKey)}
+                    {t(workflowSlides[currentStep - 2].titleKey)}
                   </h2>
                   <p className="text-muted-foreground">
-                    {t(workflowSlides[currentStep - 1].descKey)}
+                    {t(workflowSlides[currentStep - 2].descKey)}
                   </p>
                 </motion.div>
               )}
@@ -512,8 +530,8 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                 ))}
               </div>
 
-              {/* Navigation buttons */}
-              {currentStep > 0 && (
+              {/* Navigation buttons - hide on environment step (0) */}
+              {currentStep > 1 && (
                 <div className="flex gap-2">
                   <Button
                     variant="outline"

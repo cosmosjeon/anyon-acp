@@ -173,13 +173,20 @@ html {
    PLATFORM-SPECIFIC STYLES
    ============================================================ */
 
+/* Dark mode shadows (default) */
 html.is-macos body {
-  box-shadow: inset 0 0 0 1px var(--color-border);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px var(--color-border);
 }
 
 html.is-windows body {
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 0 0 1px var(--color-border);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px var(--color-border);
 }
 
 html.is-windows html {
@@ -189,12 +196,40 @@ html.is-windows html {
 
 html.is-linux body {
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 0 0 1px var(--color-border);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px var(--color-border);
 }
 
 html.is-linux html {
   border-radius: 10px;
   clip-path: inset(0 round 10px);
+}
+
+/* Light mode shadows - softer for light backgrounds */
+.light.is-macos body,
+html.is-macos .light body {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px var(--color-border);
+}
+
+.light.is-windows body,
+html.is-windows .light body {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    inset 0 0 0 1px var(--color-border);
+}
+
+.light.is-linux body,
+html.is-linux .light body {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px var(--color-border);
 }
 
 /* ============================================================
@@ -968,13 +1003,13 @@ button:focus-visible,
 }
 
 /* Logo and video inversion for light/dark mode */
-/* Dark mode: invert black images to white */
-:not(.light) .logo-invert,
-:not(.light) .video-invert {
+/* Dark mode (default): invert black logos to white */
+.logo-invert,
+.video-invert {
   filter: invert(1);
 }
 
-/* Light mode: keep black images as black */
+/* Light mode: keep black logos as black */
 .light .logo-invert,
 .light .video-invert {
   filter: invert(0);
