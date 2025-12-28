@@ -496,6 +496,9 @@ pub async fn init_git_repo(
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
+        #[cfg(target_os = "windows")]
+        commit_cmd.creation_flags(CREATE_NO_WINDOW);
+
         match commit_cmd.output().await {
             Ok(commit_output) => {
                 let commit_success = commit_output.status.success();
@@ -543,6 +546,9 @@ pub async fn git_add_all(project_path: String) -> Result<NpxRunResult, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
     let output = cmd
         .output()
         .await
@@ -570,6 +576,9 @@ pub async fn git_commit(project_path: String, message: String) -> Result<NpxRunR
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd
         .output()
@@ -607,6 +616,10 @@ pub async fn git_set_remote(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    remove_cmd.creation_flags(CREATE_NO_WINDOW);
+
     let _ = remove_cmd.output().await;
 
     // Add new origin
@@ -615,6 +628,9 @@ pub async fn git_set_remote(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd
         .output()
@@ -662,6 +678,10 @@ pub async fn git_push(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    set_remote.creation_flags(CREATE_NO_WINDOW);
+
     let _ = set_remote.output().await;
 
     // Push
@@ -670,6 +690,9 @@ pub async fn git_push(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd
         .output()
@@ -683,6 +706,10 @@ pub async fn git_push(
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    reset_remote.creation_flags(CREATE_NO_WINDOW);
+
     let _ = reset_remote.output().await;
 
     Ok(NpxRunResult {
@@ -707,6 +734,9 @@ pub async fn git_status(project_path: String) -> Result<NpxRunResult, String> {
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd
         .output()
@@ -735,6 +765,9 @@ pub async fn git_current_branch(project_path: String) -> Result<NpxRunResult, St
         .current_dir(&path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd
         .output()
