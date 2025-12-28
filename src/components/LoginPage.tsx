@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Terminal, Loader2 } from "@/lib/icons";
+import { Loader2 } from "@/lib/icons";
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
 import anyonTextLogo from '@/assets/ANYON.png';
@@ -33,32 +33,6 @@ export const LoginPage: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Login failed:', error);
       setError(error.message || '로그인에 실패했습니다');
-      setIsLoading(false);
-    }
-  };
-
-  const handleDevLogin = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await tauriFetch(`${API_URL}/auth/dev/login`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Dev login failed');
-      }
-
-      const data = await response.json();
-      if (data.token) {
-        console.log('Dev Login successful!');
-        await login(data.token);
-      }
-    } catch (error) {
-      console.error('Dev login failed:', error);
-      setError('Dev 로그인에 실패했습니다.');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -198,24 +172,6 @@ export const LoginPage: React.FC = () => {
               </Link>
             </div>
           </form>
-
-          {/* Dev Login Button (Development Only) */}
-          {import.meta.env.DEV && (
-            <Button
-              onClick={handleDevLogin}
-              disabled={isLoading}
-              variant="ghost"
-              className="w-full h-10 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-              size="lg"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Terminal className="w-4 h-4" />
-              )}
-              Dev Login
-            </Button>
-          )}
 
           {/* 구분선 */}
           <div className="relative">
