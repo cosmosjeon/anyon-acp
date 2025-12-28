@@ -236,8 +236,14 @@ fn setup_auth_server() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Setup window effects (vibrancy, mica)
+/// Setup window effects (vibrancy, mica) and constraints
 fn setup_window_effects(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // Set minimum window size constraint (ensures it works with transparent/decorationless windows)
+    if let Some(window) = app.get_webview_window("main") {
+        use tauri::PhysicalSize;
+        let _ = window.set_min_size(Some(PhysicalSize::new(800, 600)));
+    }
+
     // Apply window vibrancy with rounded corners on macOS
     #[cfg(target_os = "macos")]
     {
@@ -438,6 +444,10 @@ macro_rules! create_handlers {
             commands::git::get_git_diff_summary,
             commands::git::get_git_log,
             commands::git::get_git_changes_count,
+            // Environment Check
+            commands::environment::check_environment_status,
+            commands::environment::open_terminal,
+            commands::environment::open_url,
         ]
     };
 }
