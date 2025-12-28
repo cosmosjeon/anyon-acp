@@ -10,6 +10,7 @@ import logo4 from '@/assets/logo4.png';
 
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);
+  const devLogin = useAuthStore((state) => state.devLogin);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
