@@ -1,6 +1,6 @@
 [package]
 name = "anyon"
-version = "0.0.10"
+version = "0.0.11"
 description = "AI-Powered Development Platform"
 authors = ["mufeedvh", "123vviekr"]
 license = "AGPL-3.0"
