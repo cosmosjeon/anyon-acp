@@ -9,6 +9,7 @@ import { Breadcrumb } from '@/components/Breadcrumb';
 import { useProjects, useProjectsNavigation } from '@/components/ProjectRoutes';
 import { api } from '@/lib/api';
 import type { Project } from '@/lib/api';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // Cross-platform project name extractor (handles / and \\)
 const getProjectName = (path: string): string => {
@@ -32,6 +33,7 @@ interface WorkspaceSelectorProps {
 export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId }) => {
   const { goToProjectList, goToMvp, goToMaintenance } = useProjectsNavigation();
   const { projects, loading, getProjectById } = useProjects();
+  const { t } = useTranslation();
   const [project, setProject] = useState<Project | undefined>(undefined);
 
   useEffect(() => {
@@ -132,7 +134,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
             <Breadcrumb
               items={[
                 {
-                  label: 'Projects',
+                  label: t('workspaceSelector.breadcrumb.projects'),
                   onClick: goToProjectList,
                   icon: <FolderOpen className="w-4 h-4" />,
                 },
@@ -153,7 +155,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
               className="text-center mb-12"
             >
               <h2 className="text-2xl font-medium text-muted-foreground">
-                What would you like to do?
+                {t('workspaceSelector.prompt')}
               </h2>
             </motion.div>
 
@@ -166,8 +168,8 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
               >
                 <SelectionCard
                   iconImage={mvpTabIcon}
-                  title="MVP Development"
-                  description="Build new features with AI-assisted planning and documentation"
+                  title={t('workspaceSelector.mvp.title')}
+                  description={t('workspaceSelector.mvp.description')}
                   onClick={handleSelectMvp}
                 />
               </motion.div>
@@ -179,8 +181,8 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ projectId 
               >
                 <SelectionCard
                   iconImage={maintainTabIcon}
-                  title="Maintenance"
-                  description="Fix bugs, refactor code, and maintain existing features"
+                  title={t('workspaceSelector.maintenance.title')}
+                  description={t('workspaceSelector.maintenance.description')}
                   onClick={handleSelectMaintenance}
                 />
               </motion.div>

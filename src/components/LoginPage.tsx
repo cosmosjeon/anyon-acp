@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Terminal, Loader2 } from "@/lib/icons";
 import { CustomTitlebar } from '@/components/CustomTitlebar';
 import anyonLogo from '@/assets/logo-anyon.png';
-import anyonTextLogo from '@/assets/ANYON.png';
+import logo4 from '@/assets/logo4.png';
 
 export const LoginPage: React.FC = () => {
   const login = useAuthStore((state) => state.login);
@@ -70,14 +70,14 @@ export const LoginPage: React.FC = () => {
   }, [isAuthenticated]);
 
   return (
-    <div className="h-full flex relative">
+    <div className="min-h-full h-full flex flex-col lg:flex-row relative">
       {/* 타이틀바 - 전체 화면 위에 오버레이 */}
       <div className="absolute top-0 left-0 right-0 z-50">
         <CustomTitlebar className="!bg-transparent !border-none !backdrop-blur-none" />
       </div>
 
       {/* 왼쪽: 브랜드 비주얼 영역 */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#0a0a0a]" style={{ clipPath: 'inset(0)' }}>
+      <div className="hidden lg:flex lg:w-1/2 lg:min-h-full relative bg-[#0a0a0a]" style={{ clipPath: 'inset(0)' }}>
         {/* 배경 장식 요소 */}
         <div className="absolute inset-0">
           {/* 중앙에서 바깥으로 퍼지는 흑백 그라데이션 */}
@@ -122,17 +122,17 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* 오른쪽: 로그인 폼 영역 */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-sm space-y-8">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-background overflow-y-auto">
+        <div className="w-full max-w-sm space-y-6 sm:space-y-8 py-16 sm:py-8">
           {/* 로고 */}
           <div className="text-center">
-            <img src={anyonTextLogo} alt="ANYON" className="h-12 mx-auto logo-invert" />
+<img src={logo4} alt="ANYON" className="h-8 mx-auto dark:invert" />
           </div>
 
           {/* 환영 메시지 */}
           <div className="text-center space-y-2">
-            <h2 className="text-2xl font-semibold text-foreground">
-              Welcome back
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
+              Welcome
             </h2>
             <p className="text-muted-foreground">
               계정에 로그인하여 시작하세요
@@ -146,7 +146,7 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* 로그인 폼 */}
+{/* 로그인 폼 */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Input
@@ -175,7 +175,8 @@ export const LoginPage: React.FC = () => {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 flex items-center justify-center gap-3 text-base"
+              variant="outline"
+              className="w-full h-11 sm:h-12 flex items-center justify-center gap-3 text-sm sm:text-base bg-card hover:bg-accent transition-all duration-200"
               size="lg"
             >
               {isLoading ? (
@@ -238,7 +239,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* 약관 */}
-          <p className="text-center text-xs text-muted-foreground leading-relaxed">
+          <p className="text-center text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
             로그인하면{' '}
             <a href="#" className="underline underline-offset-2 hover:text-foreground transition-colors">
               이용약관
